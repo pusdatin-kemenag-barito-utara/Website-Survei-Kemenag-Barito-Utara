@@ -6,6 +6,8 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { I18nProvider } from '@/components/shared/I18nProvider'
 import { useState, type ReactNode } from 'react'
 
+import { MaintenanceListener } from '@/components/providers/maintenance-listener'
+
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
 
@@ -13,6 +15,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <TooltipProvider>
+          <MaintenanceListener />
           {children}
           <Toaster />
         </TooltipProvider>
@@ -20,3 +23,4 @@ export function Providers({ children }: { children: ReactNode }) {
     </QueryClientProvider>
   )
 }
+
