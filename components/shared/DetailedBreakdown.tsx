@@ -102,48 +102,62 @@ export function DetailedBreakdown({ indexType, serviceFilter, summary, byService
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
-      {/* Table Unsur */}
+      {/* Table 1: Rincian Nilai Per Unsur */}
       <Card className="border border-slate-200/80 dark:border-gray-800 shadow-xl shadow-slate-200/40 dark:shadow-black/20 bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
-        <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-6">
-          <CardTitle className="text-center text-sm sm:text-base text-slate-900 dark:text-white font-extrabold uppercase leading-relaxed">
-            Rekapitulasi Nilai Survei {indexType === 'IPKP' ? 'Indeks Persepsi Kualitas Pelayanan (IPKP)' : 'Indeks Persepsi Anti Korupsi (IPAK)'}
-            <br/><span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">{serviceFilter === 'all' ? 'Semua Layanan' : serviceFilter}</span>
+        <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4 sm:p-5">
+          <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">
+            Rekapitulasi Nilai Per Unsur
           </CardTitle>
+          <p className="text-xs text-slate-400 font-medium mt-0.5">
+            Tabel rincian kalkulasi indikator {indexType === 'IPKP' ? 'IPKP (9 Unsur)' : 'IPAK (5 Unsur)'}
+          </p>
         </CardHeader>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50/80 dark:bg-gray-800/60">
-              <TableRow className="border-b border-slate-100 dark:border-gray-800">
-                <TableHead className="w-14 font-extrabold text-slate-700 uppercase tracking-wider text-center">No</TableHead>
-                <TableHead className="font-extrabold text-slate-700 uppercase tracking-wider">Unsur</TableHead>
-                <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider">Jumlah Pertanyaan</TableHead>
-                <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider">Total Nilai</TableHead>
-                <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider border-x border-slate-100 dark:border-gray-800">Nilai Rata-Rata Unsur</TableHead>
-                <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider border-x border-slate-100 dark:border-gray-800">Nilai Rata-Rata Tertimbang Unsur</TableHead>
+        <div className="overflow-x-auto w-full">
+          <Table className="min-w-[640px] sm:min-w-full">
+            <TableHeader className="bg-slate-50/80 dark:bg-gray-800/60 text-[11px] sm:text-xs">
+              <TableRow>
+                <TableHead className="w-12 text-center font-extrabold text-slate-700 dark:text-slate-300">No</TableHead>
+                <TableHead className="min-w-[180px] font-extrabold text-slate-700 dark:text-slate-300">Unsur Pelayanan</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap">Jml Soal</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap">Total Nilai</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800">Rata-Rata</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800">Rata-Rata Tertimbang</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {unsurData.map((u, i) => (
-                <TableRow key={i} className="hover:bg-slate-50/80 dark:hover:bg-gray-800/50 transition-colors">
-                  <TableCell className="text-center font-mono font-bold text-slate-400 text-xs">{i + 1}</TableCell>
-                  <TableCell className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">{u.unsur_name}</TableCell>
-                  <TableCell className="text-center font-bold text-xs">{u.jumlah_pertanyaan}</TableCell>
-                  <TableCell className="text-center font-bold text-xs">{u.total_nilai}</TableCell>
-                  <TableCell className="text-center font-mono font-bold text-xs">{u.rataRata.toFixed(2)}</TableCell>
-                  <TableCell className="text-center font-mono font-bold text-xs text-emerald-700 dark:text-emerald-400">{u.tertimbang.toFixed(2)}</TableCell>
+                <TableRow key={i} className="hover:bg-slate-50/80 dark:hover:bg-gray-800/50 transition-colors text-xs">
+                  <TableCell className="text-center font-mono font-bold text-slate-400 py-2.5 sm:py-3">{i + 1}</TableCell>
+                  <TableCell className="font-bold text-slate-800 dark:text-slate-200 py-2.5 sm:py-3">{u.unsur_name}</TableCell>
+                  <TableCell className="text-center font-bold text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">{u.jumlah_pertanyaan}</TableCell>
+                  <TableCell className="text-center font-bold text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">{u.total_nilai}</TableCell>
+                  <TableCell className="text-center font-mono font-bold text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">{u.rataRata.toFixed(2)}</TableCell>
+                  <TableCell className="text-center font-mono font-bold text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3">{u.tertimbang.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
-              <TableRow className="bg-slate-50/80 dark:bg-gray-800/60 font-extrabold text-xs">
-                <TableCell colSpan={5} className="text-center text-slate-700 dark:text-slate-300">Indeks Survei {indexType === 'IPKP' ? 'Indeks Persepsi Kualitas Pelayanan (IPKP)' : 'Indeks Persepsi Anti Korupsi (IPAK)'}</TableCell>
-                <TableCell className="text-center text-emerald-700 dark:text-emerald-400">{scoreData.nilai_index.toFixed(2)} ({locale === 'id' ? NILAI_MUTU[scoreData.mutu]?.label_id : NILAI_MUTU[scoreData.mutu]?.label_en})</TableCell>
+              <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs border-t-2 border-slate-200 dark:border-gray-700">
+                <TableCell colSpan={5} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
+                  Indeks Survei ({indexType})
+                </TableCell>
+                <TableCell className="text-center text-emerald-700 dark:text-emerald-400 font-mono py-2.5 sm:py-3 whitespace-nowrap">
+                  {scoreData.nilai_index.toFixed(2)} ({locale === 'id' ? NILAI_MUTU[scoreData.mutu]?.label_id : NILAI_MUTU[scoreData.mutu]?.label_en})
+                </TableCell>
               </TableRow>
-              <TableRow className="bg-slate-50/80 dark:bg-gray-800/60 font-extrabold text-xs">
-                <TableCell colSpan={5} className="text-center text-slate-700 dark:text-slate-300">Konversi</TableCell>
-                <TableCell className="text-center text-emerald-700 dark:text-emerald-400">{scoreData.konversi.toFixed(2)}</TableCell>
+              <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs">
+                <TableCell colSpan={5} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
+                  Nilai Konversi
+                </TableCell>
+                <TableCell className="text-center text-emerald-700 dark:text-emerald-400 font-mono py-2.5 sm:py-3 whitespace-nowrap">
+                  {scoreData.konversi.toFixed(2)}
+                </TableCell>
               </TableRow>
-              <TableRow className="bg-slate-50/80 dark:bg-gray-800/60 font-extrabold text-xs">
-                <TableCell colSpan={5} className="text-center text-slate-700 dark:text-slate-300">Mutu Pelayanan</TableCell>
-                <TableCell className="text-center text-emerald-700 dark:text-emerald-400">{scoreData.mutu} ({locale === 'id' ? NILAI_MUTU[scoreData.mutu]?.label_id : NILAI_MUTU[scoreData.mutu]?.label_en})</TableCell>
+              <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs">
+                <TableCell colSpan={5} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
+                  Mutu Pelayanan
+                </TableCell>
+                <TableCell className="text-center text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3 whitespace-nowrap">
+                  {scoreData.mutu} ({locale === 'id' ? NILAI_MUTU[scoreData.mutu]?.label_id : NILAI_MUTU[scoreData.mutu]?.label_en})
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>

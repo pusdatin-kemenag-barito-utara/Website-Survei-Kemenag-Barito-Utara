@@ -270,7 +270,7 @@ export default function BarcodePage() {
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 dark:border-gray-800 w-full flex items-center justify-center gap-2">
-                    <Image src="/hapakat.png" alt="HAPAKAT" width={100} height={32} className="object-contain opacity-80" />
+                    <Image src="/hapakat.png" alt="HAPAKAT" width={100} height={32} style={{ width: 'auto', height: 'auto' }} className="object-contain opacity-80" />
                   </div>
 
                   {/* Action Buttons */}

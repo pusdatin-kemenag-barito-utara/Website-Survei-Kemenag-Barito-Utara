@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, Legend, PieChart, Pie, Cell,
+  Legend, PieChart, Pie, Cell, LabelList, AreaChart, Area,
 } from 'recharts'
 import { FileSpreadsheet, FileText, Filter, Users, GraduationCap, UserCheck, Briefcase } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -363,18 +363,19 @@ export default function HasilPage() {
                       <Pie
                         data={parseDemoFieldData('jenis_kelamin')}
                         cx="50%"
-                        cy="50%"
-                        innerRadius={45}
-                        outerRadius={75}
+                        cy="45%"
+                        innerRadius={40}
+                        outerRadius={68}
                         paddingAngle={4}
                         dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                        labelLine={true}
                       >
                         {parseDemoFieldData('jenis_kelamin').map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={['#06b6d4', '#ec4899', '#f59e0b', '#10b981'][index % 4]} />
                         ))}
                       </Pie>
                       <Tooltip contentStyle={{ borderRadius: '14px', fontWeight: 600, fontSize: '11px' }} />
-                      <Legend verticalAlign="bottom" height={32} wrapperStyle={{ fontSize: '11px', fontWeight: 600 }} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -394,7 +395,7 @@ export default function HasilPage() {
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={parseDemoFieldData('pendidikan')}>
+                    <BarChart data={parseDemoFieldData('pendidikan')} margin={{ top: 20, right: 4, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-35} textAnchor="end" height={55} />
                       <YAxis tick={{ fontSize: 10, fontWeight: 600 }} allowDecimals={false} />
@@ -403,6 +404,7 @@ export default function HasilPage() {
                         {parseDemoFieldData('pendidikan').map((_, index) => (
                           <Cell key={`cell-${index}`} fill={['#f59e0b', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444', '#64748b'][index % 8]} />
                         ))}
+                        <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -423,7 +425,7 @@ export default function HasilPage() {
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={parseDemoFieldData('usia')}>
+                    <BarChart data={parseDemoFieldData('usia')} margin={{ top: 20, right: 4, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-35} textAnchor="end" height={55} />
                       <YAxis tick={{ fontSize: 10, fontWeight: 600 }} allowDecimals={false} />
@@ -432,6 +434,7 @@ export default function HasilPage() {
                         {parseDemoFieldData('usia').map((_, index) => (
                           <Cell key={`cell-${index}`} fill={['#f43f5e', '#ec4899', '#f59e0b', '#eab308', '#84cc16'][index % 5]} />
                         ))}
+                        <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -452,7 +455,7 @@ export default function HasilPage() {
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={parseDemoFieldData('pekerjaan')}>
+                    <BarChart data={parseDemoFieldData('pekerjaan')} margin={{ top: 20, right: 4, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-35} textAnchor="end" height={55} />
                       <YAxis tick={{ fontSize: 10, fontWeight: 600 }} allowDecimals={false} />
@@ -461,6 +464,7 @@ export default function HasilPage() {
                         {parseDemoFieldData('pekerjaan').map((_, index) => (
                           <Cell key={`cell-${index}`} fill={['#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6'][index % 6]} />
                         ))}
+                        <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -484,12 +488,14 @@ export default function HasilPage() {
                   <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={parseUnsurBarData()}>
+                    <BarChart data={parseUnsurBarData()} margin={{ top: 24, right: 4, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-25} textAnchor="end" height={60} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontWeight: 600 }} />
+                      <YAxis domain={[0, 110]} tick={{ fontSize: 11, fontWeight: 600 }} />
                       <Tooltip contentStyle={{ borderRadius: '16px', fontWeight: 600, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }} />
-                      <Bar dataKey="Nilai Konversi" fill="#10b981" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="Nilai Konversi" fill="#10b981" radius={[8, 8, 0, 0]}>
+                        <LabelList dataKey="Nilai Konversi" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#059669' }} formatter={(v: unknown) => typeof v === 'number' ? v.toFixed(1) : String(v)} />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -507,14 +513,32 @@ export default function HasilPage() {
                   <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={parseTrendData()}>
+                    <AreaChart data={parseTrendData()} margin={{ top: 12, right: 10, left: -10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorTrendHasil" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0d9488" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#0d9488" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="bulanLabel" tick={{ fontSize: 11, fontWeight: 700 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontWeight: 600 }} />
-                      <Tooltip contentStyle={{ borderRadius: '16px', fontWeight: 600 }} />
-                      <Line type="monotone" dataKey="Nilai Konversi" stroke="#0d9488" strokeWidth={3} dot={{ fill: '#0d9488', r: 6 }} />
-                      <Legend />
-                    </LineChart>
+                      <XAxis dataKey="bulanLabel" tick={{ fontSize: 10, fontWeight: 700 }} tickLine={false} />
+                      <YAxis domain={['auto', 100]} tick={{ fontSize: 10, fontWeight: 600 }} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '16px', fontWeight: 600, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
+                        formatter={(val: unknown) => [typeof val === 'number' ? val.toFixed(2) : String(val ?? ''), 'Nilai Konversi']}
+                      />
+                      <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '12px', fontSize: '11px', fontWeight: 700 }} />
+                      <Area 
+                        type="monotone" 
+                        dataKey="Nilai Konversi" 
+                        name="Nilai Konversi" 
+                        stroke="#0d9488" 
+                        strokeWidth={3} 
+                        fillOpacity={1} 
+                        fill="url(#colorTrendHasil)" 
+                        activeDot={{ r: 7, strokeWidth: 3, stroke: '#ffffff', fill: '#0d9488' }}
+                      />
+                    </AreaChart>
                   </ResponsiveContainer>
                 )}
               </CardContent>

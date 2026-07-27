@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, Legend, PieChart, Pie, Cell,
+  Legend, PieChart, Pie, Cell, LabelList, AreaChart, Area,
 } from 'recharts'
 import { FileSpreadsheet, FileText, Filter, Users, GraduationCap, UserCheck, Briefcase } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -37,8 +37,12 @@ export default function ArsipPage() {
     case 'q2': periodName = isEn ? 'Quarter 2' : 'Triwulan II'; break;
     case 'q3': periodName = isEn ? 'Quarter 3' : 'Triwulan III'; break;
     case 'q4': periodName = isEn ? 'Quarter 4' : 'Triwulan IV'; break;
-    case 'sem1': periodName = isEn ? 'Semester 1' : 'Semester 1'; break;
-    case 'sem2': periodName = isEn ? 'Semester 2' : 'Semester 2'; break;
+    case 'sem1':
+    case 's1':
+      periodName = isEn ? 'Semester 1' : 'Semester I'; break;
+    case 'sem2':
+    case 's2':
+      periodName = isEn ? 'Semester 2' : 'Semester II'; break;
     case 'tahunan': periodName = isEn ? 'Annual' : 'Tahunan'; break;
   }
   
@@ -70,17 +74,21 @@ export default function ArsipPage() {
     } else if (p === 'q4') {
       startDate = `${y}-10-01`
       endDate = `${y}-12-31`
-    } else if (p === 'sem1') {
+    } else if (p === 'sem1' || p === 's1') {
+      // Semester I: Triwulan I + Triwulan II (1 Januari - 30 Juni)
       startDate = `${y}-01-01`
       endDate = `${y}-06-30`
-    } else if (p === 'sem2') {
+    } else if (p === 'sem2' || p === 's2') {
+      // Semester II: Triwulan III + Triwulan IV (1 Juli - 31 Desember)
       startDate = `${y}-07-01`
       endDate = `${y}-12-31`
     }
     
     return {
-      start: `${startDate}T00:00:00.000Z`,
-      end: `${endDate}T23:59:59.999Z`
+      start: `${startDate}T00:00:00`,
+      end: `${endDate}T23:59:59`,
+      rawStart: startDate,
+      rawEnd: endDate
     }
   }
 
@@ -99,13 +107,235 @@ export default function ArsipPage() {
         supabase.from('services').select('*').eq('is_active', true).order('name', { ascending: true }),
       ])
 
-      if (summaryRes.data) setSummary(summaryRes.data as IndexSummary[])
-      if (byServiceRes.data) setByService(byServiceRes.data as IndexByService[])
-      if (trendRes.data) setTrend(trendRes.data as IndexTrend[])
-      if (unsurRes.data) setUnsurSummary(unsurRes.data as UnsurSummary[])
-      if (demoRes.data) setDemoSummary(demoRes.data as DemographicSummary[])
+      let summaryData = (summaryRes.data || []) as IndexSummary[]
+      let byServiceData = (byServiceRes.data || []) as IndexByService[]
+      const trendData = (trendRes.data || []) as IndexTrend[]
+      let unsurData = (unsurRes.data || []) as UnsurSummary[]
+      const demoData = (demoRes.data || []) as DemographicSummary[]
+      let responseCount = typeof countRes.data === 'number' ? countRes.data : 0
+
+      console.log('Archive RPC Result:', {
+        byServiceLen: byServiceData.length,
+        byServiceResErr: byServiceRes.error,
+        byServiceData,
+        countRes: countRes.data,
+        dates
+      })
+
+      // If stored procedure RPC byService returns empty or 0 respondents, force client calculation from raw responses
+      const hasValidByService = byServiceData.length > 0 && byServiceData.some(b => (b.jumlah_responden || 0) > 0)
+
+      if (!hasValidByService) {
+        const { data: respData } = await supabase
+          .from('responses')
+          .select(`
+            id,
+            service_id,
+            submitted_at,
+            services (id, name),
+            response_answers (
+              rating_value,
+              unsur (id, index_type, name, is_active)
+            )
+          `)
+          .gte('submitted_at', dates.start)
+          .lte('submitted_at', dates.end)
+
+        if (respData && respData.length > 0) {
+          responseCount = respData.length
+
+          // Group by service and index_type
+          const serviceMap = new Map<string, {
+            service_id: string,
+            service_name: string,
+            index_type: 'IPKP' | 'IPAK',
+            ratings: { [unsur_id: string]: number[] }
+          }>()
+
+          type ResponseItem = {
+            id: string
+            service_id: string
+            services: { id: string; name: string } | null
+            response_answers: Array<{
+              rating_value: number
+              unsur: { id: string; index_type: string; name: string; is_active: boolean } | null
+            }>
+          }
+
+          ;(respData as unknown as ResponseItem[]).forEach((r) => {
+            const sName = r.services?.name || 'Unknown'
+            const sId = r.service_id
+            
+            r.response_answers?.forEach((ans) => {
+              if (ans.unsur && ans.unsur.is_active) {
+                const iType = ans.unsur.index_type as 'IPKP' | 'IPAK'
+                const key = `${sId}_${iType}`
+                
+                if (!serviceMap.has(key)) {
+                  serviceMap.set(key, {
+                    service_id: sId,
+                    service_name: sName,
+                    index_type: iType,
+                    ratings: {}
+                  })
+                }
+
+                const entry = serviceMap.get(key)!
+                if (!entry.ratings[ans.unsur.id]) {
+                  entry.ratings[ans.unsur.id] = []
+                }
+                entry.ratings[ans.unsur.id].push(Number(ans.rating_value) || 0)
+              }
+            })
+          })
+
+          const calculatedByService: IndexByService[] = []
+          serviceMap.forEach((val) => {
+            const unsurIds = Object.keys(val.ratings)
+            const totalUnsurCount = val.index_type === 'IPKP' ? 9 : 5
+            
+            let sumWeighted = 0
+            let totalRespondenForIndex = 0
+
+            unsurIds.forEach((uId) => {
+              const arr = val.ratings[uId]
+              totalRespondenForIndex = Math.max(totalRespondenForIndex, arr.length)
+              const avg = arr.reduce((a, b) => a + b, 0) / arr.length
+              sumWeighted += (avg / totalUnsurCount)
+            })
+
+            const nilaiIndex = Number(sumWeighted.toFixed(4))
+            const nilaiKonversi = Number((sumWeighted * 25).toFixed(2))
+
+            let mutu: 'A' | 'B' | 'C' | 'D' = 'D'
+            if (nilaiKonversi >= 88.31) mutu = 'A'
+            else if (nilaiKonversi >= 76.61) mutu = 'B'
+            else if (nilaiKonversi >= 65.00) mutu = 'C'
+
+            calculatedByService.push({
+              service_id: val.service_id,
+              service_name: val.service_name,
+              index_type: val.index_type,
+              nilai_index: nilaiIndex,
+              nilai_konversi: nilaiKonversi,
+              mutu,
+              jumlah_responden: totalRespondenForIndex
+            })
+          })
+
+          byServiceData = calculatedByService
+
+          // 1. Calculate Unsur Summary for Breakdown
+          const unsurMap = new Map<string, {
+            unsur_id: string
+            unsur_name: string
+            index_type: 'IPKP' | 'IPAK'
+            service_name: string
+            jumlah_pertanyaan: number
+            total_nilai: number
+            jumlah_responden: number
+          }>()
+
+          ;(respData as unknown as Array<{
+            service_id: string
+            services: { name: string } | null
+            response_answers: Array<{
+              rating_value: number
+              unsur: { id: string; index_type: string; name: string; is_active: boolean } | null
+            }>
+            respondents?: {
+              jenis_kelamin?: string
+              pendidikan?: string
+              pekerjaan?: string
+              usia?: number
+            }
+          }>).forEach((r) => {
+            const sName = r.services?.name || 'Unknown'
+
+            r.response_answers?.forEach((ans) => {
+              if (ans.unsur && ans.unsur.is_active) {
+                const uId = ans.unsur.id
+                const uName = ans.unsur.name
+                const iType = ans.unsur.index_type as 'IPKP' | 'IPAK'
+                const key = `${sName}_${uId}`
+
+                if (!unsurMap.has(key)) {
+                  unsurMap.set(key, {
+                    unsur_id: uId,
+                    unsur_name: uName,
+                    index_type: iType,
+                    service_name: sName,
+                    jumlah_pertanyaan: 1,
+                    total_nilai: 0,
+                    jumlah_responden: 0
+                  })
+                }
+                const uEntry = unsurMap.get(key)!
+                uEntry.total_nilai += Number(ans.rating_value) || 0
+                uEntry.jumlah_responden += 1
+              }
+            })
+          })
+
+          unsurData = Array.from(unsurMap.values()).map((u) => {
+            const avg = u.jumlah_responden > 0 ? Number((u.total_nilai / u.jumlah_responden).toFixed(2)) : 0
+            const totalUnsur = u.index_type === 'IPKP' ? 9 : 5
+            return {
+              service_id: '',
+              service_name: u.service_name,
+              unsur_id: u.unsur_id,
+              unsur_name: u.unsur_name,
+              index_type: u.index_type,
+              jumlah_pertanyaan: u.jumlah_pertanyaan,
+              total_nilai: u.total_nilai,
+              jumlah_responden: u.jumlah_responden,
+              nilai_rata_rata_unsur: avg,
+              nilai_rata_rata_tertimbang: Number((avg / totalUnsur).toFixed(4))
+            }
+          })
+
+          // Summary per Index (IPKP & IPAK overall)
+          const types: ('IPKP' | 'IPAK')[] = ['IPKP', 'IPAK']
+          summaryData = types.map((iType) => {
+            const items = calculatedByService.filter(b => b.index_type === iType)
+            if (items.length === 0) {
+              return {
+                index_type: iType,
+                nilai_index: 0,
+                nilai_konversi: 0,
+                mutu: 'D' as const,
+                total_responden: 0,
+                kinerja: 'Sangat Baik',
+                calculated_at: new Date().toISOString()
+              }
+            }
+            const avgKonversi = items.reduce((acc, curr) => acc + curr.nilai_konversi, 0) / items.length
+            const avgIndex = avgKonversi / 25
+            let mutu: 'A' | 'B' | 'C' | 'D' = 'D'
+            if (avgKonversi >= 88.31) mutu = 'A'
+            else if (avgKonversi >= 76.61) mutu = 'B'
+            else if (avgKonversi >= 65.00) mutu = 'C'
+            
+            return {
+              index_type: iType,
+              nilai_index: Number(avgIndex.toFixed(4)),
+              nilai_konversi: Number(avgKonversi.toFixed(2)),
+              mutu,
+              total_responden: responseCount,
+              kinerja: 'Sangat Baik',
+              calculated_at: new Date().toISOString()
+            }
+          })
+        }
+      }
+
+      setSummary(summaryData)
+      setByService(byServiceData)
+      setTrend(trendData)
+      setUnsurSummary(unsurData)
+      setDemoSummary(demoData)
       if (servicesRes.data) setAllServices(servicesRes.data)
-      if (typeof countRes.data === 'number') setTotalResponses(countRes.data)
+      setTotalResponses(responseCount)
 
       setLoading(false)
     }
@@ -278,7 +508,7 @@ export default function ArsipPage() {
                   ) : (
                     allServices
                       .map((service, i) => {
-                        const item = byService.find(b => b.service_id === service.id && b.index_type === indexType)
+                        const item = byService.find(b => (b.service_id === service.id || b.service_name === service.name) && b.index_type === indexType)
                         const hasData = item && item.jumlah_responden > 0
                         return (
                           <TableRow key={service.id} className="hover:bg-gray-50/50">
@@ -337,18 +567,19 @@ export default function ArsipPage() {
                       <Pie
                         data={parseDemoFieldData('jenis_kelamin')}
                         cx="50%"
-                        cy="50%"
-                        innerRadius={45}
-                        outerRadius={75}
+                        cy="45%"
+                        innerRadius={40}
+                        outerRadius={68}
                         paddingAngle={4}
                         dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                        labelLine={true}
                       >
                         {parseDemoFieldData('jenis_kelamin').map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={['#06b6d4', '#ec4899', '#f59e0b', '#10b981'][index % 4]} />
                         ))}
                       </Pie>
                       <Tooltip contentStyle={{ borderRadius: '14px', fontWeight: 600, fontSize: '11px' }} />
-                      <Legend verticalAlign="bottom" height={32} wrapperStyle={{ fontSize: '11px', fontWeight: 600 }} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -368,7 +599,7 @@ export default function ArsipPage() {
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={parseDemoFieldData('pendidikan')}>
+                    <BarChart data={parseDemoFieldData('pendidikan')} margin={{ top: 20, right: 4, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-35} textAnchor="end" height={55} />
                       <YAxis tick={{ fontSize: 10, fontWeight: 600 }} allowDecimals={false} />
@@ -377,6 +608,7 @@ export default function ArsipPage() {
                         {parseDemoFieldData('pendidikan').map((_, index) => (
                           <Cell key={`cell-${index}`} fill={['#f59e0b', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444', '#64748b'][index % 8]} />
                         ))}
+                        <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -397,7 +629,7 @@ export default function ArsipPage() {
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={parseDemoFieldData('usia')}>
+                    <BarChart data={parseDemoFieldData('usia')} margin={{ top: 20, right: 4, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-35} textAnchor="end" height={55} />
                       <YAxis tick={{ fontSize: 10, fontWeight: 600 }} allowDecimals={false} />
@@ -406,6 +638,7 @@ export default function ArsipPage() {
                         {parseDemoFieldData('usia').map((_, index) => (
                           <Cell key={`cell-${index}`} fill={['#f43f5e', '#ec4899', '#f59e0b', '#eab308', '#84cc16'][index % 5]} />
                         ))}
+                        <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -426,7 +659,7 @@ export default function ArsipPage() {
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={parseDemoFieldData('pekerjaan')}>
+                    <BarChart data={parseDemoFieldData('pekerjaan')} margin={{ top: 20, right: 4, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                       <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-35} textAnchor="end" height={55} />
                       <YAxis tick={{ fontSize: 10, fontWeight: 600 }} allowDecimals={false} />
@@ -435,6 +668,7 @@ export default function ArsipPage() {
                         {parseDemoFieldData('pekerjaan').map((_, index) => (
                           <Cell key={`cell-${index}`} fill={['#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6'][index % 6]} />
                         ))}
+                        <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -455,14 +689,32 @@ export default function ArsipPage() {
                   <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={parseBarData()}>
+                    <BarChart data={parseBarData()} margin={{ top: 12, right: 10, left: -10, bottom: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-25} textAnchor="end" height={60} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontWeight: 600 }} />
-                      <Tooltip contentStyle={{ borderRadius: '16px', fontWeight: 600 }} />
-                      <Bar dataKey="IPKP" fill="#10b981" radius={[8, 8, 0, 0]} />
-                      <Bar dataKey="IPAK" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-                      <Legend />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={({ x, y, payload }) => {
+                          const val = String(payload.value || '')
+                          const truncated = val.length > 18 ? val.slice(0, 16) + '...' : val
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={12} dx={-4} textAnchor="end" fill="#64748b" fontSize={9} fontWeight={600} transform="rotate(-40)">
+                                {truncated}
+                              </text>
+                            </g>
+                          )
+                        }}
+                        interval={0} 
+                        height={85} 
+                      />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 10, fontWeight: 600 }} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '16px', fontWeight: 600, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }} 
+                        formatter={(value) => [typeof value === 'number' ? value.toFixed(2) : String(value ?? ''), 'Nilai Konversi']}
+                      />
+                      <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '12px', fontSize: '11px', fontWeight: 700 }} />
+                      <Bar dataKey="IPKP" name="Indeks IPKP" fill="#10b981" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="IPAK" name="Indeks IPAK" fill="#3b82f6" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -479,14 +731,62 @@ export default function ArsipPage() {
                   <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={trend}>
+                    <AreaChart data={trend} margin={{ top: 12, right: 10, left: -10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorTrendArsip" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0d9488" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#0d9488" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="bulan" tick={{ fontSize: 11, fontWeight: 700 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontWeight: 600 }} />
-                      <Tooltip contentStyle={{ borderRadius: '16px', fontWeight: 600 }} />
-                      <Line type="monotone" dataKey="nilai_konversi" stroke="#0d9488" strokeWidth={3} dot={{ fill: '#0d9488', r: 6 }} />
-                      <Legend />
-                    </LineChart>
+                      <XAxis 
+                        dataKey="bulan" 
+                        tick={({ x, y, payload }) => {
+                          const raw = String(payload.value || '')
+                          let formatted = raw
+                          if (raw.includes('-') || raw.includes('T')) {
+                            const d = new Date(raw)
+                            if (!isNaN(d.getTime())) {
+                              formatted = d.toLocaleDateString(locale === 'en' ? 'en-US' : 'id-ID', { month: 'short', year: 'numeric' })
+                            }
+                          }
+                          return (
+                            <g transform={`translate(${x},${y})`}>
+                              <text x={0} y={0} dy={12} textAnchor="middle" fill="#64748b" fontSize={10} fontWeight={700}>
+                                {formatted}
+                              </text>
+                            </g>
+                          )
+                        }}
+                        tickLine={false}
+                      />
+                      <YAxis domain={['auto', 100]} tick={{ fontSize: 10, fontWeight: 600 }} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '16px', fontWeight: 600, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
+                        formatter={(val: unknown) => [typeof val === 'number' ? val.toFixed(2) : String(val ?? ''), 'Nilai Konversi']}
+                        labelFormatter={(labelStr: unknown) => {
+                          const raw = String(labelStr || '')
+                          if (raw.includes('-') || raw.includes('T')) {
+                            const d = new Date(raw)
+                            if (!isNaN(d.getTime())) {
+                              return d.toLocaleDateString(locale === 'en' ? 'en-US' : 'id-ID', { month: 'long', year: 'numeric' })
+                            }
+                          }
+                          return raw
+                        }}
+                      />
+                      <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '12px', fontSize: '11px', fontWeight: 700 }} />
+                      <Area 
+                        type="monotone" 
+                        dataKey="nilai_konversi" 
+                        name="Nilai Konversi" 
+                        stroke="#0d9488" 
+                        strokeWidth={3} 
+                        fillOpacity={1} 
+                        fill="url(#colorTrendArsip)" 
+                        activeDot={{ r: 7, strokeWidth: 3, stroke: '#ffffff', fill: '#0d9488' }}
+                      />
+                    </AreaChart>
                   </ResponsiveContainer>
                 )}
               </CardContent>

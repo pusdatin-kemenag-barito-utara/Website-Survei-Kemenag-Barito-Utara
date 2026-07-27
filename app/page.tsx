@@ -6,6 +6,7 @@ import { Award, ShieldCheck, Users, ArrowRight, FileText, ClipboardList } from '
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { AnimatedNumber } from '@/components/ui/animated-number'
 import { useI18n } from '@/components/shared/I18nProvider'
 import { PublicNavbar } from '@/components/shared/PublicNavbar'
 import PageBanner from '@/components/shared/PageBanner'
@@ -14,20 +15,19 @@ import { createClient } from '@/lib/supabase/client'
 import { NILAI_MUTU } from '@/lib/constants'
 import type { IndexSummary } from '@/types'
 import { motion } from 'framer-motion'
+import { MaklumatModal } from '@/components/shared/MaklumatModal'
 
 export default function HomePage() {
   const { t, locale } = useI18n()
   const [summary, setSummary] = useState<IndexSummary[]>([])
   const [totalResponses, setTotalResponses] = useState(0)
-  const [loading, setLoading] = useState(true)
 
-  async function fetchTotalResponses(supabaseClient: ReturnType<typeof createClient>) {
+  async function fetchTotalResponses(supabaseClient: ReturnType<typeof createClient>): Promise<number> {
     // Call get_response_count RPC (SECURITY DEFINER) so public visitors also get exact count
     const { data, error } = await supabaseClient.rpc('get_response_count')
 
     if (!error && typeof data === 'number') {
-      setTotalResponses(data)
-      return
+      return data
     }
 
     // Fallback: Count overall responses across all periods
@@ -36,30 +36,31 @@ export default function HomePage() {
       .select('*', { count: 'exact', head: true })
 
     if (typeof count === 'number' && count > 0) {
-      setTotalResponses(count)
+      return count
     } else {
       const { data: allTotals } = await supabaseClient
         .from('vw_total_responses')
         .select('total_count')
 
       if (allTotals && allTotals.length > 0) {
-        const responseCount = allTotals.reduce((acc, curr) => acc + (curr.total_count || 0), 0)
-        setTotalResponses(responseCount)
+        return allTotals.reduce((acc, curr) => acc + (curr.total_count || 0), 0)
       }
     }
+    return 0
   }
 
   useEffect(() => {
     async function fetchData() {
       const supabase = createClient()
-      const { data: idxData } = await supabase
-        .from('vw_index_summary')
-        .select('*')
-        .returns<IndexSummary[]>()
+      
+      // Separate fetches so whichever completes first renders immediately
+      supabase.from('vw_index_summary').select('*').returns<IndexSummary[]>().then(({ data }) => {
+        if (data) setSummary(data)
+      })
 
-      if (idxData) setSummary(idxData)
-      await fetchTotalResponses(supabase)
-      setLoading(false)
+      fetchTotalResponses(supabase).then((count) => {
+        setTotalResponses(count)
+      })
     }
     fetchData()
   }, [])
@@ -68,11 +69,13 @@ export default function HomePage() {
     const supabase = createClient()
     const channel = supabase
       .channel('home-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'kemenag_survey', table: 'responses' }, () => {
-        supabase.from('vw_index_summary').select('*').returns<IndexSummary[]>().then(({ data }) => {
-          if (data) setSummary(data)
-        })
-        fetchTotalResponses(supabase)
+      .on('postgres_changes', { event: 'INSERT', schema: 'kemenag_survey', table: 'responses' }, async () => {
+        const [idxResult, totalCountResult] = await Promise.all([
+          supabase.from('vw_index_summary').select('*').returns<IndexSummary[]>(),
+          fetchTotalResponses(supabase)
+        ])
+        if (idxResult.data) setSummary(idxResult.data)
+        setTotalResponses(totalCountResult)
       })
       .subscribe()
 
@@ -84,6 +87,7 @@ export default function HomePage() {
 
   return (
     <>
+      <MaklumatModal />
       <PublicNavbar />
       <main className="flex-1 bg-slate-50/70 dark:bg-gray-950">
         <PageBanner
@@ -140,28 +144,24 @@ export default function HomePage() {
                 </div>
 
                 <div className="pt-4 flex items-baseline justify-between border-t border-slate-100 dark:border-gray-800">
-                  {loading ? (
-                    <div className="h-10 w-28 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-                  ) : ipkp ? (
-                    <>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
-                          {ipkp.nilai_konversi.toFixed(2)}
-                        </span>
-                        <span className="text-xs font-bold text-slate-400">/ 100</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-900 px-3 py-1 rounded-full">
-                        <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-xs font-extrabold text-emerald-900 dark:text-emerald-200">
-                          {ipkp.mutu} &bull; {locale === 'id' ? NILAI_MUTU[ipkp.mutu]?.label_id : NILAI_MUTU[ipkp.mutu]?.label_en}
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-2xl font-black text-slate-300 font-mono">0.00</span>
-                      <Badge className="text-slate-400 bg-slate-100 border-slate-200">{locale === 'en' ? 'No Data Yet' : 'Belum Ada Data'}</Badge>
+                  <div className="flex items-baseline gap-1.5">
+                    <AnimatedNumber
+                      value={ipkp?.nilai_konversi ?? 0}
+                      decimals={2}
+                      duration={1000}
+                      className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white font-mono"
+                    />
+                    <span className="text-xs font-bold text-slate-400">/ 100</span>
+                  </div>
+                  {ipkp ? (
+                    <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-900 px-3 py-1 rounded-full">
+                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-extrabold text-emerald-900 dark:text-emerald-200">
+                        {ipkp.mutu} &bull; {locale === 'id' ? NILAI_MUTU[ipkp.mutu]?.label_id : NILAI_MUTU[ipkp.mutu]?.label_en}
+                      </span>
                     </div>
+                  ) : (
+                    <Badge className="text-slate-400 bg-slate-100 border-slate-200">{locale === 'en' ? 'Loading...' : 'Memuat...'}</Badge>
                   )}
                 </div>
               </Card>
@@ -196,28 +196,24 @@ export default function HomePage() {
                 </div>
 
                 <div className="pt-4 flex items-baseline justify-between border-t border-slate-100 dark:border-gray-800">
-                  {loading ? (
-                    <div className="h-10 w-28 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-                  ) : ipak ? (
-                    <>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
-                          {ipak.nilai_konversi.toFixed(2)}
-                        </span>
-                        <span className="text-xs font-bold text-slate-400">/ 100</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-900 px-3 py-1 rounded-full">
-                        <span className="size-2 rounded-full bg-indigo-500 animate-pulse" />
-                        <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200">
-                          {ipak.mutu} &bull; {locale === 'id' ? NILAI_MUTU[ipak.mutu]?.label_id : NILAI_MUTU[ipak.mutu]?.label_en}
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-2xl font-black text-slate-300 font-mono">0.00</span>
-                      <Badge className="text-slate-400 bg-slate-100 border-slate-200">{locale === 'en' ? 'No Data Yet' : 'Belum Ada Data'}</Badge>
+                  <div className="flex items-baseline gap-1.5">
+                    <AnimatedNumber
+                      value={ipak?.nilai_konversi ?? 0}
+                      decimals={2}
+                      duration={1000}
+                      className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white font-mono"
+                    />
+                    <span className="text-xs font-bold text-slate-400">/ 100</span>
+                  </div>
+                  {ipak ? (
+                    <div className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-900 px-3 py-1 rounded-full">
+                      <span className="size-2 rounded-full bg-indigo-500 animate-pulse" />
+                      <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200">
+                        {ipak.mutu} &bull; {locale === 'id' ? NILAI_MUTU[ipak.mutu]?.label_id : NILAI_MUTU[ipak.mutu]?.label_en}
+                      </span>
                     </div>
+                  ) : (
+                    <Badge className="text-slate-400 bg-slate-100 border-slate-200">{locale === 'en' ? 'Loading...' : 'Memuat...'}</Badge>
                   )}
                 </div>
               </Card>
@@ -252,21 +248,18 @@ export default function HomePage() {
                 </div>
 
                 <div className="pt-4 flex items-center justify-between border-t border-slate-100 dark:border-gray-800">
-                  {loading ? (
-                    <div className="h-10 w-28 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
-                  ) : (
-                    <>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
-                          {totalResponses.toLocaleString('id-ID')}
-                        </span>
-                        <span className="text-xs font-bold text-slate-400">{locale === 'en' ? 'Respondents' : 'Orang'}</span>
-                      </div>
-                      <div className="text-[11px] font-extrabold text-purple-800 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/80 px-3 py-1 rounded-full border border-purple-200 dark:border-purple-900">
-                        {locale === 'en' ? 'Data Year 2026' : 'Data Tahun 2026'}
-                      </div>
-                    </>
-                  )}
+                  <div className="flex items-baseline gap-1.5">
+                    <AnimatedNumber
+                      value={totalResponses}
+                      decimals={0}
+                      duration={1000}
+                      className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white font-mono"
+                    />
+                    <span className="text-xs font-bold text-slate-400">{locale === 'en' ? 'Respondents' : 'Orang'}</span>
+                  </div>
+                  <div className="text-[11px] font-extrabold text-purple-800 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/80 px-3 py-1 rounded-full border border-purple-200 dark:border-purple-900">
+                    {locale === 'en' ? 'Data Year 2026' : 'Data Tahun 2026'}
+                  </div>
                 </div>
               </Card>
             </motion.div>

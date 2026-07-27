@@ -127,14 +127,17 @@ export function PublicNavbar() {
 
   return (
     <>
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 border-b border-gray-100/80 bg-white/80 backdrop-blur-xl shadow-[0_1px_20px_rgba(0,0,0,0.04)] transition-all duration-300">
-        <div className="mx-auto flex h-16 w-full px-4 sm:px-6 lg:px-10 items-center justify-between">
-          {/* Logo */}
-          <div className="flex-1 flex justify-start">
+      {/* Navbar — Two-Row Layout */}
+      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl shadow-[0_2px_20px_rgba(0,0,0,0.06)] transition-all duration-300">
+
+        {/* ── ROW 1: Logo + Utilities (clock, language, login) ── */}
+        <div className="border-b border-gray-100/80">
+          <div className="mx-auto flex h-14 w-full px-4 sm:px-6 lg:px-10 items-center justify-between">
+
+            {/* Logo */}
             <Link href={SURVEY_ROUTES.HOME} className="flex items-center gap-2.5 sm:gap-3 group">
               <div className="flex h-10 items-center justify-center">
-                <Image src="/arus.png" alt="ARUS Logo" width={80} height={40} className="object-contain drop-shadow-sm group-hover:drop-shadow-md transition-all duration-300" />
+                <Image src="/arus.png" alt="ARUS Logo" width={80} height={40} style={{ width: 'auto', height: 'auto' }} className="object-contain drop-shadow-sm group-hover:drop-shadow-md transition-all duration-300" />
               </div>
               <div className="flex flex-col leading-none max-w-[400px]">
                 <span className="text-[10px] text-emerald-700 font-bold hidden sm:block leading-[1.3] border-l-2 border-emerald-500 pl-2">
@@ -145,25 +148,85 @@ export function PublicNavbar() {
                   )}
                 </span>
               </div>
-              <div className="hidden sm:flex h-9 items-center justify-center pl-2 border-l border-slate-200/90 dark:border-gray-800">
+              <div className="hidden sm:flex h-9 items-center justify-center pl-2 border-l border-slate-200/90">
                 <Image src="/Logo_PANRB.png" alt="Logo Kementerian PANRB" width={95} height={38} className="h-8 w-auto object-contain drop-shadow-xs group-hover:scale-105 transition-all duration-300" />
               </div>
             </Link>
-          </div>
 
-          {/* Desktop Nav (Centered) */}
-          <div className="hidden items-center gap-1.5 lg:flex">
+            {/* Right utilities */}
+            <div className="flex items-center gap-2">
+              {/* Live Clock */}
+              {currentTime && (
+                <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-700 font-mono text-[11px] font-bold shadow-2xs whitespace-nowrap">
+                  <div className="relative flex size-2 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                  </div>
+                  <Clock className="size-3.5 text-emerald-600 shrink-0" />
+                  <span>{currentTime}</span>
+                </div>
+              )}
+
+              {/* Language Toggle */}
+              <div className="hidden lg:block">
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 rounded-xl bg-white hover:bg-emerald-50/50 shadow-xs transition-all duration-200 focus:outline-none cursor-pointer">
+                    <Image
+                      src={locale === 'id' ? "https://flagcdn.com/w20/id.png" : "https://flagcdn.com/w20/us.png"}
+                      alt={locale === 'id' ? "ID" : "EN"}
+                      width={18} height={13}
+                      className="w-4 rounded-xs shadow-xs"
+                      unoptimized
+                    />
+                    <span className="uppercase">{locale}</span>
+                    <ChevronDown className="size-3 text-slate-400" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40 rounded-2xl p-1.5 shadow-xl border-slate-200">
+                    <DropdownMenuItem onClick={() => setLocale('id')} className={cn("gap-2.5 cursor-pointer rounded-xl py-2 text-xs font-bold", locale === 'id' && "bg-emerald-50 text-emerald-700")}>
+                      <Image src="https://flagcdn.com/w20/id.png" alt="ID" width={18} height={13} className="w-4 rounded-xs shadow-xs" unoptimized />
+                      <span>Indonesia</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocale('en')} className={cn("gap-2.5 cursor-pointer rounded-lg py-2 text-xs font-bold", locale === 'en' && "bg-emerald-50 text-emerald-700")}>
+                      <Image src="https://flagcdn.com/w20/us.png" alt="EN" width={18} height={13} className="w-4 rounded-xs shadow-xs" unoptimized />
+                      <span>English</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Login Link */}
+              <Link href="/admin/login" className="hidden lg:block">
+                <span className="flex items-center gap-2 px-4 py-2 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/20 transition-all duration-200 cursor-pointer">
+                  <LogIn className="size-4" />
+                  <span>{t('nav.login')}</span>
+                </span>
+              </Link>
+
+              {/* Mobile Hamburger */}
+              <button
+                className="relative flex lg:hidden size-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 transition-all duration-200 active:scale-95 cursor-pointer"
+                onClick={() => setOpen(true)}
+                aria-label="Buka menu"
+              >
+                <Menu className="size-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── ROW 2: Navigation Links (desktop only) ── */}
+        <div className="hidden lg:block bg-white/95">
+          <div className="mx-auto flex h-12 w-full px-4 sm:px-6 lg:px-10 items-center justify-center gap-2">
             {links.map((link) => {
               const isActive = pathname === link.href
 
               if (link.href === SURVEY_ROUTES.HASIL) {
                 const isHasilActive = pathname.startsWith('/hasil')
-
                 return (
                   <DropdownMenu key={link.href}>
                     <DropdownMenuTrigger
                       className={cn(
-                        'group relative flex items-center gap-1.5 px-3.5 py-2 text-sm font-bold rounded-xl transition-all duration-200 focus:outline-none cursor-pointer',
+                        'group relative flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200 focus:outline-none cursor-pointer',
                         isHasilActive
                           ? 'text-emerald-800 bg-emerald-100/80 border border-emerald-200/80 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
@@ -191,12 +254,11 @@ export function PublicNavbar() {
 
               if (link.href === '/arsip') {
                 const isArsipActive = pathname.startsWith('/arsip')
-                
                 return (
                   <DropdownMenu key={link.href}>
                     <DropdownMenuTrigger
                       className={cn(
-                        'group relative flex items-center gap-1.5 px-3.5 py-2 text-sm font-bold rounded-xl transition-all duration-200 focus:outline-none cursor-pointer',
+                        'group relative flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200 focus:outline-none cursor-pointer',
                         isArsipActive
                           ? 'text-emerald-800 bg-emerald-100/80 border border-emerald-200/80 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
@@ -298,86 +360,17 @@ export function PublicNavbar() {
               return (
                 <Link key={link.href} href={link.href}>
                   <span className={cn(
-                    'relative flex items-center gap-1.5 px-2.5 xl:px-3.5 py-1.5 text-xs xl:text-sm font-bold rounded-xl transition-all duration-200',
+                    'relative flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200',
                     isActive
                       ? 'text-emerald-800 bg-emerald-100/80 border border-emerald-200/80 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
                   )}>
-                    <link.icon className="size-3.5 xl:size-4 text-emerald-600" />
+                    <link.icon className="size-4 text-emerald-600" />
                     <span className="whitespace-nowrap">{link.label}</span>
                   </span>
                 </Link>
               )
             })}
-          </div>
-
-          {/* Right Section (Actions & Mobile Hamburger) */}
-          <div className="flex-1 flex justify-end items-center gap-2">
-            {/* Desktop Actions */}
-            <div className="hidden lg:flex items-center gap-2">
-              {/* Automatic Live Clock & Date Widget */}
-              {currentTime && (
-                <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-gray-800 border border-slate-200/90 dark:border-gray-700 text-slate-700 dark:text-slate-200 font-mono text-[11px] xl:text-xs font-bold shadow-2xs whitespace-nowrap">
-                  <div className="relative flex size-2 items-center justify-center">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                  </div>
-                  <Clock className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>{currentTime}</span>
-                </div>
-              )}
-
-              {/* Language Toggle Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 rounded-xl bg-white hover:bg-emerald-50/50 shadow-xs transition-all duration-200 focus:outline-none cursor-pointer"
-                >
-                  <Image 
-                    src={locale === 'id' ? "https://flagcdn.com/w20/id.png" : "https://flagcdn.com/w20/us.png"} 
-                    alt={locale === 'id' ? "ID" : "EN"}
-                    width={18}
-                    height={13}
-                    className="w-4 rounded-xs shadow-xs"
-                    unoptimized
-                  />
-                  <span className="uppercase">{locale}</span>
-                  <ChevronDown className="size-3 text-slate-400" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40 rounded-2xl p-1.5 shadow-xl border-slate-200">
-                  <DropdownMenuItem
-                    onClick={() => setLocale('id')}
-                    className={cn("gap-2.5 cursor-pointer rounded-xl py-2 text-xs font-bold", locale === 'id' && "bg-emerald-50 text-emerald-700")}
-                  >
-                    <Image src="https://flagcdn.com/w20/id.png" alt="ID" width={18} height={13} className="w-4 rounded-xs shadow-xs" unoptimized />
-                    <span>Indonesia</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setLocale('en')}
-                    className={cn("gap-2.5 cursor-pointer rounded-lg py-2 text-xs font-bold", locale === 'en' && "bg-emerald-50 text-emerald-700")}
-                  >
-                    <Image src="https://flagcdn.com/w20/us.png" alt="EN" width={18} height={13} className="w-4 rounded-xs shadow-xs" unoptimized />
-                    <span>English</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Login Link */}
-              <Link href="/admin/login">
-                <span className="flex items-center gap-2 px-4 py-2 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/20 transition-all duration-200 cursor-pointer">
-                  <LogIn className="size-4" />
-                  <span>{t('nav.login')}</span>
-                </span>
-              </Link>
-            </div>
-
-            {/* Mobile Hamburger */}
-            <button
-              className="relative flex lg:hidden size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 transition-all duration-200 active:scale-95 cursor-pointer"
-              onClick={() => setOpen(true)}
-              aria-label="Buka menu"
-            >
-              <Menu className="size-5" />
-            </button>
           </div>
         </div>
       </nav>
@@ -400,17 +393,17 @@ export function PublicNavbar() {
             {/* Drawer */}
             <motion.aside
               key="drawer"
-              initial={{ x: '-100%' }}
+              initial={{ x: '100%' }}
               animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
+              exit={{ x: '100%' }}
               transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-              className="fixed left-0 top-0 z-[70] h-full w-72 bg-white shadow-2xl flex flex-col md:hidden"
+              className="fixed right-0 top-0 z-[70] h-full w-72 bg-white shadow-2xl flex flex-col md:hidden"
             >
               {/* Drawer Header */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
                 <Link href={SURVEY_ROUTES.HOME} className="flex items-center" onClick={() => setOpen(false)}>
                   <div className="flex h-10 items-center justify-center">
-                    <Image src="/arus.png" alt="ARUS Logo" width={100} height={50} className="object-contain" />
+                    <Image src="/arus.png" alt="ARUS Logo" width={100} height={50} style={{ width: 'auto', height: 'auto' }} className="object-contain" />
                   </div>
                 </Link>
                 <button
@@ -644,10 +637,25 @@ export function PublicNavbar() {
                 <Link
                   href="/admin/login"
                   onClick={() => setOpen(false)}
-                  className="flex w-full items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all duration-200"
+                  className="group relative flex w-full items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-sm font-extrabold text-white overflow-hidden"
+                  style={{
+                    background: 'linear-gradient(135deg, #059669 0%, #0d9488 50%, #0891b2 100%)',
+                    boxShadow: '0 4px 20px rgba(5, 150, 105, 0.4)',
+                  }}
                 >
-                  <LogIn className="size-4" />
-                  {t('nav.login')}
+                  {/* Shimmer overlay */}
+                  <span
+                    className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)',
+                    }}
+                  />
+                  {/* Pulsing glow ring */}
+                  <span className="absolute inset-0 rounded-2xl animate-pulse opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    style={{ boxShadow: '0 0 20px rgba(5, 150, 105, 0.6)' }}
+                  />
+                  <LogIn className="relative size-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-200" />
+                  <span className="relative">{t('nav.login')}</span>
                 </Link>
               </div>
             </motion.aside>
