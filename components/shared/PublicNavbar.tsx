@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { Menu, X, Home, ClipboardList, BarChart3, BookOpen, ChevronDown, LogIn, Clock } from 'lucide-react'
+import { Menu, X, Home, ClipboardList, BarChart3, BookOpen, ChevronDown, LogIn, Clock, Activity, ShieldCheck } from 'lucide-react'
 import { useI18n } from '@/components/shared/I18nProvider'
 import { SURVEY_ROUTES } from '@/lib/constants'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -137,7 +137,7 @@ export function PublicNavbar() {
             {/* Logo */}
             <Link href={SURVEY_ROUTES.HOME} className="flex items-center gap-2.5 sm:gap-3 group">
               <div className="flex h-10 items-center justify-center">
-                <Image src="/arus.png" alt="ARUS Logo" width={80} height={40} style={{ width: 'auto', height: 'auto' }} className="object-contain drop-shadow-sm group-hover:drop-shadow-md transition-all duration-300" />
+                <Image src="/arus.webp" alt="ARUS Logo" width={80} height={40} style={{ width: 'auto', height: 'auto' }} className="object-contain drop-shadow-sm group-hover:drop-shadow-md transition-all duration-300" />
               </div>
               <div className="flex flex-col leading-none max-w-[400px]">
                 <span className="text-[10px] text-emerald-700 font-bold hidden sm:block leading-[1.3] border-l-2 border-emerald-500 pl-2">
@@ -149,7 +149,7 @@ export function PublicNavbar() {
                 </span>
               </div>
               <div className="hidden sm:flex h-9 items-center justify-center pl-2 border-l border-slate-200/90">
-                <Image src="/Logo_PANRB.png" alt="Logo Kementerian PANRB" width={95} height={38} className="h-8 w-auto object-contain drop-shadow-xs group-hover:scale-105 transition-all duration-300" />
+                <Image src="/Logo_PANRB.webp" alt="Logo Kementerian PANRB" width={95} height={38} className="h-8 w-auto object-contain drop-shadow-xs group-hover:scale-105 transition-all duration-300" />
               </div>
             </Link>
 
@@ -236,15 +236,17 @@ export function PublicNavbar() {
                       <span>{link.label}</span>
                       <ChevronDown className="size-3.5 text-slate-400 group-data-[state=open]:rotate-180 transition-transform duration-200" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="center" className="w-52 rounded-2xl p-1.5 shadow-xl border-slate-200">
+                    <DropdownMenuContent align="center" sideOffset={8} className="w-56 rounded-2xl p-1.5 shadow-2xl shadow-emerald-950/15 border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl">
                       <Link href="/hasil/ipkp">
-                        <DropdownMenuItem className={cn("cursor-pointer rounded-xl py-2 text-xs font-semibold", pathname === '/hasil/ipkp' && "bg-emerald-50 text-emerald-700 font-bold")}>
-                          {t('nav.recap_ipkp')}
+                        <DropdownMenuItem className={cn("cursor-pointer rounded-xl py-2 px-3 text-xs font-bold transition-all", pathname === '/hasil/ipkp' ? "bg-emerald-100/80 text-emerald-800" : "text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-700")}>
+                          <Activity className="size-4 mr-2 text-emerald-600 shrink-0" />
+                          <span>{t('nav.recap_ipkp')}</span>
                         </DropdownMenuItem>
                       </Link>
                       <Link href="/hasil/ipak">
-                        <DropdownMenuItem className={cn("cursor-pointer rounded-xl py-2 text-xs font-semibold", pathname === '/hasil/ipak' && "bg-emerald-50 text-emerald-700 font-bold")}>
-                          {t('nav.recap_ipak')}
+                        <DropdownMenuItem className={cn("cursor-pointer rounded-xl py-2 px-3 text-xs font-bold transition-all", pathname === '/hasil/ipak' ? "bg-emerald-100/80 text-emerald-800" : "text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-700")}>
+                          <ShieldCheck className="size-4 mr-2 text-emerald-600 shrink-0" />
+                          <span>{t('nav.recap_ipak')}</span>
                         </DropdownMenuItem>
                       </Link>
                     </DropdownMenuContent>
@@ -268,43 +270,44 @@ export function PublicNavbar() {
                       <span>{link.label}</span>
                       <ChevronDown className="size-3.5 text-slate-400 group-data-[state=open]:rotate-180 transition-transform duration-200" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="center" className="w-56 rounded-2xl p-1.5 shadow-xl border-slate-200">
+                    <DropdownMenuContent align="center" sideOffset={8} className="w-56 rounded-2xl p-1.5 shadow-2xl shadow-emerald-950/15 border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl">
                       {archiveData.map((item) => (
                         <DropdownMenuSub key={item.year}>
-                          <DropdownMenuSubTrigger className="rounded-xl py-2 cursor-pointer font-bold text-xs">
-                            <FolderArchive className="size-4 mr-2 text-emerald-600" />
+                          <DropdownMenuSubTrigger className="rounded-xl py-2 px-3 cursor-pointer font-extrabold text-xs text-slate-700 dark:text-slate-200 hover:text-emerald-800 hover:bg-emerald-50/80">
+                            <FolderArchive className="size-4 mr-2 text-emerald-600 shrink-0" />
                             <span>{locale === 'en' ? `${item.year} Archives` : `Arsip Tahun ${item.year}`}</span>
                           </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent className="w-52 rounded-2xl p-1.5 shadow-xl">
+                          <DropdownMenuSubContent sideOffset={8} className="w-52 rounded-2xl p-1.5 shadow-2xl shadow-emerald-950/15 border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl">
                             <DropdownMenuSub>
-                              <DropdownMenuSubTrigger className="rounded-xl py-1.5 cursor-pointer text-xs font-semibold">
-                                {locale === 'en' ? 'IPKP Index' : 'Indeks IPKP'}
+                              <DropdownMenuSubTrigger className="rounded-xl py-2 px-3 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-800 hover:bg-emerald-50/80">
+                                <Activity className="size-4 mr-2 text-emerald-600 shrink-0" />
+                                <span>{locale === 'en' ? 'IPKP Index' : 'Indeks IPKP'}</span>
                               </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent className="w-48 rounded-xl p-1">
+                              <DropdownMenuSubContent sideOffset={8} className="w-52 rounded-2xl p-1.5 shadow-2xl shadow-emerald-950/15 border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl space-y-0.5">
                                 {item.quarters.map((q) => (
                                   <Link key={q} href={`/arsip/ipkp/${item.year}/q${q}`}>
-                                    <DropdownMenuItem className="cursor-pointer text-xs py-1.5 rounded-md font-medium">
+                                    <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                                       {locale === 'en' ? `Quarter ${q}` : `Triwulan ${q}`} ({item.year})
                                     </DropdownMenuItem>
                                   </Link>
                                 ))}
                                 {item.hasSemester1 && (
                                   <Link href={`/arsip/ipkp/${item.year}/s1`}>
-                                    <DropdownMenuItem className="cursor-pointer text-xs py-1.5 rounded-md font-medium">
+                                    <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                                       {locale === 'en' ? 'Semester 1' : 'Semester I'} ({item.year})
                                     </DropdownMenuItem>
                                   </Link>
                                 )}
                                 {item.hasSemester2 && (
                                   <Link href={`/arsip/ipkp/${item.year}/s2`}>
-                                    <DropdownMenuItem className="cursor-pointer text-xs py-1.5 rounded-md font-medium">
+                                    <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                                       {locale === 'en' ? 'Semester 2' : 'Semester II'} ({item.year})
                                     </DropdownMenuItem>
                                   </Link>
                                 )}
                                 {item.hasTahunan && (
                                   <Link href={`/arsip/ipkp/${item.year}/tahunan`}>
-                                    <DropdownMenuItem className="cursor-pointer text-xs py-1.5 rounded-md font-bold text-emerald-700">
+                                    <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-extrabold text-emerald-800 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/80 hover:bg-emerald-100 transition-all">
                                       {locale === 'en' ? 'Annual' : 'Tahunan'} ({item.year})
                                     </DropdownMenuItem>
                                   </Link>
@@ -312,37 +315,38 @@ export function PublicNavbar() {
                               </DropdownMenuSubContent>
                             </DropdownMenuSub>
 
-                            <DropdownMenuSeparator />
+                            <DropdownMenuSeparator className="my-1 bg-slate-100/80 dark:bg-slate-800" />
 
                             <DropdownMenuSub>
-                              <DropdownMenuSubTrigger className="rounded-xl py-1.5 cursor-pointer text-xs font-semibold">
-                                {locale === 'en' ? 'IPAK Index' : 'Indeks IPAK'}
+                              <DropdownMenuSubTrigger className="rounded-xl py-2 px-3 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-800 hover:bg-emerald-50/80">
+                                <ShieldCheck className="size-4 mr-2 text-emerald-600 shrink-0" />
+                                <span>{locale === 'en' ? 'IPAK Index' : 'Indeks IPAK'}</span>
                               </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent className="w-48 rounded-xl p-1">
+                              <DropdownMenuSubContent sideOffset={8} className="w-52 rounded-2xl p-1.5 shadow-2xl shadow-emerald-950/15 border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl space-y-0.5">
                                 {item.quarters.map((q) => (
                                   <Link key={q} href={`/arsip/ipak/${item.year}/q${q}`}>
-                                    <DropdownMenuItem className="cursor-pointer text-xs py-1.5 rounded-md font-medium">
+                                    <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                                       {locale === 'en' ? `Quarter ${q}` : `Triwulan ${q}`} ({item.year})
                                     </DropdownMenuItem>
                                   </Link>
                                 ))}
                                 {item.hasSemester1 && (
                                   <Link href={`/arsip/ipak/${item.year}/s1`}>
-                                    <DropdownMenuItem className="cursor-pointer text-xs py-1.5 rounded-md font-medium">
+                                    <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                                       {locale === 'en' ? 'Semester 1' : 'Semester I'} ({item.year})
                                     </DropdownMenuItem>
                                   </Link>
                                 )}
                                 {item.hasSemester2 && (
                                   <Link href={`/arsip/ipak/${item.year}/s2`}>
-                                    <DropdownMenuItem className="cursor-pointer text-xs py-1.5 rounded-md font-medium">
+                                    <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                                       {locale === 'en' ? 'Semester 2' : 'Semester II'} ({item.year})
                                     </DropdownMenuItem>
                                   </Link>
                                 )}
                                 {item.hasTahunan && (
                                   <Link href={`/arsip/ipak/${item.year}/tahunan`}>
-                                    <DropdownMenuItem className="cursor-pointer text-xs py-1.5 rounded-md font-bold text-emerald-700">
+                                    <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-extrabold text-emerald-800 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/80 hover:bg-emerald-100 transition-all">
                                       {locale === 'en' ? 'Annual' : 'Tahunan'} ({item.year})
                                     </DropdownMenuItem>
                                   </Link>
@@ -403,7 +407,7 @@ export function PublicNavbar() {
               <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
                 <Link href={SURVEY_ROUTES.HOME} className="flex items-center" onClick={() => setOpen(false)}>
                   <div className="flex h-10 items-center justify-center">
-                    <Image src="/arus.png" alt="ARUS Logo" width={100} height={50} style={{ width: 'auto', height: 'auto' }} className="object-contain" />
+                    <Image src="/arus.webp" alt="ARUS Logo" width={100} height={50} style={{ width: 'auto', height: 'auto' }} className="object-contain" />
                   </div>
                 </Link>
                 <button

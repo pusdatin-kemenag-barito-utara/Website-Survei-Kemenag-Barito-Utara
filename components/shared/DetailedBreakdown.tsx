@@ -1,8 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { Star, StarHalf } from 'lucide-react'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/components/shared/I18nProvider'
 import { NILAI_MUTU } from '@/lib/constants'
 import type { IndexSummary, IndexByService, UnsurSummary, DemographicSummary } from '@/types'
@@ -10,13 +12,69 @@ import type { IndexSummary, IndexByService, UnsurSummary, DemographicSummary } f
 interface DetailedBreakdownProps {
   indexType: 'IPKP' | 'IPAK'
   serviceFilter: string
+  periodTitle?: string
   summary: IndexSummary[]
   byService: IndexByService[]
   unsurSummary: UnsurSummary[]
   demoSummary: DemographicSummary[]
 }
 
-export function DetailedBreakdown({ indexType, serviceFilter, summary, byService, unsurSummary, demoSummary }: DetailedBreakdownProps) {
+const getUnsurRatingLabel = (score: number) => {
+  if (score >= 3.53) return 'Sangat Baik'
+  if (score >= 3.06) return 'Baik'
+  if (score >= 2.60) return 'Kurang Baik'
+  return 'Tidak Baik'
+}
+
+function StarRatingItem({ score }: { score: number }) {
+  const [showClickScore, setShowClickScore] = useState(false)
+  const label = getUnsurRatingLabel(score)
+
+  const stars = []
+  for (let i = 1; i <= 4; i++) {
+    if (score >= i) {
+      stars.push(<Star key={i} className="size-3.5 fill-amber-400 text-amber-400 inline-block" />)
+    } else if (score >= i - 0.5) {
+      stars.push(<StarHalf key={i} className="size-3.5 fill-amber-400 text-amber-400 inline-block" />)
+    } else {
+      stars.push(<Star key={i} className="size-3.5 text-slate-300 dark:text-slate-600 inline-block" />)
+    }
+  }
+
+  return (
+    <TooltipProvider delay={0}>
+      <Tooltip>
+        <TooltipTrigger
+          onClick={() => setShowClickScore(!showClickScore)}
+          className="inline-flex items-center justify-center gap-2.5 px-3 py-1 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-950/60 transition-all cursor-pointer group select-none"
+          title={`Skor: ${score.toFixed(2)} / 4.00 (${label})`}
+        >
+          <div className="flex items-center gap-1 group-hover:scale-110 transition-transform duration-200">{stars}</div>
+          <span className="text-[11px] font-extrabold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/80 border border-amber-200 dark:border-amber-800/80 px-2 py-0.5 rounded-full whitespace-nowrap shadow-sm group-hover:border-amber-300 transition-colors">
+            {showClickScore ? `${score.toFixed(2)} (${label})` : label}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="bg-slate-900 text-white font-extrabold text-xs py-1.5 px-3 rounded-xl shadow-xl">
+          Skor: <span className="text-amber-300 font-mono text-sm ml-1">{score.toFixed(2)}</span> / 4.00 ({label})
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
+const getPendidikanRank = (val: string): number => {
+  const v = val.toUpperCase().trim()
+  if (v.includes('SD') || v.includes('PRIMARY')) return 1
+  if (v.includes('SMP') || v.includes('SLTP') || v.includes('JUNIOR')) return 2
+  if (v.includes('SMA') || v.includes('SMK') || v.includes('SLTA') || v.includes('MA') || v.includes('SENIOR')) return 3
+  if (v.includes('D1') || v.includes('D2') || v.includes('D3') || v.includes('DIPLOMA')) return 4
+  if (v.includes('D4') || v.includes('S1') || v.includes('SARJANA')) return 5
+  if (v.includes('S2') || v.includes('MAGISTER') || v.includes('PASCASARJANA')) return 6
+  if (v.includes('S3') || v.includes('DOKTOR')) return 7
+  return 99
+}
+
+export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summary, byService, unsurSummary, demoSummary }: DetailedBreakdownProps) {
   const { locale } = useI18n()
 
   // 1. Calculate Score Data
@@ -92,6 +150,12 @@ export function DetailedBreakdown({ indexType, serviceFilter, summary, byService
       return fieldOrder.indexOf(a.label.toLowerCase()) - fieldOrder.indexOf(b.label.toLowerCase())
     })
 
+    result.forEach((group) => {
+      if (group.label.toLowerCase() === 'pendidikan') {
+        group.options.sort((a, b) => getPendidikanRank(a.value) - getPendidikanRank(b.value))
+      }
+    })
+
     return result
   }, [serviceFilter, demoSummary])
 
@@ -104,13 +168,21 @@ export function DetailedBreakdown({ indexType, serviceFilter, summary, byService
       
       {/* Table 1: Rincian Nilai Per Unsur */}
       <Card className="border border-slate-200/80 dark:border-gray-800 shadow-xl shadow-slate-200/40 dark:shadow-black/20 bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
-        <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4 sm:p-5">
-          <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">
-            Rekapitulasi Nilai Per Unsur
-          </CardTitle>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">
-            Tabel rincian kalkulasi indikator {indexType === 'IPKP' ? 'IPKP (9 Unsur)' : 'IPAK (5 Unsur)'}
-          </p>
+        <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>Rekapitulasi Nilai Per Unsur</span>
+            </CardTitle>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              Tabel rincian kalkulasi indikator {indexType === 'IPKP' ? 'IPKP (9 Unsur)' : 'IPAK (5 Unsur)'}
+            </p>
+          </div>
+          {periodTitle && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-extrabold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200/80 shadow-xs shrink-0 self-start sm:self-auto">
+              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+              Periode: {periodTitle}
+            </span>
+          )}
         </CardHeader>
         <div className="overflow-x-auto w-full">
           <Table className="min-w-[640px] sm:min-w-full">
@@ -121,6 +193,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, summary, byService
                 <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap">Jml Soal</TableHead>
                 <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap">Total Nilai</TableHead>
                 <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800">Rata-Rata</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800 min-w-[200px] px-4">Rating Bintang</TableHead>
                 <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800">Rata-Rata Tertimbang</TableHead>
               </TableRow>
             </TableHeader>
@@ -132,11 +205,12 @@ export function DetailedBreakdown({ indexType, serviceFilter, summary, byService
                   <TableCell className="text-center font-bold text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">{u.jumlah_pertanyaan}</TableCell>
                   <TableCell className="text-center font-bold text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">{u.total_nilai}</TableCell>
                   <TableCell className="text-center font-mono font-bold text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">{u.rataRata.toFixed(2)}</TableCell>
+                  <TableCell className="text-center py-2.5 sm:py-3"><StarRatingItem score={u.rataRata} /></TableCell>
                   <TableCell className="text-center font-mono font-bold text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3">{u.tertimbang.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
               <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs border-t-2 border-slate-200 dark:border-gray-700">
-                <TableCell colSpan={5} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
+                <TableCell colSpan={6} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
                   Indeks Survei ({indexType})
                 </TableCell>
                 <TableCell className="text-center text-emerald-700 dark:text-emerald-400 font-mono py-2.5 sm:py-3 whitespace-nowrap">
@@ -144,7 +218,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, summary, byService
                 </TableCell>
               </TableRow>
               <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs">
-                <TableCell colSpan={5} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
+                <TableCell colSpan={6} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
                   Nilai Konversi
                 </TableCell>
                 <TableCell className="text-center text-emerald-700 dark:text-emerald-400 font-mono py-2.5 sm:py-3 whitespace-nowrap">
@@ -152,7 +226,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, summary, byService
                 </TableCell>
               </TableRow>
               <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs">
-                <TableCell colSpan={5} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
+                <TableCell colSpan={6} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
                   Mutu Pelayanan
                 </TableCell>
                 <TableCell className="text-center text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3 whitespace-nowrap">
@@ -166,16 +240,22 @@ export function DetailedBreakdown({ indexType, serviceFilter, summary, byService
 
       {/* Unified Score and Demographics Card */}
       <Card className="border border-slate-200/80 dark:border-gray-800 shadow-xl shadow-slate-200/40 dark:shadow-black/20 bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
-        <div className="text-center py-6 px-4 bg-slate-50/50 dark:bg-gray-800/40 border-b border-slate-100 dark:border-gray-800">
+        <div className="text-center py-6 px-4 bg-slate-50/50 dark:bg-gray-800/40 border-b border-slate-100 dark:border-gray-800 flex flex-col items-center">
           <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white uppercase leading-relaxed">
             Survei {indexType === 'IPKP' ? 'Indeks Persepsi Kualitas Pelayanan (IPKP)' : 'Indeks Persepsi Anti Korupsi (IPAK)'}<br/>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA TAHUN 2026</span>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-extrabold">KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA</span>
           </h2>
+          {periodTitle && (
+            <div className="mt-2.5 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-black text-xs tracking-wide shadow-xs">
+              <span className="size-2 rounded-full bg-emerald-600 animate-pulse" />
+              <span>PERIODE: {periodTitle.toUpperCase()}</span>
+            </div>
+          )}
         </div>
         
         <div className="flex flex-col sm:flex-row w-full bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white font-extrabold text-xs sm:text-sm">
           <div className="w-full sm:w-1/2 text-center py-3 px-4 border-b sm:border-b-0 sm:border-r border-white/20 uppercase tracking-wide">
-            Nilai Survei {indexType === 'IPKP' ? 'Indeks Persepsi Kualitas Pelayanan (IPKP)' : 'Indeks Persepsi Anti Korupsi (IPAK)'}
+            Nilai Survei {indexType === 'IPKP' ? 'Indeks Persepsi Kualitas Pelayanan (IPKP)' : 'Indeks Persepsi Anti Korupsi (IPAK)'} {periodTitle ? `(${periodTitle})` : ''}
           </div>
           <div className="w-full sm:w-1/2 text-center py-3 px-4 uppercase tracking-wide">
             {serviceFilter === 'all' ? 'Semua Pelayanan' : serviceFilter}

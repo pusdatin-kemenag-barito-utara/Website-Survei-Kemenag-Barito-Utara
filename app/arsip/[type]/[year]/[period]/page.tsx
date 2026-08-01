@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, notFound } from 'next/navigation'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, PieChart, Pie, Cell, LabelList, AreaChart, Area,
@@ -26,6 +26,21 @@ export default function ArsipPage() {
   const yearStr = (params?.year as string) || new Date().getFullYear().toString()
   const period = (params?.period as string) || 'tahunan'
   
+  const validTypes = ['ipkp', 'ipak']
+  const validPeriods = ['q1', 'q2', 'q3', 'q4', 's1', 's2', 'sem1', 'sem2', 'tahunan']
+  const yearNum = parseInt(yearStr, 10)
+
+  const [isNotFound, setIsNotFound] = useState(false)
+
+  // Validate URL parameters: Year must be >= 2026, type and period must be valid
+  if (!validTypes.includes(type.toLowerCase()) || !validPeriods.includes(period.toLowerCase()) || isNaN(yearNum) || yearNum < 2026) {
+    notFound()
+  }
+
+  if (isNotFound) {
+    notFound()
+  }
+
   const indexType = type.toUpperCase() === 'IPAK' ? 'IPAK' : 'IPKP'
   
   const { t, locale } = useI18n()
@@ -337,12 +352,23 @@ export default function ArsipPage() {
       if (servicesRes.data) setAllServices(servicesRes.data)
       setTotalResponses(responseCount)
 
+      if (responseCount === 0) {
+        setIsNotFound(true)
+      }
+
       setLoading(false)
     }
     fetchData()
   }, [yearStr, period])
 
-  const uniqueServices = Array.from(new Set(byService.map((s) => s.service_name))).sort()
+  const serviceOptions = Array.from(new Set([
+    ...allServices.map((s) => s.name),
+    ...byService.map((s) => s.service_name)
+  ])).sort()
+
+  const displayedServices = serviceFilter === 'all'
+    ? allServices
+    : allServices.filter((s) => s.name === serviceFilter)
 
   const parseBarData = () => {
     const ipkpByService = byService.filter((b) => b.index_type === 'IPKP')
@@ -364,6 +390,18 @@ export default function ArsipPage() {
       }
     })
   }
+
+const getPendidikanRank = (val: string): number => {
+  const v = val.toUpperCase().trim()
+  if (v.includes('SD') || v.includes('PRIMARY')) return 1
+  if (v.includes('SMP') || v.includes('SLTP') || v.includes('JUNIOR')) return 2
+  if (v.includes('SMA') || v.includes('SMK') || v.includes('SLTA') || v.includes('MA') || v.includes('SENIOR')) return 3
+  if (v.includes('D1') || v.includes('D2') || v.includes('D3') || v.includes('DIPLOMA')) return 4
+  if (v.includes('D4') || v.includes('S1') || v.includes('SARJANA')) return 5
+  if (v.includes('S2') || v.includes('MAGISTER') || v.includes('PASCASARJANA')) return 6
+  if (v.includes('S3') || v.includes('DOKTOR')) return 7
+  return 99
+}
 
   const parseDemoFieldData = (fieldKey: string) => {
     let filtered = demoSummary.filter((d) => d.field_key.toLowerCase() === fieldKey.toLowerCase())
@@ -387,7 +425,11 @@ export default function ArsipPage() {
       return []
     }
 
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value }))
+    const result = Array.from(map.entries()).map(([name, value]) => ({ name, value }))
+    if (fieldKey.toLowerCase() === 'pendidikan') {
+      result.sort((a, b) => getPendidikanRank(a.name) - getPendidikanRank(b.name))
+    }
+    return result
   }
 
   const getMutuDescription = (mutu: string) => {
@@ -404,7 +446,10 @@ export default function ArsipPage() {
   async function handleExportExcel() {
     try {
       const fullPeriodLabel = `${periodName} Tahun ${yearStr}`
-      await exportToExcel(summary, byService, totalResponses, fullPeriodLabel, demoSummary)
+      const filteredByService = serviceFilter === 'all'
+        ? byService
+        : byService.filter(b => b.service_name === serviceFilter)
+      await exportToExcel(summary, filteredByService, totalResponses, fullPeriodLabel, demoSummary)
       toast.success('Berhasil mengekspor ke Excel')
     } catch {
       toast.error('Gagal mengekspor Excel')
@@ -414,7 +459,10 @@ export default function ArsipPage() {
   async function handleExportPdf() {
     try {
       const fullPeriodLabel = `${periodName} Tahun ${yearStr}`
-      await exportToPdf(summary, byService, totalResponses, fullPeriodLabel, demoSummary)
+      const filteredByService = serviceFilter === 'all'
+        ? byService
+        : byService.filter(b => b.service_name === serviceFilter)
+      await exportToPdf(summary, filteredByService, totalResponses, fullPeriodLabel, demoSummary)
       toast.success('Berhasil mengekspor ke PDF')
     } catch {
       toast.error('Gagal mengekspor PDF')
@@ -453,7 +501,7 @@ export default function ArsipPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t('results.all_services')}</SelectItem>
-                    {uniqueServices.map((s) => (
+                    {serviceOptions.map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>
@@ -474,11 +522,15 @@ export default function ArsipPage() {
           </div>
 
           <Card className="mb-12 shadow-lg border-0 bg-white overflow-hidden">
-            <CardHeader className="border-b bg-gray-50/50 py-4">
-              <CardTitle className="text-center text-base md:text-lg text-gray-800 font-medium uppercase leading-snug">
+            <CardHeader className="border-b bg-gray-50/50 py-4 flex flex-col items-center">
+              <CardTitle className="text-center text-base md:text-lg text-gray-800 font-bold uppercase leading-snug">
                 Rekapitulasi Data Survei {tableTitle} Per Layanan<br/>
-                KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA {periodName.toUpperCase()} {yearStr}
+                KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA
               </CardTitle>
+              <div className="mt-2.5 inline-flex items-center gap-2 px-4 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 font-extrabold text-xs tracking-wide shadow-xs">
+                <span className="size-2 rounded-full bg-emerald-600 animate-pulse" />
+                <span>KATEGORI PERIODE: {periodName.toUpperCase()} {yearStr}</span>
+              </div>
             </CardHeader>
             <div className="overflow-x-auto">
               <Table>
@@ -499,14 +551,14 @@ export default function ArsipPage() {
                         Memuat data...
                       </TableCell>
                     </TableRow>
-                  ) : allServices.length === 0 ? (
+                  ) : displayedServices.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                         Belum ada layanan aktif
                       </TableCell>
                     </TableRow>
                   ) : (
-                    allServices
+                    displayedServices
                       .map((service, i) => {
                         const item = byService.find(b => (b.service_id === service.id || b.service_name === service.name) && b.index_type === indexType)
                         const hasData = item && item.jumlah_responden > 0
@@ -541,6 +593,7 @@ export default function ArsipPage() {
             <DetailedBreakdown 
               indexType={indexType} 
               serviceFilter={serviceFilter} 
+              periodTitle={`${periodName} ${yearStr}`}
               summary={summary} 
               byService={byService} 
               unsurSummary={unsurSummary} 

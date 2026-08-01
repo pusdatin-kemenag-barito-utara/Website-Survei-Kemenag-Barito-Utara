@@ -258,7 +258,7 @@ export default function HomePage() {
                     <span className="text-xs font-bold text-slate-400">{locale === 'en' ? 'Respondents' : 'Orang'}</span>
                   </div>
                   <div className="text-[11px] font-extrabold text-purple-800 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/80 px-3 py-1 rounded-full border border-purple-200 dark:border-purple-900">
-                    {locale === 'en' ? 'Data Year 2026' : 'Data Tahun 2026'}
+                    {locale === 'en' ? `Data Year ${new Date().getFullYear()}` : `Data Tahun ${new Date().getFullYear()}`}
                   </div>
                 </div>
               </Card>

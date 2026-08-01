@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -35,11 +35,15 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+const getCurrentTime = () => Date.now();
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTime, setLockoutTime] = useState<number | null>(null);
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
   const {
@@ -50,9 +54,30 @@ export default function AdminLoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  // Handle lockout countdown timer
+  useEffect(() => {
+    if (!lockoutTime) return;
+    const timer = setInterval(() => {
+      const currentTime = getCurrentTime();
+      const remaining = Math.ceil((lockoutTime - currentTime) / 1000);
+      if (remaining <= 0) {
+        setLockoutTime(null);
+        setFailedAttempts(0);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutTime]);
+
   async function onSubmit(data: LoginForm) {
+    const now = getCurrentTime();
+    if (lockoutTime && now < lockoutTime) {
+      const remainingSec = Math.ceil((lockoutTime - now) / 1000);
+      toast.error(`Terlalu banyak percobaan gagal. Silakan tunggu ${remainingSec} detik.`);
+      return;
+    }
+
     if (turnstileSiteKey && !turnstileToken) {
-      toast.error("Silakan selesaikan verifikasi keamanan");
+      toast.error("Silakan selesaikan verifikasi keamanan (CAPTCHA)");
       return;
     }
 
@@ -62,19 +87,31 @@ export default function AdminLoginPage() {
       const isHuman = await verifyTurnstileToken(turnstileToken);
       if (!isHuman) {
         toast.error("Verifikasi keamanan gagal, coba lagi.");
+        setTurnstileToken("");
         setLoading(false);
         return;
       }
     }
 
+    const sanitizedEmail = data.email.trim().toLowerCase();
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
+      email: sanitizedEmail,
       password: data.password,
     });
 
     if (error) {
-      toast.error("Email atau kata sandi salah");
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+      setTurnstileToken(""); // Reset CAPTCHA token on failure
+
+      if (newAttempts >= 5) {
+        const lockoutUntil = getCurrentTime() + 60 * 1000; // 60 seconds lockout
+        setLockoutTime(lockoutUntil);
+        toast.error("Terlalu banyak percobaan login gagal. Akun dikunci sementara selama 60 detik.");
+      } else {
+        toast.error(`Email atau kata sandi tidak valid. Sisa percobaan: ${5 - newAttempts}`);
+      }
       setLoading(false);
       return;
     }
@@ -84,7 +121,8 @@ export default function AdminLoginPage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      toast.error("Gagal memuat sesi pengguna");
+      toast.error("Gagal memuat sesi pengguna.");
+      setTurnstileToken("");
       setLoading(false);
       return;
     }
@@ -92,7 +130,7 @@ export default function AdminLoginPage() {
     // Verifikasi ketersediaan pengguna di database pusdatin terpusat
     const { data: pusdatinUser, error: pusdatinError } = await supabase.rpc(
       "get_pusdatin_user",
-      { email_address: data.email },
+      { email_address: sanitizedEmail },
     );
 
     // Hanya lakukan pengecekan ketat jika bukan super admin
@@ -100,6 +138,7 @@ export default function AdminLoginPage() {
       if (pusdatinError || !pusdatinUser) {
         await supabase.auth.signOut();
         toast.error("Akun Anda tidak terdaftar di sistem terpusat.");
+        setTurnstileToken("");
         setLoading(false);
         return;
       }
@@ -107,6 +146,7 @@ export default function AdminLoginPage() {
       if (pusdatinUser.status !== "active") {
         await supabase.auth.signOut();
         toast.error("Akun Anda sedang dinonaktifkan oleh Administrator.");
+        setTurnstileToken("");
         setLoading(false);
         return;
       }
@@ -120,10 +160,15 @@ export default function AdminLoginPage() {
       if (!hasSurveyAccess) {
         await supabase.auth.signOut();
         toast.error("Anda tidak memiliki hak akses untuk aplikasi SIKAP.");
+        setTurnstileToken("");
         setLoading(false);
         return;
       }
     }
+
+    // Reset attempt counter on clean success
+    setFailedAttempts(0);
+    setLockoutTime(null);
 
     toast.success("Berhasil login! Mengalihkan ke halaman dashboard...", {
       position: "top-right",
@@ -148,7 +193,7 @@ export default function AdminLoginPage() {
         <div className="relative z-10 flex items-center gap-3">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-white/10 p-2.5 shadow-lg backdrop-blur-md border border-white/20">
             <Image
-              src="/arus.png"
+              src="/arus.webp"
               alt="ARUS Logo"
               width={40}
               height={40}

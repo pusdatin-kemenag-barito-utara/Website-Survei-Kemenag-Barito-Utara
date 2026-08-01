@@ -10,7 +10,7 @@ export function Footer() {
     <footer className="border-t border-gray-100 bg-white py-8">
       <div className="flex flex-col items-center gap-1.5 text-center px-4">
         <div className="flex flex-col items-center justify-center mb-2 gap-2">
-          <Image src="/hapakat.png" alt="HAPAKAT Logo" width={120} height={40} style={{ width: 'auto', height: 'auto' }} className="object-contain opacity-90 hover:opacity-100 transition-opacity" />
+          <Image src="/hapakat.webp" alt="HAPAKAT Logo" width={120} height={40} style={{ width: 'auto', height: 'auto' }} className="object-contain opacity-90 hover:opacity-100 transition-opacity" />
         </div>
         <p className="text-xs text-gray-600 font-medium">
           {locale === 'en' ? (

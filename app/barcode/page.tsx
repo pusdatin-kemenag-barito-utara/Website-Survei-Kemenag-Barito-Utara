@@ -108,7 +108,7 @@ export default function BarcodePage() {
                   <img src={qrDataUrl} alt="QR Code" className="size-64" />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="bg-white p-1 rounded-xl shadow-sm">
-                      <Image src="/arus.png" alt="ARUS Logo" width={50} height={50} className="object-contain" />
+                      <Image src="/arus.webp" alt="ARUS Logo" width={50} height={50} className="object-contain" />
                     </div>
                   </div>
                 </div>

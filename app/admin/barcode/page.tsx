@@ -16,7 +16,7 @@ export default function AdminBarcodePage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [services, setServices] = useState<Service[]>([])
   const [selectedServiceId, setSelectedServiceId] = useState<string>('all')
-  const [centerLogo, setCenterLogo] = useState<string>('/arus.png')
+  const [centerLogo, setCenterLogo] = useState<string>('/arus.webp')
   const [copied, setCopied] = useState(false)
 
   const origin = typeof window !== 'undefined'
@@ -187,9 +187,9 @@ export default function AdminBarcodePage() {
                 </Label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {[
-                    { id: '/arus.png', label: 'SI-ARUS', img: '/arus.png' },
+                    { id: '/arus.webp', label: 'SI-ARUS', img: '/arus.webp' },
                     { id: '/kemenag.svg', label: 'Kemenag', img: '/kemenag.svg' },
-                    { id: '/hapakat.png', label: 'HAPAKAT', img: '/hapakat.png' },
+                    { id: '/hapakat.webp', label: 'HAPAKAT', img: '/hapakat.webp' },
                     { id: 'none', label: 'Polos', img: null },
                   ].map((item) => (
                     <button
@@ -240,7 +240,7 @@ export default function AdminBarcodePage() {
               <div className="flex justify-center items-center gap-3 mb-2">
                 <Image src="/kemenag.svg" alt="Logo Kemenag" width={40} height={40} className="object-contain" />
                 <div className="h-8 w-px bg-white/20" />
-                <Image src="/arus.png" alt="Logo SI-ARUS" width={40} height={40} className="object-contain" />
+                <Image src="/arus.webp" alt="Logo SI-ARUS" width={40} height={40} className="object-contain" />
               </div>
               <h3 className="text-base sm:text-lg font-black uppercase tracking-wider text-white">
                 SURVEI KEPUASAN MASYARAKAT
@@ -271,7 +271,7 @@ export default function AdminBarcodePage() {
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-gray-800 w-full flex items-center justify-center gap-2">
-                <Image src="/hapakat.png" alt="HAPAKAT" width={100} height={32} style={{ width: 'auto', height: 'auto' }} className="object-contain opacity-80" />
+                <Image src="/hapakat.webp" alt="HAPAKAT" width={100} height={32} style={{ width: 'auto', height: 'auto' }} className="object-contain opacity-80" />
               </div>
 
               {/* Action Buttons */}

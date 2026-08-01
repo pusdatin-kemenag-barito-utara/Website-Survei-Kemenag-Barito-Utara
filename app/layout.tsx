@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     siteName: "SI-ARUS Kemenag Barito Utara",
     images: [
       {
-        url: "/arus.png",
+        url: "/arus.webp",
         width: 1200,
         height: 630,
         alt: "SI-ARUS Kemenag Barito Utara",
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara",
     description: "Sistem Informasi Analisis Rekapitulasi Ulasan Survei Kepuasan Masyarakat Kantor Kementerian Agama Kabupaten Barito Utara.",
-    images: ["/arus.png"],
+    images: ["/arus.webp"],
   },
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "google-site-verification-placeholder",
@@ -82,7 +82,7 @@ export default function RootLayout({
     "alternateName": "Sistem Informasi Analisis Rekapitulasi Ulasan Survei Kepuasan Masyarakat",
     "url": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
     "logo": `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/kemenag.svg`,
-    "image": `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/arus.png`,
+    "image": `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/arus.webp`,
     "description": "Aplikasi resmi Survei Kepuasan Masyarakat (SKM) Indeks Persepsi Kualitas Pelayanan (IPKP) & Indeks Persepsi Anti Korupsi (IPAK).",
     "address": {
       "@type": "PostalAddress",

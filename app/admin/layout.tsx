@@ -156,7 +156,7 @@ function SidebarContent({
           <Link href="/admin" className="flex items-center gap-3 overflow-hidden">
             <div className="relative flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-bold shadow-sm border border-gray-100 p-1">
               <Image
-                src="/arus.png"
+                src="/arus.webp"
                 alt="SI-ARUS"
                 fill
                 unoptimized

@@ -30,7 +30,7 @@ export default function PageBanner({
       {/* Background image with realistic survey atmosphere */}
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700 scale-105"
-        style={{ backgroundImage: "url('/hero_survey_bg.png')" }}
+        style={{ backgroundImage: "url('/hero_survey_bg.webp')" }}
       />
 
       {/* Soft dark teal/emerald overlay with subtle transparency to highlight Kemenag PTSP background */}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, notFound } from 'next/navigation'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, PieChart, Pie, Cell, LabelList, AreaChart, Area,
@@ -22,8 +22,15 @@ import { toast } from 'sonner'
 
 export default function HasilPage() {
   const params = useParams()
-  const type = (params?.type as string) || 'ipkp'
-  const indexType = type.toUpperCase() === 'IPAK' ? 'IPAK' : 'IPKP'
+  const rawType = (params?.type as string) || ''
+  const typeLower = rawType.toLowerCase()
+
+  // Validate URL parameter: strict check for 'ipkp' or 'ipak' only
+  if (!['ipkp', 'ipak'].includes(typeLower)) {
+    notFound()
+  }
+
+  const indexType = typeLower === 'ipak' ? 'IPAK' : 'IPKP'
   const pageTitle = indexType === 'IPAK' ? 'Indeks Persepsi Anti Korupsi (IPAK)' : 'Indeks Persepsi Kualitas Pelayanan (IPKP)'
   const tableTitle = indexType === 'IPAK' ? 'Indeks Persepsi Anti Korupsi (IPAK)' : 'Indeks Persepsi Kualitas Pelayanan (IPKP)'
 
@@ -86,7 +93,10 @@ export default function HasilPage() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  const uniqueServices = Array.from(new Set(byService.map((s) => s.service_name))).sort()
+  const serviceOptions = Array.from(new Set([
+    ...allServices.map((s) => s.name),
+    ...byService.map((s) => s.service_name)
+  ])).sort()
 
   const displayedServices = serviceFilter === 'all'
     ? allServices
@@ -144,6 +154,18 @@ export default function HasilPage() {
     })
   }
 
+const getPendidikanRank = (val: string): number => {
+  const v = val.toUpperCase().trim()
+  if (v.includes('SD') || v.includes('PRIMARY')) return 1
+  if (v.includes('SMP') || v.includes('SLTP') || v.includes('JUNIOR')) return 2
+  if (v.includes('SMA') || v.includes('SMK') || v.includes('SLTA') || v.includes('MA') || v.includes('SENIOR')) return 3
+  if (v.includes('D1') || v.includes('D2') || v.includes('D3') || v.includes('DIPLOMA')) return 4
+  if (v.includes('D4') || v.includes('S1') || v.includes('SARJANA')) return 5
+  if (v.includes('S2') || v.includes('MAGISTER') || v.includes('PASCASARJANA')) return 6
+  if (v.includes('S3') || v.includes('DOKTOR')) return 7
+  return 99
+}
+
   const parseDemoFieldData = (fieldKey: string) => {
     let filtered = demoSummary.filter((d) => d.field_key.toLowerCase() === fieldKey.toLowerCase())
     if (serviceFilter !== 'all') {
@@ -166,7 +188,11 @@ export default function HasilPage() {
       return []
     }
 
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value }))
+    const result = Array.from(map.entries()).map(([name, value]) => ({ name, value }))
+    if (fieldKey.toLowerCase() === 'pendidikan') {
+      result.sort((a, b) => getPendidikanRank(a.name) - getPendidikanRank(b.name))
+    }
+    return result
   }
 
   const getMutuDescription = (mutu: string) => {
@@ -182,7 +208,7 @@ export default function HasilPage() {
 
   async function handleExportExcel() {
     try {
-      const activePeriodLabel = 'Hasil Survei SKM 2026'
+      const activePeriodLabel = `Hasil Survei SKM ${new Date().getFullYear()}`
       await exportToExcel(summary, byService, activeTotalResponses, activePeriodLabel, demoSummary)
       toast.success(locale === 'en' ? 'Successfully exported to Excel' : 'Berhasil mengekspor ke Excel')
     } catch {
@@ -192,7 +218,7 @@ export default function HasilPage() {
 
   async function handleExportPdf() {
     try {
-      const activePeriodLabel = 'Hasil Survei SKM 2026'
+      const activePeriodLabel = `Hasil Survei SKM ${new Date().getFullYear()}`
       await exportToPdf(summary, byService, activeTotalResponses, activePeriodLabel, demoSummary)
       toast.success(locale === 'en' ? 'Successfully exported to PDF' : 'Berhasil mengekspor ke PDF')
     } catch {
@@ -230,7 +256,7 @@ export default function HasilPage() {
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl p-1 shadow-xl max-h-72">
                     <SelectItem value="all" className="rounded-xl font-bold">{t('results.all_services')}</SelectItem>
-                    {uniqueServices.map((s) => (
+                    {serviceOptions.map((s) => (
                       <SelectItem key={s} value={s} className="rounded-xl font-medium">{s}</SelectItem>
                     ))}
                   </SelectContent>
@@ -255,7 +281,7 @@ export default function HasilPage() {
             <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-6">
               <CardTitle className="text-center text-sm sm:text-base text-slate-900 dark:text-white font-extrabold uppercase tracking-wide leading-relaxed">
                 Rekapitulasi Data Survei {tableTitle} Per Layanan<br/>
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA TAHUN 2026</span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA TAHUN {new Date().getFullYear()}</span>
               </CardTitle>
             </CardHeader>
             <div className="overflow-x-auto">
@@ -337,6 +363,7 @@ export default function HasilPage() {
             <DetailedBreakdown 
               indexType={indexType} 
               serviceFilter={serviceFilter} 
+              periodTitle={`Tahun ${new Date().getFullYear()}`}
               summary={summary} 
               byService={byService} 
               unsurSummary={unsurSummary} 
