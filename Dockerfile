@@ -16,8 +16,8 @@ COPY frontend/package.json frontend/package-lock.json* ./frontend/
 WORKDIR /app/frontend
 RUN npm install
 COPY frontend/ ./
-COPY .env ../.env
 ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
 # Stage 3: Runner Stage
