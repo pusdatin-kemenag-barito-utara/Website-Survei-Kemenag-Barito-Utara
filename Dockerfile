@@ -1,8 +1,9 @@
 # Multi-stage Dockerfile for SIKAP Kemenag (Golang Fiber Backend + Next.js Frontend)
 
 # Stage 1: Build Golang Backend
-FROM golang:1.24 AS backend-builder
+FROM golang:alpine AS backend-builder
 WORKDIR /app/backend
+
 
 
 COPY backend/go.mod backend/go.sum ./
