@@ -1,6 +1,7 @@
 module survey-kemenag-backend
 
-go 1.25.0
+go 1.23
+
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.14
