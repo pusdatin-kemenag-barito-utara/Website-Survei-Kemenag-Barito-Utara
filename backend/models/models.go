@@ -124,7 +124,7 @@ type Response struct {
 	TurnstileVerified bool      `gorm:"type:boolean;not null;default:false" json:"turnstile_verified"`
 	IPKPFeedback      string    `gorm:"column:ipkp_feedback;type:text" json:"ipkp_feedback,omitempty"`
 	IPAKFeedback      string    `gorm:"column:ipak_feedback;type:text" json:"ipak_feedback,omitempty"`
-	IPAddress         string    `gorm:"type:inet" json:"ip_address"`
+	IPAddress         string    `gorm:"type:text" json:"ip_address"`
 	SubmittedAt       time.Time `gorm:"type:timestamptz;not null;default:now()" json:"submitted_at"`
 
 	Service Service      `gorm:"foreignKey:ServiceID" json:"service,omitempty"`
