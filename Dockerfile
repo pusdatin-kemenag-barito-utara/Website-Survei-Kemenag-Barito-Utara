@@ -30,9 +30,11 @@ RUN apk add --no-cache ca-certificates tzdata bash curl
 
 COPY --from=backend-builder /app/backend/api-sikap /app/api-sikap
 COPY --from=frontend-builder /app/frontend/public /app/frontend/public
-COPY --from=frontend-builder /app/frontend/.next/standalone /app/
+COPY --from=frontend-builder /app/frontend/.next/standalone/frontend /app/frontend/
+COPY --from=frontend-builder /app/frontend/.next/standalone/node_modules /app/node_modules/
 COPY --from=frontend-builder /app/frontend/.next/static /app/frontend/.next/static
 
 EXPOSE 3000 8080
 
-CMD ["sh", "-c", "/app/api-sikap & HOSTNAME=0.0.0.0 PORT=3000 node frontend/server.js"]
+CMD ["sh", "-c", "/app/api-sikap & HOSTNAME=0.0.0.0 PORT=3000 node /app/frontend/server.js"]
+
