@@ -1,0 +1,7 @@
+# Go Backend GitIgnore
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+.env
