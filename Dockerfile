@@ -35,6 +35,7 @@ COPY --from=frontend-builder /app/frontend/.next/static /app/frontend/.next/stat
 
 EXPOSE 3000 8080
 
-CMD ["sh", "-c", "/app/api-sikap & HOSTNAME=0.0.0.0 PORT=3000 node /app/server.js"]
+CMD ["sh", "-c", "PORT=8080 /app/api-sikap & HOSTNAME=0.0.0.0 PORT=3000 node /app/server.js"]
+
 
 
