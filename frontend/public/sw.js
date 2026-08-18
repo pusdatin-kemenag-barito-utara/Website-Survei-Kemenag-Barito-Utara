@@ -1,7 +1,6 @@
-// SI-ARUS Service Worker - PWA & Offline Resilience with HTTP/3 Navigation Preload
-const CACHE_NAME = 'si-arus-cache-v1.1.0';
+// SI-ARUS Service Worker - PWA & High Performance Asset Caching
+const CACHE_NAME = 'si-arus-cache-v1.2.0';
 const STATIC_ASSETS = [
-  '/',
   '/favicon.ico',
   '/icon.png',
   '/apple-icon.png',
@@ -13,7 +12,7 @@ const STATIC_ASSETS = [
   '/manifest.webmanifest',
 ];
 
-// Install Event: Pre-cache critical static shell
+// Install Event: Pre-cache static shell assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
@@ -24,16 +23,12 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate Event: Enable Navigation Preload for HTTP/3 & Clean up legacy caches
+// Activate Event: Clean up legacy caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    Promise.all([
-      // Enable Navigation Preload if supported
-      self.registration.navigationPreload
-        ? self.registration.navigationPreload.enable()
-        : Promise.resolve(),
-      // Clean old caches
-      caches.keys().then((cacheNames) => {
+    caches
+      .keys()
+      .then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cache) => {
             if (cache !== CACHE_NAME) {
@@ -41,85 +36,53 @@ self.addEventListener('activate', (event) => {
             }
           })
         );
-      }),
-    ]).then(() => self.clients.claim())
+      })
+      .then(() => self.clients.claim())
   );
 });
 
-// Fetch Event: Stale-While-Revalidate / Cache-First for static assets, Network-First for others
+// Fetch Event: Cache-First for static assets only; let HTML/API bypass directly
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests and API/Auth routes
+  // Never intercept non-GET, navigation/HTML, API, or third-party requests
   if (request.method !== 'GET') return;
+  if (request.mode === 'navigate' || request.destination === 'document') return;
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_image')) return;
   if (url.origin.includes('supabase') || url.origin.includes('pusdatin') || url.origin.includes('cloudflare')) return;
 
-  // 1. Google Fonts and Static Media: Cache-First with Background Revalidation
+  // Cache-First for static media, fonts, CSS, and JS chunks
   const isStaticMedia =
     url.origin.includes('fonts.googleapis.com') ||
     url.origin.includes('fonts.gstatic.com') ||
     request.destination === 'image' ||
     request.destination === 'font' ||
     request.destination === 'style' ||
-    url.pathname.match(/\.(png|jpg|jpeg|webp|svg|ico|woff2?|ttf|css)$/);
+    request.destination === 'script' ||
+    url.pathname.match(/\.(png|jpg|jpeg|webp|svg|ico|woff2?|ttf|css|js)$/);
 
   if (isStaticMedia) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
-          // Background revalidation
-          fetch(request)
-            .then((networkResponse) => {
-              if (networkResponse && networkResponse.status === 200) {
-                caches.open(CACHE_NAME).then((cache) => cache.put(request, networkResponse));
-              }
-            })
-            .catch(() => {});
           return cachedResponse;
         }
 
-        return fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return networkResponse;
-        });
+        return fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                try {
+                  cache.put(request, responseToCache);
+                } catch {}
+              });
+            }
+            return networkResponse;
+          })
+          .catch(() => cachedResponse || new Response('', { status: 408 }));
       })
     );
-    return;
-  }
-
-  // 2. Navigation / HTML pages: Use Navigation Preload -> Network -> Cache Fallback
-  if (request.mode === 'navigate' || request.destination === 'document') {
-    event.respondWith(
-      (async () => {
-        try {
-          // Use preloaded response if available (HTTP/3 speedup)
-          const preloadResponse = await event.preloadResponse;
-          if (preloadResponse) {
-            const clone = preloadResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-            return preloadResponse;
-          }
-
-          const networkResponse = await fetch(request);
-          if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return networkResponse;
-        } catch {
-          const cached = await caches.match(request);
-          if (cached) return cached;
-          const fallback = await caches.match('/');
-          if (fallback) return fallback;
-          return new Response('Offline', { status: 503, statusText: 'Offline' });
-        }
-      })()
-    );
-    return;
   }
 });

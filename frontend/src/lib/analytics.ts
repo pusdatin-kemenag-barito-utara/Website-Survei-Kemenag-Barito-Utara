@@ -10,8 +10,8 @@ declare global {
   }
 }
 
-export const GA_MEASUREMENT_ID = (import.meta as any)?.env?.PUBLIC_GA_MEASUREMENT_ID || "";
-export const GTAG_ID = (import.meta as any)?.env?.PUBLIC_GTAG_ID || "";
+export const GA_MEASUREMENT_ID = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || "";
+export const GTAG_ID = import.meta.env.PUBLIC_GTAG_ID || "";
 
 /**
  * Generic safe event dispatcher to GA4 / GTAG

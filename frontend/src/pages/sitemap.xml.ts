@@ -1,5 +1,5 @@
 export function GET() {
-  const baseUrl = process.env.PUBLIC_APP_URL || (import.meta as any).env?.PUBLIC_APP_URL || "";
+  const baseUrl = import.meta.env.PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || "";
   const now = new Date();
   const lastMod = now.toISOString().slice(0, 10);
 
