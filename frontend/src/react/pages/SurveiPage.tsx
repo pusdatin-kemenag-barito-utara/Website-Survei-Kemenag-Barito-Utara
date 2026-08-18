@@ -104,7 +104,7 @@ export default function SurveiPage() {
   const [ipkpFeedback, setIpkpFeedback] = useState('')
   const [ipakFeedback, setIpakFeedback] = useState('')
 
-  const { control, handleSubmit, setValue, formState: { errors } } = useForm<FormValues>({
+  const { control, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { service_id: '', is_anonymous: false, respondent_name: '', respondent_contact: '', respondent_address: '' },
   })
@@ -319,7 +319,23 @@ export default function SurveiPage() {
     setDemographics((prev) => ({ ...prev, [fieldId]: value }))
   }
 
-  if (submitted) return <SurveyThankYou />
+  if (submitted) {
+    return (
+      <SurveyThankYou
+        serviceName={services.find((s) => s.id === selectedServiceId)?.name}
+        onReset={() => {
+          setSubmitted(false)
+          setStep(0)
+          reset()
+          setAnswers({})
+          setDemographics({})
+          setIpkpFeedback('')
+          setIpakFeedback('')
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
+      />
+    )
+  }
 
   if (loading) {
     return (

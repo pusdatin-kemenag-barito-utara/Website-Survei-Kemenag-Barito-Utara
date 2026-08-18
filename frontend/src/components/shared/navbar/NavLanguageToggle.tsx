@@ -23,7 +23,7 @@ export function NavLanguageToggle() {
   return (
     <div className="hidden lg:block">
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 rounded-xl bg-white hover:bg-emerald-50/50 shadow-xs transition-all duration-200 focus:outline-none cursor-pointer">
+        <DropdownMenuTrigger aria-label="Pilih Bahasa" className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 rounded-xl bg-white hover:bg-emerald-50/50 shadow-xs transition-all duration-200 focus:outline-none cursor-pointer">
           <Image
             src={locale === 'id' ? "https://flagcdn.com/w20/id.png" : "https://flagcdn.com/w20/us.png"}
             alt={locale === 'id' ? "ID" : "EN"}

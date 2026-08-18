@@ -69,6 +69,7 @@
     "thank_you": "Terima Kasih!",
     "thank_you_desc": "Partisipasi Anda dalam survei ini sangat berarti untuk meningkatkan kualitas pelayanan kami.",
     "fill_again": "Isi Survei Lagi",
+    "success_submit": "Survei berhasil terkirim! Terima kasih atas partisipasi Anda.",
     "error_submit": "Gagal mengirim survei. Silakan coba lagi.",
     "select_service_error": "Silakan pilih layanan terlebih dahulu"
   },

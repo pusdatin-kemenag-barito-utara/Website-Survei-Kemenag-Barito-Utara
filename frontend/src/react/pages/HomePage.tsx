@@ -43,15 +43,15 @@ export default function HomePage() {
           eyebrow={t('common.app_full')}
         >
           <div className="flex flex-col items-center justify-center gap-3.5 sm:flex-row">
-            <Link href="/survei">
-              <Button size="lg" className="bg-white text-emerald-900 hover:bg-emerald-50 font-extrabold rounded-2xl px-7 py-6 shadow-xl shadow-black/20 hover:scale-[1.02] transition-all cursor-pointer">
+            <Link href="/survei" aria-label={t('home.start_survey')}>
+              <Button size="lg" aria-label={t('home.start_survey')} className="bg-white text-emerald-900 hover:bg-emerald-50 font-extrabold rounded-2xl px-7 py-6 shadow-xl shadow-black/20 hover:scale-[1.02] transition-all cursor-pointer">
                 <ClipboardList className="mr-2.5 size-5 text-emerald-600" />
                 <span>{t('home.start_survey')}</span>
                 <ArrowRight className="ml-2.5 size-4 text-emerald-600" />
               </Button>
             </Link>
-            <Link href="/hasil">
-              <Button size="lg" variant="outline" className="border-white/30 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl px-6 py-6 backdrop-blur-md shadow-lg hover:scale-[1.02] transition-all cursor-pointer">
+            <Link href="/hasil" aria-label={t('home.view_results')}>
+              <Button size="lg" aria-label={t('home.view_results')} variant="outline" className="border-white/30 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl px-6 py-6 backdrop-blur-md shadow-lg hover:scale-[1.02] transition-all cursor-pointer">
                 <FileText className="mr-2.5 size-4 text-emerald-300" />
                 <span>{t('home.view_results')}</span>
               </Button>

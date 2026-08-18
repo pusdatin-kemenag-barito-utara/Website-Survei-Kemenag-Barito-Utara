@@ -69,6 +69,7 @@
     "thank_you": "Thank You!",
     "thank_you_desc": "Your participation in this survey is very valuable for improving our service quality.",
     "fill_again": "Take Survey Again",
+    "success_submit": "Survey successfully submitted! Thank you for your participation.",
     "error_submit": "Failed to submit survey. Please try again.",
     "select_service_error": "Please select a service first"
   },

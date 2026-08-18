@@ -64,6 +64,7 @@ export function NavArchiveDropdown({ isActive, label }: NavArchiveDropdownProps)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        aria-label={label}
         className={cn(
           'group relative flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200 focus:outline-none cursor-pointer',
           isActive
