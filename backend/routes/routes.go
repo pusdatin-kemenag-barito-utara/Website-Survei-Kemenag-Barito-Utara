@@ -29,7 +29,6 @@ func SetupRoutes(app *fiber.App) {
 	serviceHandler := handlers.NewServiceHandler(repo)
 	questionHandler := handlers.NewQuestionHandler(repo)
 	responseHandler := handlers.NewResponseHandler(repo, surveyService)
-	settingHandler := handlers.NewSettingHandler(repo)
 	categoryHandler := handlers.NewServiceCategoryHandler(repo)
 	auditLogHandler := handlers.NewAuditLogHandler(repo)
 	demographicHandler := handlers.NewDemographicHandler(repo)
@@ -65,12 +64,12 @@ func SetupRoutes(app *fiber.App) {
 	// --- Public Routes ---
 	api.Post("/auth/login", loginLimiter, authHandler.Login)
 	api.Get("/survey/active-period", periodHandler.GetActivePeriod)
+	api.Get("/survey/periods", periodHandler.ListPeriods)
 	api.Get("/survey/services", serviceHandler.GetServices)
 	api.Get("/survey/form-questions", questionHandler.GetSurveyFormQuestions)
 	api.Post("/survey/submit", submitLimiter, responseHandler.SubmitSurvey)
 	api.Get("/survey/public-results", statsHandler.GetPublicResults)
 	api.Get("/survey/archive-results", statsHandler.GetArchiveResults)
-	api.Get("/settings", settingHandler.GetAppSettings)
 
 
 
@@ -119,9 +118,6 @@ func SetupRoutes(app *fiber.App) {
 	admin.Get("/responses/:id/answers", responseHandler.GetResponseAnswersAdmin)
 	admin.Get("/responses/:id/demographics", responseHandler.GetResponseDemographicsAdmin)
 	admin.Delete("/responses/:id", responseHandler.DeleteResponseAdmin)
-
-	// Admin - Settings
-	admin.Put("/settings", settingHandler.UpdateAppSetting)
 
 	// Admin - Demographic Fields & Options
 	admin.Get("/demographics", demographicHandler.ListFieldsAdmin)

@@ -1,5 +1,5 @@
-// SI-ARUS Service Worker - PWA & High Performance Asset Caching
-const CACHE_NAME = 'si-arus-cache-v1.2.0';
+// SI-ARUS Service Worker - PWA & High Performance Static Asset Caching
+const CACHE_NAME = 'si-arus-cache-v1.3.0';
 const STATIC_ASSETS = [
   '/favicon.ico',
   '/icon.png',
@@ -23,7 +23,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate Event: Clean up legacy caches
+// Activate Event: Clean up all legacy caches aggressively
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
@@ -41,26 +41,27 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event: Cache-First for static assets only; let HTML/API bypass directly
+// Fetch Event: Cache-First for static images/fonts ONLY
+// NEVER intercept or cache scripts, HTML, API, or extension requests
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
-
-  // Never intercept non-GET, navigation/HTML, API, or third-party requests
+  if (!request.url.startsWith('http')) return;
   if (request.method !== 'GET') return;
   if (request.mode === 'navigate' || request.destination === 'document') return;
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_image')) return;
+
+  const url = new URL(request.url);
+
+  // Bypass API, dynamic dev modules, and external auth
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_image') || url.pathname.startsWith('/@') || url.pathname.includes('/node_modules/')) return;
   if (url.origin.includes('supabase') || url.origin.includes('pusdatin') || url.origin.includes('cloudflare')) return;
 
-  // Cache-First for static media, fonts, CSS, and JS chunks
+  // ONLY cache static media (images and fonts) - NEVER cache JS scripts to avoid stale React chunk conflicts
   const isStaticMedia =
     url.origin.includes('fonts.googleapis.com') ||
     url.origin.includes('fonts.gstatic.com') ||
     request.destination === 'image' ||
     request.destination === 'font' ||
-    request.destination === 'style' ||
-    request.destination === 'script' ||
-    url.pathname.match(/\.(png|jpg|jpeg|webp|svg|ico|woff2?|ttf|css|js)$/);
+    url.pathname.match(/\.(png|jpg|jpeg|webp|svg|ico|woff2?|ttf)$/i);
 
   if (isStaticMedia) {
     event.respondWith(
@@ -71,7 +72,7 @@ self.addEventListener('fetch', (event) => {
 
         return fetch(request)
           .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
+            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
               const responseToCache = networkResponse.clone();
               caches.open(CACHE_NAME).then((cache) => {
                 try {

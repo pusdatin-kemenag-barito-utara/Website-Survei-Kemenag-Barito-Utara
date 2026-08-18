@@ -14,7 +14,7 @@ import {
   PlusCircle,
   ClipboardList,
   PieChart,
-  Settings,
+  QrCode,
   Layers,
   HelpCircle,
 } from "lucide-react";
@@ -195,10 +195,10 @@ export default function AdminDashboardPage() {
       href: "/admin/laporan",
     },
     {
-      title: "Pengaturan Sistem",
-      desc: "Konfigurasi aplikasi & data admin",
-      icon: <Settings className="size-5 text-slate-600" />,
-      href: "/admin/pengaturan",
+      title: "QR Code & Barcode",
+      desc: "Unduh barcode akses survei publik",
+      icon: <QrCode className="size-5 text-emerald-600" />,
+      href: "/admin/barcode",
     },
   ];
 

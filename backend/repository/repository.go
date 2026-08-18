@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"strings"
+	"time"
+
 	"survey-kemenag-backend/domain"
 	"survey-kemenag-backend/models"
 
@@ -106,17 +109,58 @@ func (r *gormRepository) DB() *gorm.DB {
 
 // Period Repository Methods
 func (r *gormRepository) GetActivePeriod() (*models.SurveyPeriod, error) {
+	now := time.Now().Format("2006-01-02")
 	var period models.SurveyPeriod
+
+	// 1. Check if there is a designated active period
 	err := r.db.Where("is_active = ?", true).First(&period).Error
-	if err != nil {
-		return nil, err
+	if err == nil {
+		pStart := strings.Split(period.StartDate, "T")[0]
+		pEnd := strings.Split(period.EndDate, "T")[0]
+
+		// If current active period is still within date range, return it immediately
+		if now >= pStart && now <= pEnd {
+			return &period, nil
+		}
+
+		// If it has expired (now > pEnd), auto-deactivate it so rollover can take place
+		r.db.Model(&models.SurveyPeriod{}).Where("id = ?", period.ID).Update("is_active", false)
 	}
-	return &period, nil
+
+	// 2. Automatically find and activate the period matching TODAY's date (prioritize triwulan)
+	var currentPeriod models.SurveyPeriod
+	err = r.db.Where("start_date <= ? AND end_date >= ? AND period_type = ?", now, now, "triwulan").
+		Order("start_date desc").First(&currentPeriod).Error
+
+	if err != nil {
+		// Fallback to any period type covering today (e.g. semester or tahunan)
+		err = r.db.Where("start_date <= ? AND end_date >= ?", now, now).
+			Order("start_date desc").First(&currentPeriod).Error
+	}
+
+	if err == nil {
+		// Auto-activate this current period in DB so future queries and admin UI reflect it
+		r.db.Model(&models.SurveyPeriod{}).Where("1 = 1").Update("is_active", false)
+		r.db.Model(&models.SurveyPeriod{}).Where("id = ?", currentPeriod.ID).Update("is_active", true)
+		currentPeriod.IsActive = true
+		return &currentPeriod, nil
+	}
+
+	// 3. Fallback: if no period matches today, return the most recent active or available period
+	var latestPeriod models.SurveyPeriod
+	if err := r.db.Order("end_date desc, created_at desc").First(&latestPeriod).Error; err == nil {
+		return &latestPeriod, nil
+	}
+
+	return nil, err
 }
 
 func (r *gormRepository) ListPeriods() ([]models.SurveyPeriod, error) {
+	// Sync active period based on date before listing
+	_, _ = r.GetActivePeriod()
+
 	var periods []models.SurveyPeriod
-	err := r.db.Order("created_at desc").Find(&periods).Error
+	err := r.db.Order("start_date asc, created_at desc").Find(&periods).Error
 	return periods, err
 }
 

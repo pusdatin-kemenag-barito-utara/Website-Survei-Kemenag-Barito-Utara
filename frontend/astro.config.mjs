@@ -20,13 +20,7 @@ export default defineConfig({
       "process.env": {},
     },
     optimizeDeps: {
-      entries: ["src/**/*.{astro,html,js,jsx,ts,tsx}"],
       include: [
-        "react",
-        "react-dom",
-        "react-dom/client",
-        "react/jsx-runtime",
-        "react/jsx-dev-runtime",
         "@tanstack/react-query",
         "framer-motion",
         "lucide-react",
@@ -64,6 +58,7 @@ export default defineConfig({
     },
     plugins: [tailwindcss()],
     resolve: {
+      dedupe: ["react", "react-dom"],
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
         next: fileURLToPath(new URL("./src/next", import.meta.url)),

@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from "react";
-import { useParams, notFound } from "next/navigation";
+import { useParams } from "next/navigation";
+import NotFoundPage from "@/react/pages/NotFoundPage";
 import {
   BarChart,
   Bar,
@@ -96,6 +97,9 @@ function getDates(y: string, p: string) {
 }
 
 export default function ArsipPage() {
+  const { t, locale } = useI18n();
+  const isEn = locale === "en";
+
   const params = useParams();
   const type = (params?.type as string) || "ipkp";
   const yearStr =
@@ -116,19 +120,13 @@ export default function ArsipPage() {
   ];
   const yearNum = parseInt(yearStr, 10);
 
-  // Validate URL parameters
-  if (
+  const isInvalid =
     !validTypes.includes(type.toLowerCase()) ||
     !validPeriods.includes(period.toLowerCase()) ||
     isNaN(yearNum) ||
-    yearNum < 2026
-  ) {
-    notFound();
-  }
+    yearNum < 2026;
 
   const indexType = type.toUpperCase() === "IPAK" ? "IPAK" : "IPKP";
-  const { t, locale } = useI18n();
-  const isEn = locale === "en";
 
   let periodName = isEn ? "Annual" : "Tahunan";
   switch (period.toLowerCase()) {
@@ -503,6 +501,9 @@ export default function ArsipPage() {
     }
   }
 
+  if (isInvalid) {
+    return <NotFoundPage />;
+  }
 
   return (
     <>

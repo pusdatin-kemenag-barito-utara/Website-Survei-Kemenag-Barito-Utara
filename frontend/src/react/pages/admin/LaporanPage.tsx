@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { Printer, Download, FileText, Calendar, Building2, Loader2, FileSpreadsheet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,20 +11,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { apiFetch } from '@/lib/api'
 import {
   fetchCachedPublicResults,
+  fetchCachedArchiveResults,
   fetchCachedServices,
+  fetchCachedAdminPeriods,
   getCachedPublicResultsSync,
   getCachedServicesSync,
+  getCachedAdminPeriodsSync,
 } from '@/lib/data-cache'
-import type { IndexSummary, IndexByService, UnsurSummary, DemographicSummary, Service } from '@/types'
+import type { IndexSummary, IndexByService, UnsurSummary, DemographicSummary, Service, SurveyPeriod } from '@/types'
 import { exportToPdf, exportToExcel } from '@/lib/export'
 import { toast } from 'sonner'
 
 export default function LaporanPage() {
   const cachedPub = getCachedPublicResultsSync()
   const cachedSvc = getCachedServicesSync()
+  const cachedPeriods = getCachedAdminPeriodsSync()
 
-  const [loading, setLoading] = useState(() => !cachedPub)
-  const [period, setPeriod] = useState('Triwulan III (Juli - September 2026)')
+  const [loading, setLoading] = useState(true)
+  const [periods, setPeriods] = useState<SurveyPeriod[]>(() => cachedPeriods || [])
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('')
+  const [period, setPeriod] = useState('Memuat periode...')
   const [indexType, setIndexType] = useState<'IPKP' | 'IPAK'>('IPKP')
   const [serviceFilter, setServiceFilter] = useState('all')
 
@@ -32,7 +38,7 @@ export default function LaporanPage() {
   const [kepalaNip, setKepalaNip] = useState('19750512 200003 1 002')
   const [ketuaName, setKetuaName] = useState('Drs. H. M. Yamin, M.H.')
   const [ketuaNip, setKetuaNip] = useState('19800815 200501 1 005')
-  const [reportDate, setReportDate] = useState('30 September 2026')
+  const [reportDate, setReportDate] = useState('')
 
   const [summary, setSummary] = useState<IndexSummary[]>(() => cachedPub?.index_summary || [])
   const [byService, setByService] = useState<IndexByService[]>(() => cachedPub?.by_service || [])
@@ -40,61 +46,96 @@ export default function LaporanPage() {
   const [demoSummary, setDemoSummary] = useState<DemographicSummary[]>(() => cachedPub?.demographics || [])
   const [services, setServices] = useState<Service[]>(() => cachedSvc || [])
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        interface ActivePeriodResp {
-          label?: string
-          end_date?: string
+  const loadDataForPeriod = useCallback(async (periodId: string, periodList: SurveyPeriod[]) => {
+    setLoading(true)
+    try {
+      if (periodId === 'all') {
+        const pubResults = await fetchCachedPublicResults(true)
+        if (pubResults) {
+          setSummary(pubResults.index_summary || [])
+          setUnsurSummary(pubResults.unsur_summary || [])
+          setByService(pubResults.by_service || [])
+          setDemoSummary(pubResults.demographics || [])
         }
-        const [pubResults, svcData, activePeriodResp, settingsData] = await Promise.all([
-          fetchCachedPublicResults(),
+        setPeriod('Seluruh Data Survei (Semua Periode)')
+        const now = new Date()
+        setReportDate(now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }))
+      } else {
+        const targetPeriod = periodList.find(p => p.id === periodId)
+        if (targetPeriod) {
+          const archiveData = await fetchCachedArchiveResults(targetPeriod.start_date, targetPeriod.end_date)
+          if (archiveData) {
+            setSummary(archiveData.index_summary || [])
+            setUnsurSummary(archiveData.unsur_summary || [])
+            setByService(archiveData.by_service || [])
+            setDemoSummary(archiveData.demographics || [])
+          }
+          setPeriod(targetPeriod.label)
+          const d = new Date(targetPeriod.end_date)
+          const formattedDate = !isNaN(d.getTime())
+            ? d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+            : targetPeriod.end_date
+          setReportDate(formattedDate)
+        }
+      }
+    } catch (err) {
+      console.error('Error loading report period data:', err)
+      toast.error('Gagal memuat data periode')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    async function initPage() {
+      try {
+        const [svcData, periodsData, settingsData] = await Promise.all([
           fetchCachedServices(),
-          apiFetch<ActivePeriodResp>('/survey/active-period').catch(() => null),
+          fetchCachedAdminPeriods(),
           apiFetch<Record<string, string>>('/settings').catch(() => ({})),
         ])
 
-        if (pubResults) {
-          if (pubResults.unsur_summary) setUnsurSummary(pubResults.unsur_summary)
-          if (pubResults.index_summary) setSummary(pubResults.index_summary)
-          if (pubResults.by_service) setByService(pubResults.by_service)
-          if (pubResults.demographics) setDemoSummary(pubResults.demographics)
-        }
         if (svcData) setServices(Array.isArray(svcData) ? svcData : [])
-        if (activePeriodResp?.label) setPeriod(activePeriodResp.label)
+        const pList = Array.isArray(periodsData) ? periodsData : []
+        setPeriods(pList)
+
         const st = (settingsData || {}) as Record<string, string>
         if (st['kepala_nama']) setKepalaName(st['kepala_nama'])
         if (st['kepala_nip']) setKepalaNip(st['kepala_nip'])
         if (st['ketua_nama']) setKetuaName(st['ketua_nama'])
         if (st['ketua_nip']) setKetuaNip(st['ketua_nip'])
+
+        // Default to active period or first period
+        const activeP = pList.find(p => p.is_active) || pList[0]
+        const initialId = activeP ? activeP.id : 'all'
+        setSelectedPeriodId(initialId)
+        await loadDataForPeriod(initialId, pList)
       } catch (err) {
-        console.error("Fetch laporan error:", err)
-      } finally {
-        setLoading(false)
+        console.error("Init laporan error:", err)
       }
     }
-    fetchData()
-  }, [])
+    initPage()
+  }, [loadDataForPeriod])
 
   // Filtered score logic
   const currentSummary = summary.find(s => s.index_type === indexType) || {
     index_type: indexType,
-    score: indexType === 'IPKP' ? 97.69 : 94.50,
-    nilai_konversi: indexType === 'IPKP' ? 97.69 : 94.50,
-    kategori_mutu: 'A',
-    mutu_pelayanan: 'Sangat Baik',
-    total_responden: 41,
+    score: 0,
+    nilai_konversi: 0,
+    kategori_mutu: 'Belum Terisi',
+    mutu_pelayanan: 'Belum Terisi',
+    total_responden: 0,
   }
   const filteredByService = serviceFilter === 'all'
     ? byService.filter(b => b.index_type === indexType)
     : byService.filter(b => b.index_type === indexType && b.service_name === serviceFilter)
 
-  const activeTotalResponses = currentSummary.total_responden || 41
+  const activeTotalResponses = currentSummary.total_responden ?? (summary.find(s => s.index_type === indexType)?.total_responden || 0)
 
   // Unsur breakdown
   const filteredUnsur = unsurSummary.filter(u => u.index_type === indexType)
   const unsurList = filteredUnsur.map((u) => {
-    const avg = u.nrr_unsur || (u.nilai_konversi ? u.nilai_konversi / 25 : 3.9)
+    const avg = u.nrr_unsur || (u.nilai_konversi ? u.nilai_konversi / 25 : (u.nilai_rata_rata_unsur || 0))
     const konversi = u.nilai_konversi || (avg * 25)
     return {
       unsur_name: u.unsur_name,
@@ -173,9 +214,31 @@ export default function LaporanPage() {
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
               <Calendar className="size-3.5 text-emerald-600" />
-              <span>Periode Laporan</span>
+              <span>Pilih Periode Survei</span>
             </Label>
-            <Input value={period} onChange={(e) => setPeriod(e.target.value)} className="rounded-xl text-xs font-semibold" />
+            <Select 
+              value={selectedPeriodId} 
+              onValueChange={(v) => {
+                if (v) {
+                  setSelectedPeriodId(v)
+                  loadDataForPeriod(v, periods)
+                }
+              }}
+            >
+              <SelectTrigger className="w-full rounded-xl text-xs font-bold border-emerald-200 bg-emerald-50/50">
+                <SelectValue placeholder="Pilih Periode..." />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl max-h-64">
+                {periods.map((p) => (
+                  <SelectItem key={p.id} value={p.id} className="font-semibold text-xs">
+                    {p.label} {p.is_active ? '✨ (Sedang Aktif)' : ''}
+                  </SelectItem>
+                ))}
+                <SelectItem value="all" className="font-bold text-xs text-emerald-800">
+                  🌐 Semua Data Kumulatif (Semua Periode)
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">

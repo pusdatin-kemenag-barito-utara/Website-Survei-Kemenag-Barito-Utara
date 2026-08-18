@@ -1,8 +1,11 @@
 
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ChevronDown, FolderArchive, Activity, ShieldCheck } from 'lucide-react'
 import { useI18n } from '@/components/shared/I18nProvider'
 import { cn } from '@/lib/utils'
+import { fetchCachedPeriods, getCachedPeriodsSync } from '@/lib/data-cache'
+import type { SurveyPeriod } from '@/types'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,45 +24,55 @@ interface NavArchiveDropdownProps {
 
 export function NavArchiveDropdown({ isActive, label }: NavArchiveDropdownProps) {
   const { locale } = useI18n()
+  const [periods, setPeriods] = useState<SurveyPeriod[]>(() => getCachedPeriodsSync() || [])
 
-  const getArchiveData = () => {
+  useEffect(() => {
+    fetchCachedPeriods()
+      .then((data) => {
+        if (data && data.length > 0) setPeriods(data)
+      })
+      .catch(() => {})
+  }, [])
+
+  const archiveData = useMemo(() => {
     const currentDate = new Date()
     const cYear = currentDate.getFullYear()
     const cQuarter = Math.floor(currentDate.getMonth() / 3) + 1
     const startYear = 2026
     const startQuarter = 2
 
-    const data = []
-    for (let y = cYear; y >= startYear; y--) {
-      let qStart = 1
-      let qEnd = 4
-      
-      if (y === startYear) {
-        qStart = startQuarter
+    // Extract years from DB periods if available (only <= current year)
+    const dbYears = new Set<number>()
+    periods.forEach(p => {
+      if (p.start_date) {
+        const y = parseInt(p.start_date.slice(0, 4), 10)
+        if (!isNaN(y) && y >= startYear && y <= cYear) dbYears.add(y)
       }
-      if (y === cYear) {
-        qEnd = cQuarter
-      }
+    })
+    if (dbYears.size === 0) {
+      dbYears.add(cYear)
+    }
+
+    const sortedYears = Array.from(dbYears).sort((a, b) => b - a)
+
+    return sortedYears.map((y) => {
+      let qStart = y === startYear ? startQuarter : 1
+      let qEnd = y === cYear ? cQuarter : 4
       
-      const quarters = []
+      const quarters: number[] = []
       for (let q = qStart; q <= qEnd; q++) {
         quarters.push(q)
       }
-      
-      if (quarters.length > 0) {
-        data.push({ 
-          year: y, 
-          quarters,
-          hasSemester1: quarters.includes(2),
-          hasSemester2: quarters.includes(4),
-          hasTahunan: quarters.includes(4)
-        })
-      }
-    }
-    return data
-  }
 
-  const archiveData = getArchiveData()
+      return {
+        year: y,
+        quarters,
+        hasSemester1: quarters.includes(2),
+        hasSemester2: quarters.includes(4),
+        hasTahunan: quarters.includes(4) || y < cYear,
+      }
+    })
+  }, [periods])
 
   return (
     <DropdownMenu>

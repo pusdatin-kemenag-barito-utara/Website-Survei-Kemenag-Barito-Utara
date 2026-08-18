@@ -42,6 +42,27 @@ const periodSchema = z.object({
 
 type PeriodForm = z.infer<typeof periodSchema>
 
+function formatDateDisplay(dStr: string) {
+  if (!dStr) return '-'
+  const clean = dStr.split('T')[0]
+  const [y, m, d] = clean.split('-')
+  if (!y || !m || !d) return clean
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ]
+  const mName = months[parseInt(m, 10) - 1] || m
+  return `${parseInt(d, 10)} ${mName} ${y}`
+}
+
+function formatDateDMY(dStr: string) {
+  if (!dStr) return '-'
+  const clean = dStr.split('T')[0]
+  const [y, m, d] = clean.split('-')
+  if (!y || !m || !d) return clean
+  return `${d}-${m}-${y}`
+}
+
 export default function AdminPeriodePage() {
   const cachedInitial = getCachedAdminPeriodsSync()
   const [periods, setPeriods] = useState<SurveyPeriod[]>(() => cachedInitial || [])
@@ -129,8 +150,8 @@ export default function AdminPeriodePage() {
     reset({
       period_type: p.period_type,
       label: p.label,
-      start_date: p.start_date,
-      end_date: p.end_date,
+      start_date: p.start_date ? p.start_date.split('T')[0] : '',
+      end_date: p.end_date ? p.end_date.split('T')[0] : '',
       is_active: p.is_active || false,
     })
     setDialogOpen(true)
@@ -139,6 +160,9 @@ export default function AdminPeriodePage() {
   async function onSubmit(data: PeriodForm) {
     setSaving(true)
 
+    const cleanStartDate = data.start_date ? data.start_date.split('T')[0] : ''
+    const cleanEndDate = data.end_date ? data.end_date.split('T')[0] : ''
+
     try {
       if (editing) {
         await apiFetch(`/admin/periods/${editing.id}`, {
@@ -146,8 +170,8 @@ export default function AdminPeriodePage() {
           body: JSON.stringify({
             period_type: data.period_type,
             label: data.label,
-            start_date: data.start_date,
-            end_date: data.end_date,
+            start_date: cleanStartDate,
+            end_date: cleanEndDate,
             is_active: data.is_active,
           })
         })
@@ -157,8 +181,8 @@ export default function AdminPeriodePage() {
           body: JSON.stringify({
             period_type: data.period_type,
             label: data.label,
-            start_date: data.start_date,
-            end_date: data.end_date,
+            start_date: cleanStartDate,
+            end_date: cleanEndDate,
             is_active: data.is_active,
           })
         })
@@ -192,14 +216,17 @@ export default function AdminPeriodePage() {
 
   async function toggleActiveStatus(p: SurveyPeriod) {
     setSettingActive(true)
+    const cleanStartDate = p.start_date ? p.start_date.split('T')[0] : ''
+    const cleanEndDate = p.end_date ? p.end_date.split('T')[0] : ''
+
     try {
       await apiFetch(`/admin/periods/${p.id}`, {
         method: 'PUT',
         body: JSON.stringify({
           period_type: p.period_type,
           label: p.label,
-          start_date: p.start_date,
-          end_date: p.end_date,
+          start_date: cleanStartDate,
+          end_date: cleanEndDate,
           is_active: !p.is_active,
         })
       })
@@ -240,10 +267,14 @@ export default function AdminPeriodePage() {
 
   const getPeriodStatusBadge = (p: SurveyPeriod) => {
     const today = new Date().toISOString().split('T')[0]
+    const pStart = p.start_date ? p.start_date.split('T')[0] : ''
+    const pEnd = p.end_date ? p.end_date.split('T')[0] : ''
+    const aStart = activePeriod?.start_date ? activePeriod.start_date.split('T')[0] : ''
+    const aEnd = activePeriod?.end_date ? activePeriod.end_date.split('T')[0] : ''
 
     // 1. Manually / Directly Active
     if (p.is_active) {
-      const inRange = today >= p.start_date && today <= p.end_date
+      const inRange = today >= pStart && today <= pEnd
       return (
         <div className="flex flex-col items-start gap-1">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 shadow-2xs">
@@ -262,7 +293,7 @@ export default function AdminPeriodePage() {
 
     // 2. Dynamic Overlap Logic based on Active Reference Period
     if (activePeriod) {
-      const overlapsWithActive = p.start_date <= activePeriod.end_date && p.end_date >= activePeriod.start_date
+      const overlapsWithActive = pStart <= aEnd && pEnd >= aStart
       if (overlapsWithActive) {
         return (
           <div className="flex flex-col items-start gap-1">
@@ -279,7 +310,7 @@ export default function AdminPeriodePage() {
       }
 
       // If period ended before active period started -> Selesai
-      if (p.end_date < activePeriod.start_date) {
+      if (pEnd < aStart) {
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200/90 dark:bg-gray-800 dark:text-slate-400 dark:border-gray-700" title="Periode ini telah berakhir">
             <CheckCircle2 className="size-3.5 text-slate-400" />
@@ -289,7 +320,7 @@ export default function AdminPeriodePage() {
       }
 
       // If period starts after active period ends -> Belum Dimulai
-      if (p.start_date > activePeriod.end_date) {
+      if (pStart > aEnd) {
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/90 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-900" title="Jadwal periode ini belum dimulai">
             <Calendar className="size-3.5 text-blue-500" />
@@ -299,7 +330,7 @@ export default function AdminPeriodePage() {
       }
     } else {
       // Fallback relative to current date when no activePeriod is designated
-      if (today > p.end_date) {
+      if (today > pEnd) {
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200/90 dark:bg-gray-800 dark:text-slate-400 dark:border-gray-700">
             <CheckCircle2 className="size-3.5 text-slate-400" />
@@ -308,7 +339,7 @@ export default function AdminPeriodePage() {
         )
       }
 
-      if (today < p.start_date) {
+      if (today < pStart) {
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/90 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-900">
             <Calendar className="size-3.5 text-blue-500" />
@@ -316,6 +347,13 @@ export default function AdminPeriodePage() {
           </span>
         )
       }
+
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 shadow-2xs">
+          <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span>Dalam Rentang Waktu</span>
+        </span>
+      )
     }
 
     return (
@@ -483,12 +521,26 @@ export default function AdminPeriodePage() {
                       {getTypeBadge(p.period_type)}
                     </TableCell>
 
-                    <TableCell className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                      {p.start_date}
+                    <TableCell className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {formatDateDisplay(p.start_date)}
+                        </span>
+                        <span className="font-mono text-[11px] text-slate-500 bg-slate-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-gray-700">
+                          {formatDateDMY(p.start_date)}
+                        </span>
+                      </div>
                     </TableCell>
 
-                    <TableCell className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                      {p.end_date}
+                    <TableCell className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {formatDateDisplay(p.end_date)}
+                        </span>
+                        <span className="font-mono text-[11px] text-slate-500 bg-slate-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-gray-700">
+                          {formatDateDMY(p.end_date)}
+                        </span>
+                      </div>
                     </TableCell>
 
                     <TableCell>

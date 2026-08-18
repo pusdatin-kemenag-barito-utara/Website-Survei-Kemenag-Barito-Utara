@@ -32,7 +32,11 @@ export function useSearchParams() {
 }
 
 export function useParams(): Record<string, string | string[]> {
-  const pathname = usePathname();
+  const syncPathname = usePathname();
+  const pathname =
+    typeof window !== "undefined" && window.location.pathname
+      ? window.location.pathname
+      : syncPathname;
   const params: Record<string, string> = {};
 
   const hasilMatch = pathname.match(/^\/hasil\/([^/]+)\/?$/);

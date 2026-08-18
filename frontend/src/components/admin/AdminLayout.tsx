@@ -11,7 +11,6 @@ import {
   Calendar,
   ClipboardList,
   PieChart,
-  Settings,
   LogOut,
   ChevronRight,
   ChevronDown,
@@ -92,11 +91,6 @@ const navItems: NavItem[] = [
     label: "Laporan",
     href: "/admin/laporan",
     icon: <PieChart className="size-4" />,
-  },
-  {
-    label: "Pengaturan",
-    href: "/admin/pengaturan",
-    icon: <Settings className="size-4" />,
   },
   {
     label: "QR Code & Barcode",
@@ -233,26 +227,34 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [checking, setChecking] = useState(true);
+  const [checking, setChecking] = useState(() => {
+    if (typeof window === "undefined") return false;
+    if (window.location.pathname.startsWith("/admin/login")) return false;
+    const token = localStorage.getItem("token");
+    return !token;
+  });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [userInfo, setUserInfo] = useState<PusdatinUser | null>(null);
+  const [userInfo, setUserInfo] = useState<PusdatinUser | null>(() => {
+    if (typeof window === "undefined") return null;
+    return { name: "Petugas Administrator", avatar: null };
+  });
 
   useEffect(() => {
     if (pathname?.startsWith("/admin/login")) {
+      setChecking(false);
       return;
     }
 
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     if (!token) {
+      setChecking(true);
       router.replace("/admin/login");
       return;
     }
 
-    setUserInfo((prev) =>
-      prev ? prev : { name: "Petugas Administrator", avatar: null }
-    );
     setChecking(false);
+    setUserInfo((prev) => prev || { name: "Petugas Administrator", avatar: null });
     prefetchAllAdminData();
 
     if (typeof window !== "undefined" && localStorage.getItem("just_logged_in") === "true") {

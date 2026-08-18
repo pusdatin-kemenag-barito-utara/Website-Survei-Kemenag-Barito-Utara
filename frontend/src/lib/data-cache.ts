@@ -57,6 +57,7 @@ export interface AdminStatsResponse {
 // In-Memory Client Cache Store
 let cachedPublicResults: PublicResultsResponse | null = null
 let cachedServices: Service[] | null = null
+let cachedPeriods: SurveyPeriod[] | null = null
 let cachedFormQuestions: FormQuestionsResponse | null = null
 const cachedArchiveResults: Record<string, ArchiveResultsResponse> = {}
 
@@ -70,6 +71,7 @@ let cachedAdminStats: AdminStatsResponse | null = null
 
 let inflightPublicResults: Promise<PublicResultsResponse> | null = null
 let inflightServices: Promise<Service[]> | null = null
+let inflightPeriods: Promise<SurveyPeriod[]> | null = null
 let inflightFormQuestions: Promise<FormQuestionsResponse> | null = null
 const inflightArchiveResults: Record<string, Promise<ArchiveResultsResponse> | null> = {}
 
@@ -87,6 +89,10 @@ export function getCachedPublicResultsSync(): PublicResultsResponse | null {
 
 export function getCachedServicesSync(): Service[] | null {
   return cachedServices
+}
+
+export function getCachedPeriodsSync(): SurveyPeriod[] | null {
+  return cachedPeriods || cachedAdminPeriods
 }
 
 export function getCachedFormQuestionsSync(): FormQuestionsResponse | null {
@@ -176,6 +182,25 @@ export async function fetchCachedFormQuestions(forceRefresh = false): Promise<Fo
     })
 
   return inflightFormQuestions
+}
+
+export async function fetchCachedPeriods(forceRefresh = false): Promise<SurveyPeriod[]> {
+  if (!forceRefresh && cachedPeriods) return cachedPeriods
+  if (inflightPeriods) return inflightPeriods
+
+  inflightPeriods = apiFetch<SurveyPeriod[]>('/survey/periods')
+    .then((data) => {
+      cachedPeriods = data || []
+      inflightPeriods = null
+      return cachedPeriods
+    })
+    .catch((err) => {
+      inflightPeriods = null
+      if (cachedAdminPeriods) return cachedAdminPeriods
+      throw err
+    })
+
+  return inflightPeriods
 }
 
 export async function fetchCachedArchiveResults(startDate: string, endDate: string, forceRefresh = false): Promise<ArchiveResultsResponse> {
@@ -306,11 +331,16 @@ export async function fetchCachedAdminStats(forceRefresh = false): Promise<Admin
   return inflightAdminStats
 }
 
+let hasPrefetchedAdmin = false
+
 // Prefetch all admin metadata asynchronously for instant tab switching
 export function prefetchAllAdminData() {
   if (typeof window === 'undefined') return
+  if (hasPrefetchedAdmin) return
   const token = localStorage.getItem('token')
   if (!token) return
+
+  hasPrefetchedAdmin = true
 
   // Run in background with staggered timing to avoid database connection jamming
   setTimeout(() => {
@@ -341,6 +371,7 @@ export function prefetchAllAdminData() {
 export function invalidateClientCache() {
   cachedPublicResults = null
   cachedServices = null
+  cachedPeriods = null
   cachedFormQuestions = null
   cachedAdminServices = null
   cachedAdminUnsur = null
@@ -348,6 +379,7 @@ export function invalidateClientCache() {
   cachedAdminDemographics = null
   cachedAdminPeriods = null
   cachedAdminStats = null
+  hasPrefetchedAdmin = false
   for (const k of Object.keys(cachedArchiveResults)) {
     delete cachedArchiveResults[k]
   }
