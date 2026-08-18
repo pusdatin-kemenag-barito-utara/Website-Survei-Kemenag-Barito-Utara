@@ -1,14 +1,47 @@
 version: '3.8'
 
 services:
-  sikap-app:
+  backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: sikap-kemenag-app
-    restart: always
+    container_name: sikap-kemenag-backend
+    restart: unless-stopped
     ports:
-      - "3000:3000"
       - "8080:8080"
     env_file:
       - .env
+    environment:
+      - PORT=8080
+      - GO_PORT=8080
+      - TZ=Asia/Jakarta
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sikap-kemenag-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - API_PROXY_TARGET=http://backend:8080
+      - TZ=Asia/Jakarta
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
