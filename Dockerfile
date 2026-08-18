@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o api-sikap main.go
 FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci
+RUN npm ci --include=dev
 COPY frontend/ ./
 ENV ASTRO_TELEMETRY_DISABLED=1
 

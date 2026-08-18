@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
 
 	"survey-kemenag-backend/config"
 	"survey-kemenag-backend/database"
@@ -78,7 +77,7 @@ func main() {
 	})
 
 	// Start server
-	port := os.Getenv("PORT")
+	port := cfg.Port
 	if port == "" {
 		port = "8080"
 	}

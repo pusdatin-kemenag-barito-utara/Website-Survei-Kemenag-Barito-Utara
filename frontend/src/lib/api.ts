@@ -1,4 +1,16 @@
-const API_BASE_URL = import.meta.env.PUBLIC_API_URL || '';
+function getFullApiUrl(endpoint: string): string {
+  const base = (import.meta.env.PUBLIC_API_URL || '').replace(/\/+$/, '');
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+  if (base) {
+    if (base.endsWith('/api/v1')) {
+      return `${base}${cleanEndpoint}`;
+    }
+    return `${base}/api/v1${cleanEndpoint}`;
+  }
+
+  return `/api/v1${cleanEndpoint}`;
+}
 
 export async function apiFetch<T>(
   endpoint: string,
@@ -16,7 +28,8 @@ export async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const url = getFullApiUrl(endpoint);
+  const res = await fetch(url, {
     cache: options.cache || 'no-store',
     ...options,
     headers,

@@ -58,8 +58,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   // === API PROXY: same-origin /api/v1 requests to the Go backend ===
-  if (ENABLE_API_PROXY && pathname.startsWith("/api/v1")) {
-    const target = new URL(pathname + context.url.search, API_PROXY_TARGET);
+  if (pathname.startsWith("/api/v1")) {
+    const apiTarget =
+      process.env.API_PROXY_TARGET ||
+      (import.meta as any).env?.API_PROXY_TARGET ||
+      "http://127.0.0.1:8080";
+    const target = new URL(pathname + context.url.search, apiTarget);
     const headers = new Headers(context.request.headers);
     headers.set("Host", target.host);
 
@@ -72,11 +76,22 @@ export const onRequest = defineMiddleware(async (context, next) => {
       init.body = await context.request.arrayBuffer();
     }
 
-    const res = await fetch(target, init);
-    return new Response(res.body, {
-      status: res.status,
-      headers: res.headers,
-    });
+    try {
+      const res = await fetch(target, init);
+      return new Response(res.body, {
+        status: res.status,
+        headers: res.headers,
+      });
+    } catch (err) {
+      console.error("[MIDDLEWARE] API Proxy to Golang failed:", err);
+      return new Response(
+        JSON.stringify({ error: "Backend service temporarily unavailable" }),
+        {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
   }
 
   // === SUPABASE SESSION REFRESH (matches legacy proxy.ts behavior) ===
