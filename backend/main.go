@@ -42,14 +42,38 @@ func main() {
 		MaxAge:           86400, // Cache CORS preflight requests for 24 hours
 	}))
 
+	// HTTP/3 (QUIC) Discovery & Security Protocol Headers
+	app.Use(func(c *fiber.Ctx) error {
+		c.Set("Alt-Svc", `h3=":443"; ma=86400, h3-29=":443"; ma=86400`)
+		c.Set("X-Content-Type-Options", "nosniff")
+		c.Set("X-Frame-Options", "SAMEORIGIN")
+		c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		return c.Next()
+	})
+
 	// Setup Routes
 	routes.SetupRoutes(app)
 
-	// Healthcheck endpoint
+	// Healthcheck endpoint for Uptime Kuma monitoring & VPS health checks
 	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status":  "ok",
-			"service": "SIKAP Golang Backend",
+		dbStatus := "connected"
+		if database.DB != nil {
+			if sqlDB, err := database.DB.DB(); err != nil || sqlDB.Ping() != nil {
+				dbStatus = "disconnected"
+			}
+		} else {
+			dbStatus = "uninitialized"
+		}
+
+		status := fiber.StatusOK
+		if dbStatus != "connected" {
+			status = fiber.StatusServiceUnavailable
+		}
+
+		return c.Status(status).JSON(fiber.Map{
+			"status":   "ok",
+			"database": dbStatus,
+			"service":  "SI-ARUS Kemenag Barito Utara Backend",
 		})
 	})
 

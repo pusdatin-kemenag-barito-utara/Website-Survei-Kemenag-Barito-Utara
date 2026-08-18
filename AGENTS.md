@@ -1,5 +1,12 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# SI-ARUS Kemenag Barito Utara Architecture
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+## Frontend
+- **Framework**: Astro 7 (Node.js standalone adapter for SSR)
+- **UI & Islands**: React 19 (`@astrojs/react`) with Astro client directives (`client:only="react"`)
+- **Styling**: Tailwind CSS v4 + Plus Jakarta Sans
+- **Transitions**: Astro `<ClientRouter />` for smooth SPA navigation
+
+## Backend
+- **Framework**: Golang Fiber REST API v2
+- **Database**: PostgreSQL on Supabase (`schema: kemenag_survey`)
+- **Live Reload**: Air (`.air.toml`)

@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"time"
+
 	"survey-kemenag-backend/models"
 	"survey-kemenag-backend/repository"
+	"survey-kemenag-backend/service"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -17,6 +20,11 @@ func NewServiceHandler(repo repository.Repository) *ServiceHandler {
 }
 
 func (h *ServiceHandler) GetServices(c *fiber.Ctx) error {
+	cacheKey := "survey_services"
+	if cachedData, found := service.GetCache(cacheKey); found {
+		return c.JSON(cachedData)
+	}
+
 	services, err := h.repo.ListActiveServices()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -26,17 +34,26 @@ func (h *ServiceHandler) GetServices(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(fiber.Map{
+	data := fiber.Map{
 		"services":   services,
 		"categories": categories,
-	})
+	}
+	service.SetCache(cacheKey, data, 10*time.Minute)
+
+	return c.JSON(data)
 }
 
 func (h *ServiceHandler) ListServicesAdmin(c *fiber.Ctx) error {
+	cacheKey := "admin_services"
+	if cachedData, found := service.GetCache(cacheKey); found {
+		return c.JSON(cachedData)
+	}
+
 	services, err := h.repo.ListAllServicesAdmin()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	service.SetCache(cacheKey, services, 5*time.Minute)
 	return c.JSON(services)
 }
 
@@ -49,6 +66,9 @@ func (h *ServiceHandler) CreateService(c *fiber.Ctx) error {
 	if err := h.repo.CreateService(&s); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	service.DeleteCache("survey_services")
+	service.DeleteCache("admin_services")
+	service.DeleteCache("admin_stats")
 	return c.Status(fiber.StatusCreated).JSON(s)
 }
 
@@ -68,6 +88,9 @@ func (h *ServiceHandler) UpdateService(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	service.DeleteCache("survey_services")
+	service.DeleteCache("admin_services")
+	service.DeleteCache("admin_stats")
 	return c.JSON(updated)
 }
 
@@ -81,5 +104,8 @@ func (h *ServiceHandler) DeleteService(c *fiber.Ctx) error {
 	if err := h.repo.DeleteService(id); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	service.DeleteCache("survey_services")
+	service.DeleteCache("admin_services")
+	service.DeleteCache("admin_stats")
 	return c.JSON(fiber.Map{"message": "Layanan berhasil dihapus"})
 }

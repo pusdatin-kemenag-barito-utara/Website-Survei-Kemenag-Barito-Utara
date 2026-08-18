@@ -1,0 +1,253 @@
+---
+import "@/styles/globals.css";
+import { ClientRouter } from "astro:transitions";
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  type?: string;
+}
+
+const appUrl = import.meta.env.PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || "";
+const gaMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || process.env.PUBLIC_GA_MEASUREMENT_ID || "";
+const gtagId = import.meta.env.PUBLIC_GTAG_ID || process.env.PUBLIC_GTAG_ID || "";
+
+const {
+  title = "SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara",
+  description = "SI-ARUS - Sistem Informasi Analisis Rekapitulasi Ulasan Survei Kepuasan Masyarakat Kantor Kementerian Agama Kabupaten Barito Utara.",
+  image = `${appUrl}/arus.webp`,
+  type = "website",
+} = Astro.props;
+
+const keywords = [
+  "SI-ARUS",
+  "Survei Kepuasan Masyarakat",
+  "Kemenag Barito Utara",
+  "Kementerian Agama Barito Utara",
+  "PTSP Kemenag",
+  "IPKP",
+  "IPAK",
+  "Muara Teweh",
+  "PermenPAN-RB No 14 Tahun 2017",
+  "Layanan Publik Kemenag",
+  "IKM",
+  "Indeks Kepuasan Masyarakat",
+].join(", ");
+
+const siteTitle = title.includes("SI-ARUS")
+  ? title
+  : `${title} | SI-ARUS Kemenag Barito Utara`;
+
+const ogImageUrl = image.startsWith("http") ? image : `${appUrl}${image}`;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "GovernmentOrganization",
+      "@id": `${appUrl}/#organization`,
+      name: "Kantor Kementerian Agama Kabupaten Barito Utara",
+      alternateName: "Kemenag Barito Utara",
+      url: appUrl,
+      logo: `${appUrl}/kemenag.svg`,
+      image: `${appUrl}/arus.webp`,
+      description:
+        "Kantor Kementerian Agama Kabupaten Barito Utara, menyelenggarakan pelayanan publik prima berintegritas.",
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: "Jl. Ahmad Yani No. 1",
+        addressLocality: "Muara Teweh",
+        addressRegion: "Kalimantan Tengah",
+        postalCode: "73812",
+        addressCountry: "ID",
+      },
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${appUrl}/#website`,
+      url: appUrl,
+      name: "SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara",
+      alternateName:
+        "Sistem Informasi Analisis Rekapitulasi Ulasan Survei Kepuasan Masyarakat",
+      publisher: {
+        "@id": `${appUrl}/#organization`,
+      },
+      inLanguage: ["id-ID", "en-US"],
+    },
+    {
+      "@type": "WebApplication",
+      "@id": `${appUrl}/#webapp`,
+      name: "SI-ARUS",
+      url: appUrl,
+      applicationCategory: "GovernmentApplication",
+      operatingSystem: "All",
+      browserRequirements: "Requires JavaScript. Requires HTML5.",
+      description:
+        "Aplikasi resmi Survei Kepuasan Masyarakat (SKM) Indeks Persepsi Kualitas Pelayanan (IPKP) & Indeks Persepsi Anti Korupsi (IPAK).",
+      author: {
+        "@id": `${appUrl}/#organization`,
+      },
+    },
+  ],
+};
+---
+
+<!doctype html>
+<html lang={Astro.cookies.get('locale')?.value || 'id'} class="h-full antialiased">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Accept-CH" content="DPR, Width, Viewport-Width, Downlink, ECT" />
+    
+    <!-- Primary Metadata -->
+    <title>{siteTitle}</title>
+    <meta name="title" content={siteTitle} />
+    <meta name="description" content={description} />
+    <meta name="keywords" content={keywords} />
+    <meta name="author" content="Kantor Kementerian Agama Kabupaten Barito Utara" />
+    <meta name="generator" content="Astro" />
+    <link rel="canonical" href={appUrl} />
+
+    <!-- HTTP/3 & Network Connection Hints -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+    <link rel="preconnect" href="https://db.kemenag-baritoutara.com" crossorigin="anonymous" />
+    <link rel="preconnect" href="https://pusdatin.kemenag-baritoutara.com" />
+    <link rel="dns-prefetch" href="https://pusdatin.kemenag-baritoutara.com" />
+    <link rel="dns-prefetch" href="https://challenges.cloudflare.com" />
+
+    <!-- Preload Maklumat Pelayanan Banner for Instant LCP -->
+    <link rel="preload" as="image" href="/maklumat-pelayanan.webp" type="image/webp" fetchpriority="high" />
+
+    {gaMeasurementId && (
+      <>
+        <!-- Google Analytics 4 (GA4) & Google Tag (Measurement ID: {gaMeasurementId}) -->
+        <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}></script>
+        <script is:inline set:html={`
+          window.dataLayer = window.dataLayer || [];
+          function gtag() {
+            window.dataLayer.push(arguments);
+          }
+          window.gtag = gtag;
+          gtag('js', new Date());
+
+          // GA4 Configuration with Enhanced Measurement & SPA-aware Pageview control
+          gtag('config', '${gaMeasurementId}', {
+            send_page_view: false,
+            cookie_flags: 'SameSite=None;Secure',
+          });
+
+          ${gtagId && gtagId !== gaMeasurementId ? `gtag('config', '${gtagId}');` : ''}
+
+          // Track initial load & all seamless SPA transitions via Astro ClientRouter
+          document.addEventListener('astro:page-load', () => {
+            gtag('event', 'page_view', {
+              page_title: document.title,
+              page_location: window.location.href,
+              page_path: window.location.pathname + window.location.search,
+            });
+          });
+        `} />
+      </>
+    )}
+
+    <!-- Google Font API: Plus Jakarta Sans (Primary & Single Font) -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+    />
+
+    <!-- Priority Hints for Critical LCP Resources -->
+    <link
+      rel="preload"
+      as="image"
+      href="/hero_survey_bg.webp"
+      type="image/webp"
+      fetchpriority="high"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/arus.webp"
+      type="image/webp"
+      fetchpriority="high"
+    />
+
+    <!-- PWA & Mobile Web Capabilities -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#059669" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#022c22" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SI-ARUS" />
+    <meta name="application-name" content="SI-ARUS" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Icons & Favicons -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/icon.png" type="image/png" sizes="512x512" />
+    <link rel="icon" href="/kemenag.svg" type="image/svg+xml" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-icon.png" sizes="180x180" />
+
+    <!-- Google Site Verification -->
+    <meta
+      name="google-site-verification"
+      content={import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION || process.env.PUBLIC_GOOGLE_SITE_VERIFICATION || ""}
+    />
+
+    <!-- Open Graph (OG) Protocols -->
+    <meta property="og:site_name" content="SI-ARUS Kemenag Barito Utara" />
+    <meta property="og:title" content={siteTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={appUrl} />
+    <meta property="og:type" content={type} />
+    <meta property="og:locale" content="id_ID" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:secure_url" content={ogImageUrl} />
+    <meta property="og:image:type" content="image/webp" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={siteTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+    <meta name="twitter:image:alt" content="SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara" />
+
+    <!-- Schema.org Structured Data -->
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+    <!-- Service Worker Registration for PWA -->
+    <script is:inline>
+      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker
+            .register('/sw.js')
+            .then((reg) => {
+              console.log('[PWA] Service Worker registered with scope:', reg.scope);
+            })
+            .catch((err) => {
+              console.warn('[PWA] Service Worker registration failed:', err);
+            });
+        });
+      }
+    </script>
+
+    <!-- Client Router for Instant SPA Page Transitions -->
+    <ClientRouter />
+  </head>
+  <body class="min-h-full flex flex-col font-sans">
+    <slot />
+  </body>
+</html>

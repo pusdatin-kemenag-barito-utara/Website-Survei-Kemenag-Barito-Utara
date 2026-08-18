@@ -1,49 +1,152 @@
-# Monorepo Root GitIgnore
+# ==============================================================================
+# SI-ARUS Kemenag Barito Utara - Unified Root .gitignore
+# Single Source of Truth for Root, Frontend (Astro 7), & Backend (Golang Fiber)
+# ==============================================================================
 
-# Dependencies
-node_modules/
-**/node_modules/
-
-# Environment Variables
+# ------------------------------------------------------------------------------
+# 1. ENVIRONMENT VARIABLES & SENSITIVE SECRETS
+# ------------------------------------------------------------------------------
 .env
-.env.local
-.env.*.local
+.env.*
+.env*.local
 *.env
+*.pem
+*.key
+*.crt
+*.cert
 
-# Next.js & Build Outputs
-.next/
-**/build/
-**/dist/
-**/bin/
-*.exe
+# Allow environment templates
+!.env.example
+!.env.*.example
 
-# Go Executables & Binaries
-backend/bin/
-backend/tmp/
-tmp/
+# ------------------------------------------------------------------------------
+# 2. DEPENDENCIES & PACKAGE MANAGERS (Root & Frontend)
+# ------------------------------------------------------------------------------
+node_modules/
+*/node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ------------------------------------------------------------------------------
+# 3. FRONTEND BUILD OUTPUTS & CACHES (Astro 7, React 19, Vite)
+# ------------------------------------------------------------------------------
+.astro/
+*/.astro/
+dist/
+*/dist/
+build/
+*/build/
+out/
+*/out/
+
+# Caches & Temp Bundles
+.cache/
+*/.cache/
+.vite/
+*/.vite/
+.turbo/
+*/.turbo/
+.rollup.cache/
+*/.rollup.cache/
+.parcel-cache/
+*/.parcel-cache/
+.vercel/
+
+# TypeScript Build Info
+*.tsbuildinfo
+
+# ------------------------------------------------------------------------------
+# 4. BACKEND BINARIES & BUILD ARTIFACTS (Golang Fiber & Air Live-Reload)
+# ------------------------------------------------------------------------------
+# Go Binaries & Executables
+bin/
+*/bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+main
+server
+backend/main
+backend/server
+backend/tmp/
+tmp/
+*/tmp/
 
-# Testing & Logs
+# Air & Build Error Logs
+build-errors.log
+*/build-errors.log
+
+# Go Test & Profiling Outputs
+*.test
+*.out
+c.out
+profile.pprof
+
+# ------------------------------------------------------------------------------
+# 5. TESTING, COVERAGE & DIAGNOSTIC REPORTS
+# ------------------------------------------------------------------------------
 coverage/
+*/coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# ------------------------------------------------------------------------------
+# 6. LOG FILES
+# ------------------------------------------------------------------------------
 *.log
+logs/
+*/logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# IDE & Misc
-.vscode/
-!.vscode/settings.json
-.idea/
+# ------------------------------------------------------------------------------
+# 7. OPERATING SYSTEM & METADATA FILES
+# ------------------------------------------------------------------------------
+# macOS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
 Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# ------------------------------------------------------------------------------
+# 8. EDITORS, IDES & WORKSPACES
+# ------------------------------------------------------------------------------
+.vscode/
+.idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
-# Typescript & Next.js Cache
-*.tsbuildinfo
-next-env.d.ts
-
+# ------------------------------------------------------------------------------
+# 9. AI AGENTS, ASSISTANTS & SCRATCHPADS
+# ------------------------------------------------------------------------------
+.claude/
+.gemini/
+.opencode/
+.antigravitycli/
+scratch/
+*/scratch/
+.agents/scratch/

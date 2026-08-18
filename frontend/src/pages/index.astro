@@ -1,0 +1,9 @@
+﻿---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import HomeEntry from '@/react/pages/HomeEntry';
+---
+
+<BaseLayout
+>
+  <HomeEntry client:only="react" />
+</BaseLayout>

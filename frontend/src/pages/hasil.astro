@@ -1,0 +1,11 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import HasilEntry from '@/react/pages/HasilEntry';
+---
+
+<BaseLayout
+  title="Hasil Survei Kepuasan Masyarakat (IPKP & IPAK) - SI-ARUS"
+  description="Laporan dan grafik hasil Survei Kepuasan Masyarakat (SKM) Kantor Kementerian Agama Kabupaten Barito Utara."
+>
+  <HasilEntry client:only="react" />
+</BaseLayout>

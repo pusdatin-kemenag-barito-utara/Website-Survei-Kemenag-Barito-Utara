@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"strconv"
+
 	"survey-kemenag-backend/domain"
 	"survey-kemenag-backend/repository"
 	"survey-kemenag-backend/service"
@@ -54,7 +55,6 @@ func (h *ResponseHandler) ListResponsesAdmin(c *fiber.Ctx) error {
 	search := c.Query("search")
 
 	responses, total, err := h.repo.ListResponsesPaginated(serviceID, periodID, dateFrom, dateTo, search, limit, offset)
-
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -77,6 +77,8 @@ func (h *ResponseHandler) DeleteResponseAdmin(c *fiber.Ctx) error {
 	if err := h.repo.DeleteResponseFull(id); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghapus data respon"})
 	}
+	service.DeleteCache("admin_stats")
+	service.DeleteCache("public_results")
 
 	return c.JSON(fiber.Map{
 		"message": "Data respon survei berhasil dihapus",

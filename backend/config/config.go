@@ -49,7 +49,7 @@ func LoadConfig() *Config {
 		adminEmail = os.Getenv("SUPER_ADMIN_EMAIL")
 	}
 	if adminEmail == "" {
-		adminEmail = os.Getenv("NEXT_PUBLIC_SUPER_ADMIN_EMAIL")
+		adminEmail = os.Getenv("PUBLIC_SUPER_ADMIN_EMAIL")
 	}
 	if adminEmail == "" {
 		log.Fatal("❌ FATAL: ADMIN_EMAIL or SUPER_ADMIN_EMAIL environment variable is not set. Please configure it in .env")

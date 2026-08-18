@@ -632,6 +632,9 @@ func (r *gormRepository) DeleteServiceCategory(id uuid.UUID) error {
 // --- Audit Log ---
 
 func (r *gormRepository) WriteAuditLog(log *models.AuditLog) error {
+	if log.Details == "" {
+		log.Details = "{}"
+	}
 	return r.db.Create(log).Error
 }
 

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	"survey-kemenag-backend/domain"
@@ -136,28 +138,67 @@ func (s *SurveyService) GetPublicResults() (fiber.Map, error) {
 
 
 func (s *SurveyService) GetAdminStats() (fiber.Map, error) {
-	totalResponses, err := s.repo.CountTotalResponses()
-	if err != nil {
-		return nil, err
+	cacheKey := "admin_stats"
+	if cachedData, found := globalCache.Get(cacheKey); found {
+		return cachedData.(fiber.Map), nil
 	}
 
-	activeServices, err := s.repo.CountActiveServices()
-	if err != nil {
-		return nil, err
-	}
+	var (
+		totalResponses int64
+		activeServices int64
+		totalUnsur     int64
+		activePeriod   *models.SurveyPeriod
+		results        []domain.AnswerUnsurRaw
+		errResp, errServ, errUnsur, errRes error
+	)
 
-	totalUnsur, err := s.repo.CountActiveUnsur()
-	if err != nil {
-		return nil, err
-	}
+	var wg sync.WaitGroup
+	wg.Add(5)
 
-	activePeriod, _ := s.repo.GetActivePeriod()
+	go func() {
+		defer wg.Done()
+		totalResponses, errResp = s.repo.CountTotalResponses()
+	}()
+
+	go func() {
+		defer wg.Done()
+		activeServices, errServ = s.repo.CountActiveServices()
+	}()
+
+	go func() {
+		defer wg.Done()
+		totalUnsur, errUnsur = s.repo.CountActiveUnsur()
+	}()
+
+	go func() {
+		defer wg.Done()
+		activePeriod, _ = s.repo.GetActivePeriod()
+	}()
+
+	go func() {
+		defer wg.Done()
+		results, errRes = s.repo.GetAnswerUnsurRawList()
+	}()
+
+	wg.Wait()
+
+	if errResp != nil {
+		return nil, errResp
+	}
+	if errServ != nil {
+		return nil, errServ
+	}
+	if errUnsur != nil {
+		return nil, errUnsur
+	}
+	if errRes != nil {
+		results = nil
+	}
 
 	ipkpScore := 0.0
 	ipakScore := 0.0
 
-	results, err := s.repo.GetAnswerUnsurRawList()
-	if err == nil && len(results) > 0 {
+	if len(results) > 0 {
 		var ipkpSum, ipakSum float64
 		var ipkpCount, ipakCount int64
 		for _, r := range results {
@@ -177,20 +218,28 @@ func (s *SurveyService) GetAdminStats() (fiber.Map, error) {
 		}
 	}
 
-	return fiber.Map{
+	result := fiber.Map{
 		"total_responses": totalResponses,
 		"active_services": activeServices,
 		"total_unsur":     totalUnsur,
 		"active_period":   activePeriod,
 		"ipkp_score":      ipkpScore,
 		"ipak_score":      ipakScore,
-	}, nil
+	}
+	globalCache.Set(cacheKey, result, 5*time.Minute)
+
+	return result, nil
 }
 
 func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map, error) {
+	cacheKey := fmt.Sprintf("archive_results_%s_%s", startDate, endDate)
+	if cachedData, found := globalCache.Get(cacheKey); found {
+		return cachedData.(fiber.Map), nil
+	}
+
 	db := s.repo.DB()
 
-	// Base response query filtered by submitted_at range
+	// 1. Check total responses in range
 	respQuery := db.Model(&models.Response{})
 	if startDate != "" {
 		respQuery = respQuery.Where("submitted_at::date >= ?::date", startDate)
@@ -204,218 +253,236 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 		return nil, err
 	}
 
-	var responses []models.Response
-	respIDsQuery := db.Model(&models.Response{}).Select("id")
+	emptyResult := fiber.Map{
+		"total_responses": totalResponses,
+		"ipkp_score":      0.0,
+		"ipak_score":      0.0,
+		"by_service":      []domain.ByServiceStat{},
+		"unsur_summary":   []domain.UnsurStat{},
+		"demographics":    []domain.DemographicSummaryRow{},
+		"index_summary": []domain.ViewIndexSummaryRow{
+			{IndexType: "IPKP", NilaiIndex: 0.0, NilaiKonversi: 0.0, Mutu: "Belum Terisi", Kinerja: "Belum Terisi"},
+			{IndexType: "IPAK", NilaiIndex: 0.0, NilaiKonversi: 0.0, Mutu: "Belum Terisi", Kinerja: "Belum Terisi"},
+		},
+		"trend": []domain.IndexTrendRow{},
+	}
+
+	if totalResponses == 0 {
+		globalCache.Set(cacheKey, emptyResult, 10*time.Minute)
+		return emptyResult, nil
+	}
+
+	// 2. Fetch all raw answer points in 1 unified query
+	type CombinedRawAnswer struct {
+		ResponseID  uuid.UUID `gorm:"column:response_id"`
+		ServiceID   uuid.UUID `gorm:"column:service_id"`
+		ServiceName string    `gorm:"column:service_name"`
+		UnsurID     uuid.UUID `gorm:"column:unsur_id"`
+		UnsurName   string    `gorm:"column:unsur_name"`
+		IndexType   string    `gorm:"column:index_type"`
+		RatingValue int       `gorm:"column:rating_value"`
+		Bulan       string    `gorm:"column:bulan"`
+	}
+
+	var rawAnswers []CombinedRawAnswer
+	answerQuery := db.Table("kemenag_survey.response_answers ra").
+		Select("ra.response_id, r.service_id, s.name as service_name, q.unsur_id, u.name as unsur_name, u.index_type, ra.rating_value, to_char(r.submitted_at, 'YYYY-MM') as bulan").
+		Joins("JOIN kemenag_survey.responses r ON ra.response_id = r.id").
+		Joins("JOIN kemenag_survey.services s ON r.service_id = s.id").
+		Joins("JOIN kemenag_survey.questions q ON ra.question_id = q.id").
+		Joins("JOIN kemenag_survey.unsur u ON q.unsur_id = u.id")
+
 	if startDate != "" {
-		respIDsQuery = respIDsQuery.Where("submitted_at::date >= ?::date", startDate)
+		answerQuery = answerQuery.Where("r.submitted_at::date >= ?::date", startDate)
 	}
 	if endDate != "" {
-		respIDsQuery = respIDsQuery.Where("submitted_at::date <= ?::date", endDate)
+		answerQuery = answerQuery.Where("r.submitted_at::date <= ?::date", endDate)
 	}
-	respIDsQuery.Find(&responses)
 
-	respIDs := make([]uuid.UUID, len(responses))
-	for i, r := range responses {
-		respIDs[i] = r.ID
+	if err := answerQuery.Scan(&rawAnswers).Error; err != nil {
+		return nil, err
+	}
+
+	// Calculate everything in-memory from rawAnswers in CPU
+	var ipkpSum, ipakSum float64
+	var ipkpCount, ipakCount int64
+
+	type sKey struct {
+		ServiceID string
+		IndexType string
+	}
+	type sGroup struct {
+		ServiceName string
+		Ratings     map[string]int
+		ResponseIDs map[uuid.UUID]bool
+	}
+	byServiceMap := make(map[sKey]*sGroup)
+
+	type uGroup struct {
+		UnsurID   uuid.UUID
+		UnsurName string
+		IndexType string
+		Sum       float64
+		Count     int64
+	}
+	byUnsurMap := make(map[uuid.UUID]*uGroup)
+
+	type tKey struct {
+		Bulan     string
+		IndexType string
+	}
+	type tGroup struct {
+		Sum   float64
+		Count int64
+	}
+	trendMap := make(map[tKey]*tGroup)
+
+	for _, a := range rawAnswers {
+		// Overall
+		if a.IndexType == "IPAK" {
+			ipakSum += float64(a.RatingValue)
+			ipakCount++
+		} else {
+			ipkpSum += float64(a.RatingValue)
+			ipkpCount++
+		}
+
+		// Service
+		sk := sKey{ServiceID: a.ServiceID.String(), IndexType: a.IndexType}
+		if _, exists := byServiceMap[sk]; !exists {
+			byServiceMap[sk] = &sGroup{
+				ServiceName: a.ServiceName,
+				Ratings:     make(map[string]int),
+				ResponseIDs: make(map[uuid.UUID]bool),
+			}
+		}
+		sg := byServiceMap[sk]
+		sg.Ratings[a.ResponseID.String()] += a.RatingValue
+		sg.ResponseIDs[a.ResponseID] = true
+
+		// Unsur
+		if _, exists := byUnsurMap[a.UnsurID]; !exists {
+			byUnsurMap[a.UnsurID] = &uGroup{
+				UnsurID:   a.UnsurID,
+				UnsurName: a.UnsurName,
+				IndexType: a.IndexType,
+			}
+		}
+		ug := byUnsurMap[a.UnsurID]
+		ug.Sum += float64(a.RatingValue)
+		ug.Count++
+
+		// Trend
+		tk := tKey{Bulan: a.Bulan, IndexType: a.IndexType}
+		if _, exists := trendMap[tk]; !exists {
+			trendMap[tk] = &tGroup{}
+		}
+		tg := trendMap[tk]
+		tg.Sum += float64(a.RatingValue)
+		tg.Count++
 	}
 
 	ipkpScore := 0.0
 	ipakScore := 0.0
-
-	if len(respIDs) > 0 {
-		var results []domain.AnswerUnsurRaw
-		err := db.Table("kemenag_survey.response_answers ra").
-			Select("ra.rating_value, u.index_type").
-			Joins("JOIN kemenag_survey.questions q ON ra.question_id = q.id").
-			Joins("JOIN kemenag_survey.unsur u ON q.unsur_id = u.id").
-			Where("ra.response_id IN ?", respIDs).
-			Scan(&results).Error
-
-
-
-		if err == nil && len(results) > 0 {
-			var ipkpSum, ipakSum float64
-			var ipkpCount, ipakCount int64
-			for _, r := range results {
-				if r.IndexType == "IPAK" {
-					ipakSum += float64(r.RatingValue)
-					ipakCount++
-				} else {
-					ipkpSum += float64(r.RatingValue)
-					ipkpCount++
-				}
-			}
-			if ipkpCount > 0 {
-				ipkpScore = domain.RoundTwoDecimals(((ipkpSum / float64(ipkpCount)) / 4.0) * 100.0)
-			}
-			if ipakCount > 0 {
-				ipakScore = domain.RoundTwoDecimals(((ipakSum / float64(ipakCount)) / 4.0) * 100.0)
-			}
-		}
+	if ipkpCount > 0 {
+		ipkpScore = domain.RoundTwoDecimals(((ipkpSum / float64(ipkpCount)) / 4.0) * 100.0)
 	}
-
-	type ServiceResultRaw struct {
-		ServiceID   uuid.UUID `gorm:"column:service_id"`
-		ServiceName string    `gorm:"column:service_name"`
-		IndexType   string    `gorm:"column:index_type"`
-		RatingValue int       `gorm:"column:rating_value"`
-		ResponseID  uuid.UUID `gorm:"column:response_id"`
+	if ipakCount > 0 {
+		ipakScore = domain.RoundTwoDecimals(((ipakSum / float64(ipakCount)) / 4.0) * 100.0)
 	}
 
 	var byServiceList []domain.ByServiceStat
-
-	if len(respIDs) > 0 {
-		var rawResults []ServiceResultRaw
-		err := db.Table("kemenag_survey.response_answers ra").
-			Select("r.service_id, s.name as service_name, u.index_type, ra.rating_value, ra.response_id").
-			Joins("JOIN kemenag_survey.responses r ON ra.response_id = r.id").
-			Joins("JOIN kemenag_survey.services s ON r.service_id = s.id").
-			Joins("JOIN kemenag_survey.questions q ON ra.question_id = q.id").
-			Joins("JOIN kemenag_survey.unsur u ON q.unsur_id = u.id").
-			Where("ra.response_id IN ?", respIDs).
-			Scan(&rawResults).Error
-
-		if err == nil && len(rawResults) > 0 {
-			type key struct {
-				ServiceID string
-				IndexType string
-			}
-			type group struct {
-				ServiceName string
-				Ratings     map[string]int
-				ResponseIDs map[uuid.UUID]bool
-			}
-
-			grouped := make(map[key]*group)
-			for _, r := range rawResults {
-				k := key{ServiceID: r.ServiceID.String(), IndexType: r.IndexType}
-				if _, exists := grouped[k]; !exists {
-					grouped[k] = &group{
-						ServiceName: r.ServiceName,
-						Ratings:     make(map[string]int),
-						ResponseIDs: make(map[uuid.UUID]bool),
-					}
-				}
-				g := grouped[k]
-				g.Ratings[r.ResponseID.String()] += r.RatingValue
-				g.ResponseIDs[r.ResponseID] = true
-			}
-
-			for k, g := range grouped {
-				totalUnsur := 9.0
-				if k.IndexType == "IPAK" {
-					totalUnsur = 5.0
-				}
-				sumScores := 0.0
-				for _, sumRating := range g.Ratings {
-					avg := float64(sumRating) / totalUnsur
-					sumScores += avg
-				}
-				totalRespCount := float64(len(g.ResponseIDs))
-				nilaiIndex := 0.0
-				nilaiKonversi := 0.0
-				if totalRespCount > 0 {
-					nilaiIndex = domain.RoundTwoDecimals(sumScores / totalRespCount)
-					nilaiKonversi = domain.RoundTwoDecimals((nilaiIndex / 4.0) * 100.0)
-				}
-
-				mutu := "D"
-				if nilaiKonversi >= 88.31 {
-					mutu = "A"
-				} else if nilaiKonversi >= 76.61 {
-					mutu = "B"
-				} else if nilaiKonversi >= 65.00 {
-					mutu = "C"
-				}
-
-				byServiceList = append(byServiceList, domain.ByServiceStat{
-					ServiceID:       k.ServiceID,
-					ServiceName:     g.ServiceName,
-					IndexType:       k.IndexType,
-					NilaiIndex:      nilaiIndex,
-					NilaiKonversi:   nilaiKonversi,
-					Mutu:            mutu,
-					JumlahResponden: int64(totalRespCount),
-				})
-			}
+	for k, g := range byServiceMap {
+		totalUnsur := 9.0
+		if k.IndexType == "IPAK" {
+			totalUnsur = 5.0
 		}
+		sumScores := 0.0
+		for _, sumRating := range g.Ratings {
+			avg := float64(sumRating) / totalUnsur
+			sumScores += avg
+		}
+		totalRespCount := float64(len(g.ResponseIDs))
+		nilaiIndex := 0.0
+		nilaiKonversi := 0.0
+		if totalRespCount > 0 {
+			nilaiIndex = domain.RoundTwoDecimals(sumScores / totalRespCount)
+			nilaiKonversi = domain.RoundTwoDecimals((nilaiIndex / 4.0) * 100.0)
+		}
+		mutu := "D"
+		if nilaiKonversi >= 88.31 {
+			mutu = "A"
+		} else if nilaiKonversi >= 76.61 {
+			mutu = "B"
+		} else if nilaiKonversi >= 65.00 {
+			mutu = "C"
+		}
+		byServiceList = append(byServiceList, domain.ByServiceStat{
+			ServiceID:       k.ServiceID,
+			ServiceName:     g.ServiceName,
+			IndexType:       k.IndexType,
+			NilaiIndex:      nilaiIndex,
+			NilaiKonversi:   nilaiKonversi,
+			Mutu:            mutu,
+			JumlahResponden: int64(totalRespCount),
+		})
 	}
 
-	// Calculate Unsur Summary for Breakdown Table
 	var unsurList []domain.UnsurStat
-	if len(respIDs) > 0 {
-		type UnsurRaw struct {
-			UnsurID     uuid.UUID `gorm:"column:unsur_id"`
-			UnsurName   string    `gorm:"column:unsur_name"`
-			IndexType   string    `gorm:"column:index_type"`
-			RatingValue int       `gorm:"column:rating_value"`
+	for _, u := range byUnsurMap {
+		avg := 0.0
+		if u.Count > 0 {
+			avg = domain.RoundTwoDecimals(u.Sum / float64(u.Count))
 		}
-		var rawUnsur []UnsurRaw
-		err := db.Table("kemenag_survey.response_answers ra").
-			Select("u.id as unsur_id, u.name as unsur_name, u.index_type, ra.rating_value").
-			Joins("JOIN kemenag_survey.questions q ON ra.question_id = q.id").
-			Joins("JOIN kemenag_survey.unsur u ON q.unsur_id = u.id").
-			Where("ra.response_id IN ?", respIDs).
-			Scan(&rawUnsur).Error
-
-		if err == nil && len(rawUnsur) > 0 {
-			type uKey struct {
-				UnsurID   string
-				IndexType string
-			}
-			type uGroup struct {
-				UnsurName  string
-				TotalScore float64
-				Count      int64
-			}
-			uMap := make(map[uKey]*uGroup)
-			for _, ru := range rawUnsur {
-				k := uKey{UnsurID: ru.UnsurID.String(), IndexType: ru.IndexType}
-				if _, ok := uMap[k]; !ok {
-					uMap[k] = &uGroup{UnsurName: ru.UnsurName}
-				}
-				g := uMap[k]
-				g.TotalScore += float64(ru.RatingValue)
-				g.Count++
-			}
-			for k, g := range uMap {
-				avg := 0.0
-				if g.Count > 0 {
-					avg = domain.RoundTwoDecimals(g.TotalScore / float64(g.Count))
-				}
-				divider := 9.0
-				if k.IndexType == "IPAK" {
-					divider = 5.0
-				}
-				nrrTertimbang := domain.RoundTwoDecimals(avg / divider)
-				mutuText := domain.GetMutuText((avg / 4.0) * 100.0)
-
-				unsurList = append(unsurList, domain.UnsurStat{
-					UnsurID:            k.UnsurID,
-					UnsurName:          g.UnsurName,
-					IndexType:          k.IndexType,
-					NilaiRataRataUnsur: avg,
-					NRR:                nrrTertimbang,
-					Score:              domain.RoundTwoDecimals((avg / 4.0) * 100.0),
-					Mutu:               mutuText,
-					JumlahPertanyaan:   1,
-					TotalNilai:         g.TotalScore,
-					JumlahResponden:    g.Count,
-				})
-			}
+		divider := 9.0
+		if u.IndexType == "IPAK" {
+			divider = 5.0
 		}
+		nrrTertimbang := domain.RoundTwoDecimals(avg / divider)
+		mutuText := domain.GetMutuText((avg / 4.0) * 100.0)
+
+		unsurList = append(unsurList, domain.UnsurStat{
+			UnsurID:            u.UnsurID.String(),
+			UnsurName:          u.UnsurName,
+			IndexType:          u.IndexType,
+			NilaiRataRataUnsur: avg,
+			NRR:                nrrTertimbang,
+			Score:              domain.RoundTwoDecimals((avg / 4.0) * 100.0),
+			Mutu:               mutuText,
+			JumlahPertanyaan:   1,
+			TotalNilai:         u.Sum,
+			JumlahResponden:    u.Count,
+		})
 	}
 
-	// Calculate Demographics Breakdown (Jenis Kelamin, Education, etc.)
+	var trendList []domain.IndexTrendRow
+	for k, g := range trendMap {
+		score := 0.0
+		if g.Count > 0 {
+			score = domain.RoundTwoDecimals(((g.Sum / float64(g.Count)) / 4.0) * 100.0)
+		}
+		trendList = append(trendList, domain.IndexTrendRow{
+			Bulan:         k.Bulan,
+			IndexType:     k.IndexType,
+			NilaiKonversi: score,
+		})
+	}
+
+	// 3. Demographics Query
 	var demoList []domain.DemographicSummaryRow
-	if len(respIDs) > 0 {
-		db.Table("kemenag_survey.response_demographics rd").
-			Select("df.field_key, rd.value as demographic_value, count(rd.id) as count").
-			Joins("JOIN kemenag_survey.demographic_fields df ON rd.field_id = df.id").
-			Where("rd.response_id IN ?", respIDs).
-			Group("df.field_key, rd.value").
-			Scan(&demoList)
+	demoQuery := db.Table("kemenag_survey.response_demographics rd").
+		Select("df.field_key, rd.value as demographic_value, count(rd.id) as count").
+		Joins("JOIN kemenag_survey.responses r ON rd.response_id = r.id").
+		Joins("JOIN kemenag_survey.demographic_fields df ON rd.field_id = df.id").
+		Group("df.field_key, rd.value")
+
+	if startDate != "" {
+		demoQuery = demoQuery.Where("r.submitted_at::date >= ?::date", startDate)
 	}
+	if endDate != "" {
+		demoQuery = demoQuery.Where("r.submitted_at::date <= ?::date", endDate)
+	}
+	_ = demoQuery.Scan(&demoList).Error
 
 	indexSummary := []domain.ViewIndexSummaryRow{
 		{
@@ -434,57 +501,7 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 		},
 	}
 
-	// Calculate Monthly Trend Data
-	var trendList []domain.IndexTrendRow
-	if len(respIDs) > 0 {
-		type TrendRaw struct {
-			Bulan       string `gorm:"column:bulan"`
-			IndexType   string `gorm:"column:index_type"`
-			RatingValue int    `gorm:"column:rating_value"`
-		}
-		var rawTrend []TrendRaw
-		err := db.Table("kemenag_survey.response_answers ra").
-			Select("to_char(r.submitted_at, 'YYYY-MM') as bulan, u.index_type, ra.rating_value").
-			Joins("JOIN kemenag_survey.responses r ON ra.response_id = r.id").
-			Joins("JOIN kemenag_survey.questions q ON ra.question_id = q.id").
-			Joins("JOIN kemenag_survey.unsur u ON q.unsur_id = u.id").
-			Where("ra.response_id IN ?", respIDs).
-			Scan(&rawTrend).Error
-
-		if err == nil && len(rawTrend) > 0 {
-			type tKey struct {
-				Bulan     string
-				IndexType string
-			}
-			type tGroup struct {
-				Sum   float64
-				Count int64
-			}
-			tMap := make(map[tKey]*tGroup)
-			for _, rt := range rawTrend {
-				k := tKey{Bulan: rt.Bulan, IndexType: rt.IndexType}
-				if _, ok := tMap[k]; !ok {
-					tMap[k] = &tGroup{}
-				}
-				g := tMap[k]
-				g.Sum += float64(rt.RatingValue)
-				g.Count++
-			}
-			for k, g := range tMap {
-				score := 0.0
-				if g.Count > 0 {
-					score = domain.RoundTwoDecimals(((g.Sum / float64(g.Count)) / 4.0) * 100.0)
-				}
-				trendList = append(trendList, domain.IndexTrendRow{
-					Bulan:         k.Bulan,
-					IndexType:     k.IndexType,
-					NilaiKonversi: score,
-				})
-			}
-		}
-	}
-
-	return fiber.Map{
+	result := fiber.Map{
 		"total_responses": totalResponses,
 		"ipkp_score":      ipkpScore,
 		"ipak_score":      ipakScore,
@@ -493,17 +510,28 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 		"demographics":    demoList,
 		"index_summary":   indexSummary,
 		"trend":           trendList,
-	}, nil
+	}
+	globalCache.Set(cacheKey, result, 10*time.Minute)
+
+	return result, nil
 }
 
-
-
-
-
 func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP string) (uuid.UUID, error) {
-	activePeriod, err := s.repo.GetActivePeriod()
-	if err != nil {
-		return uuid.Nil, fiber.NewError(fiber.StatusBadRequest, "Tidak ada periode survei aktif saat ini")
+	var activePeriod models.SurveyPeriod
+	if cachedPeriod, found := globalCache.Get("survey_active_period"); found {
+		if p, ok := cachedPeriod.(models.SurveyPeriod); ok {
+			activePeriod = p
+		} else if pPtr, ok := cachedPeriod.(*models.SurveyPeriod); ok && pPtr != nil {
+			activePeriod = *pPtr
+		}
+	}
+	if activePeriod.ID == uuid.Nil {
+		p, err := s.repo.GetActivePeriod()
+		if err != nil {
+			return uuid.Nil, fiber.NewError(fiber.StatusBadRequest, "Tidak ada periode survei aktif saat ini")
+		}
+		activePeriod = *p
+		globalCache.Set("survey_active_period", activePeriod, 10*time.Minute)
 	}
 
 	serviceID, err := uuid.Parse(req.ServiceID)
@@ -557,12 +585,24 @@ func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP s
 		}
 	}
 
-	// 2. Pre-fetch all active questions in 1 query to avoid N+1 queries in loop
-	allQuestions, err := s.repo.ListActiveQuestions()
-	if err != nil {
-		tx.Rollback()
-		return uuid.Nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal memuat pertanyaan survei")
+	// 2. Pre-fetch all active questions (from memory cache when available)
+	var allQuestions []models.Question
+	if cachedForm, found := globalCache.Get("survey_form_questions"); found {
+		if m, ok := cachedForm.(fiber.Map); ok {
+			if qList, ok := m["questions"].([]models.Question); ok {
+				allQuestions = qList
+			}
+		}
 	}
+	if len(allQuestions) == 0 {
+		var err error
+		allQuestions, err = s.repo.ListActiveQuestions()
+		if err != nil {
+			tx.Rollback()
+			return uuid.Nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal memuat pertanyaan survei")
+		}
+	}
+
 	questionMap := make(map[uuid.UUID]models.Question, len(allQuestions))
 	for _, q := range allQuestions {
 		questionMap[q.ID] = q
@@ -599,15 +639,14 @@ func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP s
 
 	// Feature 3: Async Goroutine for non-blocking Audit Log recording
 	go func(rID uuid.UUID) {
-		s.repo.WriteAuditLog(&models.AuditLog{
+		_ = s.repo.WriteAuditLog(&models.AuditLog{
 			UserEmail:  "system@kemenag.go.id",
 			Action:     "SUBMIT_SURVEY",
 			EntityName: "Response",
 			EntityID:   rID.String(),
+			Details:    "{}",
 		})
 	}(resp.ID)
-
-
 
 	return resp.ID, nil
 }

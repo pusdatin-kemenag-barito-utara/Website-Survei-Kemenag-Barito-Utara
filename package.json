@@ -1,13 +1,13 @@
 {
   "name": "sikap-survey-monorepo",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "postinstall": "cd frontend && npm install",
-    "dev": "concurrently \"cd backend && %USERPROFILE%\\go\\bin\\air.exe\" \"cd frontend && npm run dev -- -H 0.0.0.0 -p 3000\"",
-    "dev:no-air": "concurrently \"cd backend && go run main.go\" \"cd frontend && npm run dev -- -H 0.0.0.0 -p 3000\"",
+    "dev": "concurrently -n \"BE,FE\" -c \"cyan.bold,magenta.bold\" \"cd backend && %USERPROFILE%\\go\\bin\\air.exe\" \"cd frontend && npm run dev\"",
+    "dev:no-air": "concurrently -n \"BE,FE\" -c \"cyan.bold,magenta.bold\" \"cd backend && go run main.go\" \"cd frontend && npm run dev\"",
     "dev:backend": "cd backend && go run main.go",
-    "dev:frontend": "cd frontend && npm run dev -- -H 0.0.0.0 -p 3000",
+    "dev:frontend": "cd frontend && npm run dev",
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && go build -o bin/server main.go"
   },

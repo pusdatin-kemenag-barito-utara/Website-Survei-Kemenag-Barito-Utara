@@ -1,0 +1,9 @@
+﻿---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import MaintenanceEntry from '@/react/pages/MaintenanceEntry';
+---
+
+<BaseLayout
+  title="Sistem Sedang Pemeliharaan",>
+  <MaintenanceEntry client:only="react" />
+</BaseLayout>

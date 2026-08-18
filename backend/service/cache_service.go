@@ -46,10 +46,48 @@ func (c *MemoryCache) Delete(key string) {
 	delete(c.items, key)
 }
 
+func init() {
+	// Background garbage collector for expired cache entries (every 5 minutes)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		for range ticker.C {
+			globalCache.PurgeExpired()
+		}
+	}()
+}
+
 func (c *MemoryCache) ClearAll() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.items = make(map[string]CacheItem)
+}
+
+func (c *MemoryCache) PurgeExpired() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	for k, item := range c.items {
+		if now.After(item.Expiration) {
+			delete(c.items, k)
+		}
+	}
+}
+
+// Global Cache Helper functions
+func SetCache(key string, value interface{}, duration time.Duration) {
+	globalCache.Set(key, value, duration)
+}
+
+func GetCache(key string) (interface{}, bool) {
+	return globalCache.Get(key)
+}
+
+func DeleteCache(key string) {
+	globalCache.Delete(key)
+}
+
+func ClearCache() {
+	globalCache.ClearAll()
 }
 
 // HashIP hashes IP Address with SHA-256 for privacy compliance (UU PDP)

@@ -1,0 +1,80 @@
+{
+  "name": "SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara",
+  "short_name": "SI-ARUS",
+  "description": "Sistem Informasi Analisis Rekapitulasi Ulasan Survei Kepuasan Masyarakat Kantor Kementerian Agama Kabupaten Barito Utara",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#059669",
+  "lang": "id-ID",
+  "dir": "ltr",
+  "categories": [
+    "government",
+    "utilities",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48 32x32 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Isi Survei",
+      "short_name": "Survei",
+      "description": "Mulai pengisian kuesioner survei kepuasan masyarakat",
+      "url": "/survei",
+      "icons": [
+        {
+          "src": "/apple-icon.png",
+          "sizes": "180x180"
+        }
+      ]
+    },
+    {
+      "name": "Lihat Hasil Survei",
+      "short_name": "Hasil",
+      "description": "Lihat rekapitulasi nilai IPKP dan IPAK publik",
+      "url": "/hasil",
+      "icons": [
+        {
+          "src": "/apple-icon.png",
+          "sizes": "180x180"
+        }
+      ]
+    },
+    {
+      "name": "Barcode QR Survei",
+      "short_name": "Barcode",
+      "description": "Buka barcode QR kuesioner untuk scan pengunjung",
+      "url": "/barcode",
+      "icons": [
+        {
+          "src": "/apple-icon.png",
+          "sizes": "180x180"
+        }
+      ]
+    }
+  ]
+}
