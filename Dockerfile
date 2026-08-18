@@ -16,10 +16,9 @@ COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 COPY frontend/ ./
 ENV ASTRO_TELEMETRY_DISABLED=1
-ENV PUBLIC_API_URL=http://127.0.0.1:8080/api/v1
-ENV PUBLIC_APP_URL=http://localhost:3000
 
 RUN npm run build
+RUN npm prune --production
 
 # Stage 3: Runner Stage
 FROM node:22-alpine AS runner
@@ -28,6 +27,8 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata bash curl
 
 COPY --from=backend-builder /app/backend/api-sikap /app/api-sikap
+COPY --from=frontend-builder /app/frontend/package.json /app/package.json
+COPY --from=frontend-builder /app/frontend/node_modules /app/node_modules
 COPY --from=frontend-builder /app/frontend/dist /app/dist
 
 EXPOSE 3000 8080
