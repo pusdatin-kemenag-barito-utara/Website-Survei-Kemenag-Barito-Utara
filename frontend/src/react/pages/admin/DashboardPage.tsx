@@ -18,7 +18,6 @@ import {
   Layers,
   HelpCircle,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
 import { motion, Variants } from "framer-motion";
 import { fetchCachedAdminStats, getCachedAdminStatsSync } from "@/lib/data-cache";
 import type { SurveyPeriod } from "@/types";

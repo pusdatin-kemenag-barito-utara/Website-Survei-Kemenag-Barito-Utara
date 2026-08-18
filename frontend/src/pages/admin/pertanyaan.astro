@@ -1,8 +1,8 @@
-﻿---
+---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import PertanyaanEntry from '@/react/pages/admin/PertanyaanEntry';
 ---
 
 <BaseLayout>
-  <PertanyaanEntry client:only="react" />
+  <PertanyaanEntry client:load />
 </BaseLayout>

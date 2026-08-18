@@ -6,9 +6,6 @@ const PUSDATIN_URL =
   (import.meta as any).env?.PUBLIC_PUSDATIN_URL ||
   "";
 const APP_ID = "sikap";
-const ENABLE_API_PROXY = process.env.ENABLE_API_PROXY === "true";
-const API_PROXY_TARGET =
-  process.env.API_PROXY_TARGET || "http://127.0.0.1:8080";
 
 function parseRequestCookies(
   request: Request,
@@ -64,7 +61,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
       (import.meta as any).env?.API_PROXY_TARGET ||
       "http://127.0.0.1:8080";
     const target = new URL(pathname + context.url.search, apiTarget);
-    const headers = new Headers(context.request.headers);
+    
+    // Clean hop-by-hop headers to prevent decompression/host mismatch
+    const headers = new Headers();
+    context.request.headers.forEach((value, key) => {
+      const lowerKey = key.toLowerCase();
+      if (!["host", "connection", "accept-encoding"].includes(lowerKey)) {
+        headers.set(key, value);
+      }
+    });
     headers.set("Host", target.host);
 
     const init: RequestInit = {
@@ -78,9 +83,24 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
     try {
       const res = await fetch(target, init);
-      return new Response(res.body, {
+      
+      const responseHeaders = new Headers();
+      res.headers.forEach((value, key) => {
+        const lowerKey = key.toLowerCase();
+        // Remove content-encoding and content-length because Node fetch decodes response body in memory
+        if (!["content-encoding", "content-length", "transfer-encoding", "connection"].includes(lowerKey)) {
+          responseHeaders.set(key, value);
+        }
+      });
+
+      if (!responseHeaders.has("Content-Type") && res.headers.has("Content-Type")) {
+        responseHeaders.set("Content-Type", res.headers.get("Content-Type")!);
+      }
+
+      const bodyBuffer = await res.arrayBuffer();
+      return new Response(bodyBuffer, {
         status: res.status,
-        headers: res.headers,
+        headers: responseHeaders,
       });
     } catch (err) {
       console.error("[MIDDLEWARE] API Proxy to Golang failed:", err);

@@ -74,15 +74,6 @@ export default function AdminUnsurPage() {
     loadData()
   }, [loadData])
 
-  const fetchUnsur = useCallback(async () => {
-    try {
-      const data = await apiFetch<Unsur[]>('/admin/unsur')
-      if (data) setUnsurList(data)
-    } catch (err) {
-      console.error("Fetch unsur error:", err)
-    }
-  }, [])
-
   function openCreate() {
     setEditing(null)
     const nextSort = unsurList.length > 0 ? Math.max(...unsurList.map(u => u.sort_order)) + 1 : 1

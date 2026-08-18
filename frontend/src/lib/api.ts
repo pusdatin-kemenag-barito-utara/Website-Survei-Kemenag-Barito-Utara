@@ -1,7 +1,12 @@
 function getFullApiUrl(endpoint: string): string {
-  const base = (import.meta.env.PUBLIC_API_URL || '').replace(/\/+$/, '');
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
+  if (typeof window !== 'undefined') {
+    // In browser, same-origin relative path is fast, robust, and handles both localhost and production
+    return `/api/v1${cleanEndpoint}`;
+  }
+
+  const base = (process.env.INTERNAL_API_URL || process.env.API_PROXY_TARGET || import.meta.env.PUBLIC_API_URL || '').replace(/\/+$/, '');
   if (base) {
     if (base.endsWith('/api/v1')) {
       return `${base}${cleanEndpoint}`;
