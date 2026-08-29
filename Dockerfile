@@ -3,6 +3,7 @@
 # Stage 1: Build Golang Backend
 FROM golang:1.24-alpine AS backend-builder
 WORKDIR /app/backend
+ENV GOTOOLCHAIN=auto
 
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download

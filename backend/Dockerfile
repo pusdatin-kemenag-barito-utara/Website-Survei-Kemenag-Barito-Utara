@@ -1,6 +1,7 @@
 # Stage 1: Build Golang Backend
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
+ENV GOTOOLCHAIN=auto
 
 RUN apk add --no-cache git
 
