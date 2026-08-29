@@ -9,7 +9,7 @@ import (
 	"survey-kemenag-backend/models"
 	"survey-kemenag-backend/repository"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 

@@ -60,7 +60,34 @@ async function getMaintenanceStatus(): Promise<boolean> {
   return cachedMaintenance.isMaintenance;
 }
 
+function logRequest(status: number, method: string, pathname: string, durationMs: number) {
+  // Skip static assets and internal vite/astro paths to keep terminal clean
+  if (
+    pathname.startsWith("/_astro/") ||
+    pathname.startsWith("/@") ||
+    pathname.startsWith("/node_modules/") ||
+    /\.(ico|png|jpg|jpeg|svg|webp|gif|woff2?|ttf|eot|css|js|map|json)$/i.test(pathname)
+  ) {
+    return;
+  }
+
+  const timeStr = new Date().toTimeString().split(" ")[0];
+  const durationStr = `${durationMs.toFixed(1)}ms`.padStart(7, " ");
+
+  // Status color codes for ANSI terminal
+  let statusColor = "\x1b[32m"; // Green for 2xx
+  if (status >= 500) statusColor = "\x1b[31m"; // Red for 5xx
+  else if (status >= 400) statusColor = "\x1b[33m"; // Yellow for 4xx
+  else if (status >= 300) statusColor = "\x1b[36m"; // Cyan for 3xx
+  const reset = "\x1b[0m";
+
+  console.log(
+    `[${timeStr}] ${statusColor}${status}${reset} - \x1b[35m${durationStr}\x1b[0m | \x1b[1m${method.padEnd(5, " ")}\x1b[0m ${pathname}`
+  );
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
+  const startTime = performance.now();
   const { pathname } = context.url;
 
   // === MAINTENANCE CHECK (Fast non-blocking check with 30s cache) ===
@@ -68,10 +95,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const isMaintenance = await getMaintenanceStatus();
     if (isMaintenance) {
       if (pathname !== "/maintenance") {
+        logRequest(302, context.request.method, pathname, performance.now() - startTime);
         return context.redirect("/maintenance");
       }
     } else {
       if (pathname === "/maintenance") {
+        logRequest(302, context.request.method, pathname, performance.now() - startTime);
         return context.redirect("/");
       }
     }
@@ -120,12 +149,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
       }
 
       const bodyBuffer = await res.arrayBuffer();
+      logRequest(res.status, context.request.method, pathname, performance.now() - startTime);
       return new Response(bodyBuffer, {
         status: res.status,
         headers: responseHeaders,
       });
     } catch (err) {
       console.error("[MIDDLEWARE] API Proxy to Golang failed:", err);
+      logRequest(502, context.request.method, pathname, performance.now() - startTime);
       return new Response(
         JSON.stringify({ error: "Backend service temporarily unavailable" }),
         {
@@ -189,7 +220,24 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   const response = await next();
 
-  // === HTTP/3 (QUIC) & Network Protocol Headers ===
+  // === Cloudflare Edge & CDN Smart Caching Rules ===
+  if (pathname.startsWith("/admin") || pathname.startsWith("/login")) {
+    response.headers.set("Cache-Control", "private, no-cache, no-store, must-revalidate");
+    response.headers.set("CDN-Cache-Control", "no-store");
+  } else if (
+    pathname.startsWith("/_astro/") ||
+    pathname.startsWith("/fonts/") ||
+    /\.(ico|png|jpg|jpeg|svg|webp|gif|woff2?|ttf|eot|css|js)$/i.test(pathname)
+  ) {
+    response.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+    response.headers.set("CDN-Cache-Control", "public, max-age=31536000, immutable");
+  } else {
+    // Public SSR Pages: Micro-cache on Cloudflare Edge with stale-while-revalidate for instantaneous response
+    response.headers.set("Cache-Control", "public, max-age=0, s-maxage=60, stale-while-revalidate=300");
+    response.headers.set("CDN-Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  }
+
+  // === HTTP/3 (QUIC) & Cloudflare Network Protocol Headers ===
   response.headers.set(
     "Alt-Svc",
     'h3=":443"; ma=86400, h3-29=":443"; ma=86400',
@@ -198,8 +246,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     "Accept-CH",
     "DPR, Width, Viewport-Width, Downlink, ECT",
   );
+  response.headers.set("Vary", "Accept-Encoding, Accept, Cookie");
 
   // === Security & Cross-Origin Isolation ===
+  response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "SAMEORIGIN");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -208,5 +258,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
     "camera=(), microphone=(), geolocation=()",
   );
 
+  logRequest(response.status, context.request.method, pathname, performance.now() - startTime);
   return response;
 });

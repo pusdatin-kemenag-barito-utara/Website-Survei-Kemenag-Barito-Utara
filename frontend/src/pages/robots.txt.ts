@@ -1,16 +1,81 @@
 export function GET() {
-  const baseUrl = import.meta.env.PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || "";
+  const baseUrl = (
+    import.meta.env.PUBLIC_APP_URL ||
+    process.env.PUBLIC_APP_URL ||
+    "https://survei.kemenag-baritoutara.com"
+  ).replace(/\/+$/, "");
+
   const content = [
+    "# ==============================================================================",
+    "# SI-ARUS - Kemenag Barito Utara Robots.txt (Enterprise Policy)",
+    "# ==============================================================================",
+    "",
+    "# --- 1. Global Search Engine Crawlers ---",
     "User-agent: *",
+    "Allow: /",
+    "Allow: /_astro/",
+    "Allow: /fonts/",
+    "Allow: /*.webp",
+    "Allow: /*.png",
+    "Allow: /*.svg",
+    "Allow: /*.ico",
+    "Allow: /*.js",
+    "Allow: /*.css",
+    "Disallow: /admin/",
+    "Disallow: /api/",
+    "Disallow: /maintenance",
+    "",
+    "# --- 2. Google Search & Google Images ---",
+    "User-agent: Googlebot",
+    "User-agent: Googlebot-Image",
+    "User-agent: Googlebot-Mobile",
+    "Allow: /",
+    "Allow: /_astro/",
+    "Disallow: /admin/",
+    "Disallow: /api/",
+    "",
+    "# --- 3. Microsoft Bing & Yahoo ---",
+    "User-agent: Bingbot",
+    "User-agent: msnbot",
+    "Allow: /",
+    "Allow: /_astro/",
+    "Disallow: /admin/",
+    "Disallow: /api/",
+    "",
+    "# --- 4. Apple Siri & Spotlight Crawler ---",
+    "User-agent: Applebot",
     "Allow: /",
     "Disallow: /admin/",
     "Disallow: /api/",
     "",
+    "# --- 5. AI Search Engines & Knowledge Crawlers ---",
+    "User-agent: GPTBot",
+    "User-agent: ChatGPT-User",
+    "User-agent: PerplexityBot",
+    "User-agent: ClaudeBot",
+    "User-agent: Google-Extended",
+    "User-agent: Amazonbot",
+    "Allow: /",
+    "Disallow: /admin/",
+    "Disallow: /api/",
+    "",
+    "# --- 6. Spam & Malicious Scraper Blocks ---",
+    "User-agent: AhrefsBot",
+    "User-agent: SemrushBot",
+    "User-agent: DotBot",
+    "User-agent: MJ12bot",
+    "Crawl-delay: 5",
+    "",
+    "# --- 7. Sitemaps & Host Definition ---",
     `Sitemap: ${baseUrl}/sitemap.xml`,
+    `Host: ${baseUrl.replace(/^https?:\/\//, "")}`,
     "",
   ].join("\n");
 
   return new Response(content, {
-    headers: { "Content-Type": "text/plain" },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "public, max-age=86400, s-maxage=86400",
+    },
   });
 }

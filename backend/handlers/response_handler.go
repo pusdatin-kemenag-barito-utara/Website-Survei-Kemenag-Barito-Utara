@@ -7,7 +7,7 @@ import (
 	"survey-kemenag-backend/repository"
 	"survey-kemenag-backend/service"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
@@ -23,9 +23,9 @@ func NewResponseHandler(repo repository.Repository, surveyService *service.Surve
 	}
 }
 
-func (h *ResponseHandler) SubmitSurvey(c *fiber.Ctx) error {
+func (h *ResponseHandler) SubmitSurvey(c fiber.Ctx) error {
 	var req domain.SubmitSurveyRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload request tidak valid"})
 	}
 
@@ -43,7 +43,7 @@ func (h *ResponseHandler) SubmitSurvey(c *fiber.Ctx) error {
 	})
 }
 
-func (h *ResponseHandler) ListResponsesAdmin(c *fiber.Ctx) error {
+func (h *ResponseHandler) ListResponsesAdmin(c fiber.Ctx) error {
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	limit, _ := strconv.Atoi(c.Query("limit", "10"))
 	offset := (page - 1) * limit
@@ -67,7 +67,7 @@ func (h *ResponseHandler) ListResponsesAdmin(c *fiber.Ctx) error {
 	})
 }
 
-func (h *ResponseHandler) DeleteResponseAdmin(c *fiber.Ctx) error {
+func (h *ResponseHandler) DeleteResponseAdmin(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -85,7 +85,7 @@ func (h *ResponseHandler) DeleteResponseAdmin(c *fiber.Ctx) error {
 	})
 }
 
-func (h *ResponseHandler) GetResponseAnswersAdmin(c *fiber.Ctx) error {
+func (h *ResponseHandler) GetResponseAnswersAdmin(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -116,7 +116,7 @@ func (h *ResponseHandler) GetResponseAnswersAdmin(c *fiber.Ctx) error {
 	return c.JSON(formattedResults)
 }
 
-func (h *ResponseHandler) GetResponseDemographicsAdmin(c *fiber.Ctx) error {
+func (h *ResponseHandler) GetResponseDemographicsAdmin(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {

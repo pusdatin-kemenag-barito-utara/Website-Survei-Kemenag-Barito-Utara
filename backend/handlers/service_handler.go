@@ -7,7 +7,7 @@ import (
 	"survey-kemenag-backend/repository"
 	"survey-kemenag-backend/service"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +19,7 @@ func NewServiceHandler(repo repository.Repository) *ServiceHandler {
 	return &ServiceHandler{repo: repo}
 }
 
-func (h *ServiceHandler) GetServices(c *fiber.Ctx) error {
+func (h *ServiceHandler) GetServices(c fiber.Ctx) error {
 	cacheKey := "survey_services"
 	if cachedData, found := service.GetCache(cacheKey); found {
 		return c.JSON(cachedData)
@@ -43,7 +43,7 @@ func (h *ServiceHandler) GetServices(c *fiber.Ctx) error {
 	return c.JSON(data)
 }
 
-func (h *ServiceHandler) ListServicesAdmin(c *fiber.Ctx) error {
+func (h *ServiceHandler) ListServicesAdmin(c fiber.Ctx) error {
 	cacheKey := "admin_services"
 	if cachedData, found := service.GetCache(cacheKey); found {
 		return c.JSON(cachedData)
@@ -57,9 +57,9 @@ func (h *ServiceHandler) ListServicesAdmin(c *fiber.Ctx) error {
 	return c.JSON(services)
 }
 
-func (h *ServiceHandler) CreateService(c *fiber.Ctx) error {
+func (h *ServiceHandler) CreateService(c fiber.Ctx) error {
 	var s models.Service
-	if err := c.BodyParser(&s); err != nil {
+	if err := c.Bind().Body(&s); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
@@ -72,7 +72,7 @@ func (h *ServiceHandler) CreateService(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(s)
 }
 
-func (h *ServiceHandler) UpdateService(c *fiber.Ctx) error {
+func (h *ServiceHandler) UpdateService(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -80,7 +80,7 @@ func (h *ServiceHandler) UpdateService(c *fiber.Ctx) error {
 	}
 
 	var s models.Service
-	if err := c.BodyParser(&s); err != nil {
+	if err := c.Bind().Body(&s); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
@@ -94,7 +94,7 @@ func (h *ServiceHandler) UpdateService(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
-func (h *ServiceHandler) DeleteService(c *fiber.Ctx) error {
+func (h *ServiceHandler) DeleteService(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {

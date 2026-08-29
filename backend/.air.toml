@@ -5,15 +5,14 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = ".\\tmp\\main.exe"
-  cmd = "go build -o .\\tmp\\main.exe main.go"
+  bin = "tmp/main.exe"
+  cmd = "go build -o tmp/main.exe main.go"
   delay = 500
   exclude_dir = ["assets", "tmp", "vendor", "testdata"]
   exclude_file = []
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
   follow_symlink = false
-  full_bin = ".\\tmp\\main.exe"
 
   include_dir = []
   include_ext = ["go", "tpl", "tm", "html"]

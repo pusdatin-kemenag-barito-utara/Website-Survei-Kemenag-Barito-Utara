@@ -5,7 +5,7 @@ import (
 	"survey-kemenag-backend/models"
 	"survey-kemenag-backend/repository"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 type AuditLogHandler struct {
@@ -17,7 +17,7 @@ func NewAuditLogHandler(repo repository.Repository) *AuditLogHandler {
 }
 
 // List godoc - GET /admin/audit-logs?limit=50&page=1
-func (h *AuditLogHandler) List(c *fiber.Ctx) error {
+func (h *AuditLogHandler) List(c fiber.Ctx) error {
 	limit := 50
 	page := 1
 	if l := c.Query("limit"); l != "" {

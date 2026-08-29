@@ -12,6 +12,8 @@ interface Props {
 const appUrl = import.meta.env.PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || "";
 const gaMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || process.env.PUBLIC_GA_MEASUREMENT_ID || "";
 const gtagId = import.meta.env.PUBLIC_GTAG_ID || process.env.PUBLIC_GTAG_ID || "";
+const cfBeaconToken = import.meta.env.PUBLIC_CF_BEACON_TOKEN || process.env.PUBLIC_CF_BEACON_TOKEN || "";
+const enableCfRum = import.meta.env.PUBLIC_CLOUDFLARE_RUM_ENABLED !== "false";
 
 const {
   title = "SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara",
@@ -41,6 +43,11 @@ const siteTitle = title.includes("SI-ARUS")
 
 const ogImageUrl = image.startsWith("http") ? image : `${appUrl}${image}`;
 
+const canonicalUrl = new URL(
+  Astro.url.pathname,
+  appUrl || "https://survei.kemenag-baritoutara.com"
+).href.replace(/\/+$/, "") || appUrl;
+
 const jsonLd = {
   "@context": "https://schema.org",
   "@graph": [
@@ -48,12 +55,20 @@ const jsonLd = {
       "@type": "GovernmentOrganization",
       "@id": `${appUrl}/#organization`,
       name: "Kantor Kementerian Agama Kabupaten Barito Utara",
-      alternateName: "Kemenag Barito Utara",
+      alternateName: ["Kemenag Barito Utara", "Kankemenag Barut"],
       url: appUrl,
       logo: `${appUrl}/kemenag.svg`,
       image: `${appUrl}/arus.webp`,
       description:
-        "Kantor Kementerian Agama Kabupaten Barito Utara, menyelenggarakan pelayanan publik prima berintegritas.",
+        "Kantor Kementerian Agama Kabupaten Barito Utara, menyelenggarakan pelayanan bimbingan masyarakat Islam, Kristen, Katolik, Hindu, Buddha, Pendidikan Agama, Haji, dan PTSP.",
+      telephone: "+62-519-21067",
+      email: "baritoutara@kemenag.go.id",
+      sameAs: [
+        "https://baritoutara.kemenag.go.id",
+        "https://kemenag.go.id",
+        "https://pusdatin.kemenag-baritoutara.com",
+        "https://kalteng.kemenag.go.id",
+      ],
       address: {
         "@type": "PostalAddress",
         streetAddress: "Jl. Ahmad Yani No. 1",
@@ -61,6 +76,16 @@ const jsonLd = {
         addressRegion: "Kalimantan Tengah",
         postalCode: "73812",
         addressCountry: "ID",
+      },
+      geo: {
+        "@type": "GeoCoordinates",
+        latitude: -0.9576,
+        longitude: 114.8967,
+      },
+      parentOrganization: {
+        "@type": "GovernmentOrganization",
+        name: "Kementerian Agama Republik Indonesia",
+        url: "https://kemenag.go.id",
       },
     },
     {
@@ -74,6 +99,73 @@ const jsonLd = {
         "@id": `${appUrl}/#organization`,
       },
       inLanguage: ["id-ID", "en-US"],
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${appUrl}/hasil?q={search_term_string}`,
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@type": "GovernmentService",
+      "@id": `${appUrl}/#service`,
+      name: "Pelayanan Terpadu Satu Pintu (PTSP) Kemenag Barito Utara",
+      serviceType: "Pelayanan Publik Terpadu Keagamaan dan Pendidikan Keagamaan",
+      provider: {
+        "@id": `${appUrl}/#organization`,
+      },
+      serviceArea: {
+        "@type": "AdministrativeArea",
+        name: "Kabupaten Barito Utara, Kalimantan Tengah",
+      },
+      termsOfService: "PermenPAN-RB No 14 Tahun 2017",
+      url: `${appUrl}/survei`,
+    },
+    {
+      "@type": "Dataset",
+      "@id": `${appUrl}/#dataset`,
+      name: "Data Hasil Indeks Kepuasan Masyarakat (IKM/IPKP) & Indeks Persepsi Anti Korupsi (IPAK)",
+      description:
+        "Dataset publik hasil evaluasi survei kepuasan masyarakat terhadap layanan publik di Kantor Kemenag Barito Utara sesuai standar PermenPAN-RB No. 14/2017.",
+      creator: {
+        "@id": `${appUrl}/#organization`,
+      },
+      publisher: {
+        "@id": `${appUrl}/#organization`,
+      },
+      license: "https://creativecommons.org/licenses/by/4.0/",
+      temporalCoverage: "2026",
+      spatialCoverage: "Kabupaten Barito Utara",
+      url: `${appUrl}/hasil`,
+    },
+    {
+      "@type": "FAQPage",
+      "@id": `${appUrl}/#faq`,
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "Apa itu SI-ARUS Kemenag Barito Utara?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "SI-ARUS (Sistem Informasi Analisis Rekapitulasi Ulasan Survei Kepuasan Masyarakat) adalah platform digital resmi Kantor Kementerian Agama Kabupaten Barito Utara untuk menghimpun, mengolah, dan mempublikasikan hasil Indeks Persepsi Kualitas Pelayanan (IPKP) dan Indeks Persepsi Anti Korupsi (IPAK) secara transparan dan akuntabel.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Dasar hukum apa yang digunakan dalam survei kepuasan masyarakat SI-ARUS?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Pelaksanaan survei berpedoman pada Peraturan Menteri Pendayagunaan Aparatur Negara dan Reformasi Birokrasi (PermenPAN-RB) Nomor 14 Tahun 2017 tentang Pedoman Penyusunan Survei Kepuasan Masyarakat Unit Penyelenggara Pelayanan Publik.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Apakah identitas responden survei dijamin kerahasiaannya?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Ya, seluruh data responden dienkripsi dengan standar keamanan tinggi dan masyarakat memiliki opsi untuk mengisi survei secara anonim tanpa membuka data kontak pribadi.",
+          },
+        },
+      ],
     },
     {
       "@type": "WebApplication",
@@ -89,69 +181,6 @@ const jsonLd = {
         "@id": `${appUrl}/#organization`,
       },
     },
-    {
-      "@type": "SiteNavigationElement",
-      "@id": `${appUrl}/#navigation`,
-      name: "Menu Navigasi Utama SI-ARUS",
-      hasPart: [
-        {
-          "@type": "WebPage",
-          "@id": `${appUrl}/#home`,
-          name: "Beranda",
-          description: "Halaman Utama Portal Survei Kepuasan Masyarakat",
-          url: `${appUrl}/`,
-        },
-        {
-          "@type": "WebPage",
-          "@id": `${appUrl}/survei#page`,
-          name: "Isi Survei",
-          description: "Formulir Pengisian Survei Kepuasan Masyarakat IPKP & IPAK",
-          url: `${appUrl}/survei`,
-        },
-        {
-          "@type": "WebPage",
-          "@id": `${appUrl}/hasil#page`,
-          name: "Hasil Survei",
-          description: "Rekapitulasi Nilai Mutu Indeks IPKP & IPAK Terkini",
-          url: `${appUrl}/hasil`,
-        },
-        {
-          "@type": "WebPage",
-          "@id": `${appUrl}/hasil/ipkp#page`,
-          name: "Indeks Kualitas Pelayanan (IPKP)",
-          description: "Rincian Nilai 9 Unsur Indeks Persepsi Kualitas Pelayanan",
-          url: `${appUrl}/hasil/ipkp`,
-        },
-        {
-          "@type": "WebPage",
-          "@id": `${appUrl}/hasil/ipak#page`,
-          name: "Indeks Persepsi Anti Korupsi (IPAK)",
-          description: "Rincian Nilai 5 Unsur Indeks Persepsi Anti Korupsi",
-          url: `${appUrl}/hasil/ipak`,
-        },
-        {
-          "@type": "WebPage",
-          "@id": `${appUrl}/barcode#page`,
-          name: "Barcode & QR Code",
-          description: "Unduh dan Scan QR Code Akses Survei Pelayanan Publik",
-          url: `${appUrl}/barcode`,
-        },
-        {
-          "@type": "WebPage",
-          "@id": `${appUrl}/arsip#page`,
-          name: "Arsip Survei",
-          description: "Laporan dan Arsip Nilai Survei Triwulan & Tahunan",
-          url: `${appUrl}/arsip`,
-        },
-        {
-          "@type": "WebPage",
-          "@id": `${appUrl}/profil#page`,
-          name: "Tentang SI-ARUS",
-          description: "Profil Sistem dan Maklumat Pelayanan Kemenag Barito Utara",
-          url: `${appUrl}/profil`,
-        },
-      ],
-    },
   ],
 };
 ---
@@ -163,14 +192,40 @@ const jsonLd = {
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta http-equiv="Accept-CH" content="DPR, Width, Viewport-Width, Downlink, ECT" />
     
-    <!-- Primary Metadata -->
+    <!-- Primary Metadata & SEO -->
     <title>{siteTitle}</title>
     <meta name="title" content={siteTitle} />
     <meta name="description" content={description} />
     <meta name="keywords" content={keywords} />
     <meta name="author" content="Kantor Kementerian Agama Kabupaten Barito Utara" />
+    <meta name="publisher" content="Kementerian Agama Republik Indonesia" />
     <meta name="generator" content="Astro" />
-    <link rel="canonical" href={appUrl} />
+
+    <!-- Canonical & Multilingual Alternate Tags -->
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" hreflang="id" href={canonicalUrl} />
+    <link rel="alternate" hreflang="en" href={`${canonicalUrl}?lang=en`} />
+    <link rel="alternate" hreflang="x-default" href={canonicalUrl} />
+
+    <!-- Search Engine Directives -->
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+
+    <!-- Regional & Geo-Targeting Metadata (Barito Utara, Kalimantan Tengah) -->
+    <meta name="geo.region" content="ID-KT" />
+    <meta name="geo.placename" content="Muara Teweh, Kabupaten Barito Utara" />
+    <meta name="geo.position" content="-0.9576;114.8967" />
+    <meta name="ICBM" content="-0.9576, 114.8967" />
+
+    <!-- Dublin Core Metadata for Government & Institutional Authority -->
+    <meta name="DC.title" content={siteTitle} />
+    <meta name="DC.creator" content="Kantor Kementerian Agama Kabupaten Barito Utara" />
+    <meta name="DC.subject" content="Survei Kepuasan Masyarakat, IPKP, IPAK, Pelayanan Publik PTSP" />
+    <meta name="DC.description" content={description} />
+    <meta name="DC.publisher" content="Kementerian Agama Republik Indonesia" />
+    <meta name="DC.language" content="id" />
+    <meta name="DC.coverage" content="Indonesia, Kalimantan Tengah, Barito Utara" />
 
     <!-- HTTP/3 & Network Connection Hints -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -180,6 +235,8 @@ const jsonLd = {
     <link rel="preconnect" href="https://www.googletagmanager.com" />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
     <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+    <link rel="preconnect" href="https://static.cloudflareinsights.com" crossorigin="anonymous" />
+    <link rel="dns-prefetch" href="https://static.cloudflareinsights.com" />
     <link rel="preconnect" href="https://db.kemenag-baritoutara.com" crossorigin="anonymous" />
     <link rel="preconnect" href="https://pusdatin.kemenag-baritoutara.com" />
     <link rel="dns-prefetch" href="https://pusdatin.kemenag-baritoutara.com" />
@@ -187,6 +244,16 @@ const jsonLd = {
 
     <!-- Preload Maklumat Pelayanan Banner for Instant LCP -->
     <link rel="preload" as="image" href="/maklumat-pelayanan.webp" type="image/webp" fetchpriority="high" />
+
+    <!-- Cloudflare Browser Insights & Real User Monitoring (RUM) with Core Web Vitals & SPA Support -->
+    {enableCfRum && (
+      <script
+        is:inline
+        defer
+        src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon={cfBeaconToken ? JSON.stringify({ token: cfBeaconToken, spa: true }) : '{"spa": true}'}
+      ></script>
+    )}
 
     {gaMeasurementId && (
       <>
@@ -270,7 +337,7 @@ const jsonLd = {
     <meta property="og:site_name" content="SI-ARUS Kemenag Barito Utara" />
     <meta property="og:title" content={siteTitle} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={appUrl} />
+    <meta property="og:url" content={canonicalUrl} />
     <meta property="og:type" content={type} />
     <meta property="og:locale" content="id_ID" />
     <meta property="og:locale:alternate" content="en_US" />

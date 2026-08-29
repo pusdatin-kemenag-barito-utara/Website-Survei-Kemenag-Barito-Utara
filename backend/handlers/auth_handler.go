@@ -7,7 +7,7 @@ import (
 	"survey-kemenag-backend/domain"
 	"survey-kemenag-backend/repository"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -21,9 +21,9 @@ func NewAuthHandler(cfg *config.Config, repo repository.Repository) *AuthHandler
 	return &AuthHandler{Config: cfg, Repo: repo}
 }
 
-func (h *AuthHandler) Login(c *fiber.Ctx) error {
+func (h *AuthHandler) Login(c fiber.Ctx) error {
 	var req domain.LoginRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request payload",
 		})
@@ -90,7 +90,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 }
 
 
-func (h *AuthHandler) Me(c *fiber.Ctx) error {
+func (h *AuthHandler) Me(c fiber.Ctx) error {
 	email := c.Locals("email")
 	role := c.Locals("role")
 

@@ -7,7 +7,7 @@ import (
 	"survey-kemenag-backend/repository"
 	"survey-kemenag-backend/service"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +19,7 @@ func NewPeriodHandler(repo repository.Repository) *PeriodHandler {
 	return &PeriodHandler{repo: repo}
 }
 
-func (h *PeriodHandler) GetActivePeriod(c *fiber.Ctx) error {
+func (h *PeriodHandler) GetActivePeriod(c fiber.Ctx) error {
 	cacheKey := "survey_active_period"
 	if cachedData, found := service.GetCache(cacheKey); found {
 		return c.JSON(cachedData)
@@ -35,7 +35,7 @@ func (h *PeriodHandler) GetActivePeriod(c *fiber.Ctx) error {
 	return c.JSON(period)
 }
 
-func (h *PeriodHandler) ListPeriods(c *fiber.Ctx) error {
+func (h *PeriodHandler) ListPeriods(c fiber.Ctx) error {
 	cacheKey := "admin_periods"
 	if cachedData, found := service.GetCache(cacheKey); found {
 		return c.JSON(cachedData)
@@ -49,9 +49,9 @@ func (h *PeriodHandler) ListPeriods(c *fiber.Ctx) error {
 	return c.JSON(periods)
 }
 
-func (h *PeriodHandler) CreatePeriod(c *fiber.Ctx) error {
+func (h *PeriodHandler) CreatePeriod(c fiber.Ctx) error {
 	var period models.SurveyPeriod
-	if err := c.BodyParser(&period); err != nil {
+	if err := c.Bind().Body(&period); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
@@ -65,7 +65,7 @@ func (h *PeriodHandler) CreatePeriod(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(period)
 }
 
-func (h *PeriodHandler) SetPeriodActive(c *fiber.Ctx) error {
+func (h *PeriodHandler) SetPeriodActive(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -82,7 +82,7 @@ func (h *PeriodHandler) SetPeriodActive(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Periode survei berhasil diaktifkan"})
 }
 
-func (h *PeriodHandler) UpdatePeriod(c *fiber.Ctx) error {
+func (h *PeriodHandler) UpdatePeriod(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -90,7 +90,7 @@ func (h *PeriodHandler) UpdatePeriod(c *fiber.Ctx) error {
 	}
 
 	var period models.SurveyPeriod
-	if err := c.BodyParser(&period); err != nil {
+	if err := c.Bind().Body(&period); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
@@ -105,7 +105,7 @@ func (h *PeriodHandler) UpdatePeriod(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
-func (h *PeriodHandler) DeletePeriod(c *fiber.Ctx) error {
+func (h *PeriodHandler) DeletePeriod(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {

@@ -10,8 +10,8 @@ import (
 	"survey-kemenag-backend/repository"
 	"survey-kemenag-backend/service"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/limiter"
 )
 
 func SetupRoutes(app *fiber.App) {
@@ -40,7 +40,7 @@ func SetupRoutes(app *fiber.App) {
 	loginLimiter := limiter.New(limiter.Config{
 		Max:        5,
 		Expiration: 1 * time.Minute,
-		LimitReached: func(c *fiber.Ctx) error {
+		LimitReached: func(c fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error": "Terlalu banyak percobaan login. Silakan tunggu 1 menit lagi.",
 			})
@@ -51,7 +51,7 @@ func SetupRoutes(app *fiber.App) {
 	submitLimiter := limiter.New(limiter.Config{
 		Max:        10,
 		Expiration: 1 * time.Minute,
-		LimitReached: func(c *fiber.Ctx) error {
+		LimitReached: func(c fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error": "Terlalu banyak pengiriman survei dari IP ini. Silakan tunggu sebentar.",
 			})

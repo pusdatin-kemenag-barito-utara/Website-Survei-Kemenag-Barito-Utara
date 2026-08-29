@@ -12,6 +12,7 @@ declare global {
           "expired-callback"?: () => void;
           theme?: "light" | "dark" | "auto";
           size?: "normal" | "compact" | "flexible";
+          "response-field"?: boolean;
         }
       ) => string;
       reset: (widgetId: string) => void;
@@ -72,8 +73,9 @@ export function TurnstileWidget({
               }
             }
           },
-          theme: "light",
-          size: "normal",
+          theme: "auto",
+          size: "flexible",
+          "response-field": false,
         });
       } catch (err) {
         console.warn("[Turnstile render warning]", err);

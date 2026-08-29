@@ -7,7 +7,7 @@ import (
 	"survey-kemenag-backend/repository"
 	"survey-kemenag-backend/service"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +19,7 @@ func NewDemographicHandler(repo repository.Repository) *DemographicHandler {
 	return &DemographicHandler{repo: repo}
 }
 
-func (h *DemographicHandler) ListFieldsAdmin(c *fiber.Ctx) error {
+func (h *DemographicHandler) ListFieldsAdmin(c fiber.Ctx) error {
 	cacheKey := "admin_demographics"
 	if cachedData, found := service.GetCache(cacheKey); found {
 		return c.JSON(cachedData)
@@ -33,9 +33,9 @@ func (h *DemographicHandler) ListFieldsAdmin(c *fiber.Ctx) error {
 	return c.JSON(fields)
 }
 
-func (h *DemographicHandler) CreateField(c *fiber.Ctx) error {
+func (h *DemographicHandler) CreateField(c fiber.Ctx) error {
 	var field models.DemographicField
-	if err := c.BodyParser(&field); err != nil {
+	if err := c.Bind().Body(&field); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
@@ -47,7 +47,7 @@ func (h *DemographicHandler) CreateField(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(field)
 }
 
-func (h *DemographicHandler) UpdateField(c *fiber.Ctx) error {
+func (h *DemographicHandler) UpdateField(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -55,7 +55,7 @@ func (h *DemographicHandler) UpdateField(c *fiber.Ctx) error {
 	}
 
 	var field models.DemographicField
-	if err := c.BodyParser(&field); err != nil {
+	if err := c.Bind().Body(&field); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
@@ -68,7 +68,7 @@ func (h *DemographicHandler) UpdateField(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
-func (h *DemographicHandler) DeleteField(c *fiber.Ctx) error {
+func (h *DemographicHandler) DeleteField(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -83,7 +83,7 @@ func (h *DemographicHandler) DeleteField(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Field demografi berhasil dihapus"})
 }
 
-func (h *DemographicHandler) ListOptions(c *fiber.Ctx) error {
+func (h *DemographicHandler) ListOptions(c fiber.Ctx) error {
 	fieldIDStr := c.Params("fieldId")
 	fieldID, err := uuid.Parse(fieldIDStr)
 	if err != nil {
@@ -97,9 +97,9 @@ func (h *DemographicHandler) ListOptions(c *fiber.Ctx) error {
 	return c.JSON(options)
 }
 
-func (h *DemographicHandler) CreateOption(c *fiber.Ctx) error {
+func (h *DemographicHandler) CreateOption(c fiber.Ctx) error {
 	var opt models.DemographicOption
-	if err := c.BodyParser(&opt); err != nil {
+	if err := c.Bind().Body(&opt); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
@@ -109,7 +109,7 @@ func (h *DemographicHandler) CreateOption(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(opt)
 }
 
-func (h *DemographicHandler) UpdateOption(c *fiber.Ctx) error {
+func (h *DemographicHandler) UpdateOption(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -117,7 +117,7 @@ func (h *DemographicHandler) UpdateOption(c *fiber.Ctx) error {
 	}
 
 	var opt models.DemographicOption
-	if err := c.BodyParser(&opt); err != nil {
+	if err := c.Bind().Body(&opt); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload tidak valid"})
 	}
 
@@ -128,7 +128,7 @@ func (h *DemographicHandler) UpdateOption(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
-func (h *DemographicHandler) DeleteOption(c *fiber.Ctx) error {
+func (h *DemographicHandler) DeleteOption(c fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {

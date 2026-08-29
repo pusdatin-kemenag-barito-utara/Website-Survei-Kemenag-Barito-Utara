@@ -1,8 +1,14 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import ArsipEntry from '@/react/pages/ArsipEntry';
+
+const { type, year, period } = Astro.params;
+const indexType = (type || 'ipkp').toUpperCase();
+const periodLabel = period?.toUpperCase() || '';
+const title = `Arsip ${indexType} ${periodLabel} ${year} - SI-ARUS`;
+const description = `Laporan arsip dan rekapitulasi data survei ${indexType} periode ${periodLabel} tahun ${year} di Kantor Kemenag Kabupaten Barito Utara.`;
 ---
 
-<BaseLayout>
+<BaseLayout title={title} description={description}>
   <ArsipEntry client:load />
 </BaseLayout>

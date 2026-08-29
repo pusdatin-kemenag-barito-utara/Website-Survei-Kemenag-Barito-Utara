@@ -3,6 +3,7 @@ import { useEffect } from "react";
 
 export default function MaintenancePage() {
   const pusdatinUrl = import.meta.env.PUBLIC_PUSDATIN_URL || "";
+  const appId = "sikap";
 
   useEffect(() => {
     // Push state to prevent back navigation
@@ -14,10 +15,31 @@ export default function MaintenancePage() {
 
     window.addEventListener("popstate", handlePopState);
 
+    // Auto check if system is back online from Pusdatin
+    const checkOnline = async () => {
+      if (!pusdatinUrl) return;
+      try {
+        const res = await fetch(`${pusdatinUrl}/api/public/apps/${appId}/status`, {
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status !== "maintenance") {
+            window.location.replace("/");
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const interval = setInterval(checkOnline, 5000);
+
     return () => {
+      clearInterval(interval);
       window.removeEventListener("popstate", handlePopState);
     };
-  }, []);
+  }, [pusdatinUrl]);
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-slate-50 flex flex-col">

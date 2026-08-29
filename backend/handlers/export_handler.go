@@ -1,11 +1,12 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 	"survey-kemenag-backend/service"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -18,7 +19,7 @@ func NewExportHandler(surveyService *service.SurveyService) *ExportHandler {
 	return &ExportHandler{surveyService: surveyService}
 }
 
-func (h *ExportHandler) ExportResponsesExcel(c *fiber.Ctx) error {
+func (h *ExportHandler) ExportResponsesExcel(c fiber.Ctx) error {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 
@@ -78,5 +79,10 @@ func (h *ExportHandler) ExportResponsesExcel(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=Laporan-Survei-SI-ARUS-%s.xlsx", time.Now().Format("2006-01-02")))
 
-	return f.Write(c.Response().BodyWriter())
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal membuat file excel"})
+	}
+
+	return c.Send(buf.Bytes())
 }

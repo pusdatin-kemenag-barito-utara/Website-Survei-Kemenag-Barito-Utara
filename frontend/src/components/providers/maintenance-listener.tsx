@@ -1,48 +1,61 @@
 
-import { useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export function MaintenanceListener() {
-  const pathname = usePathname();
+  const [currentPath, setCurrentPath] = useState(
+    typeof window !== "undefined" ? window.location.pathname : ""
+  );
 
   useEffect(() => {
     let active = true;
+    const pusdatinUrl = import.meta.env.PUBLIC_PUSDATIN_URL || "";
+    const appId = "sikap";
+
+    if (!pusdatinUrl) return;
 
     const checkStatus = async () => {
       try {
-        const pusdatinUrl = import.meta.env.PUBLIC_PUSDATIN_URL || "";
-        const appId = "sikap";
-
-        if (!pusdatinUrl) return;
-
         const res = await fetch(`${pusdatinUrl}/api/public/apps/${appId}/status`, {
           cache: "no-store",
+          headers: { Accept: "application/json" },
         });
 
         if (res.ok && active) {
           const data = await res.json();
           const isMaintenance = data.status === "maintenance";
+          const pathname = window.location.pathname;
 
           if (isMaintenance) {
-            if (window.location.pathname !== "/maintenance") {
+            if (pathname !== "/maintenance") {
               window.location.replace("/maintenance");
             }
           } else {
-            if (window.location.pathname === "/maintenance") {
+            if (pathname === "/maintenance") {
               window.location.replace("/");
             }
           }
         }
       } catch {
-        // Ignore network errors during polling
+        // Ignore network hiccups during polling
       }
     };
 
-    // Check immediately on mount/route change
+    // Initial check
     checkStatus();
 
-    // Check periodically every 5 seconds
-    const interval = setInterval(checkStatus, 5000);
+    // Polling interval (every 10 seconds, light footprint)
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        checkStatus();
+      }
+    }, 10000);
+
+    // Astro SPA navigation listener
+    const handleAstroPageLoad = () => {
+      setCurrentPath(window.location.pathname);
+      checkStatus();
+    };
+    document.addEventListener("astro:page-load", handleAstroPageLoad);
 
     // Lock navigation back/forward when on /maintenance
     const lockHistory = () => {
@@ -51,7 +64,7 @@ export function MaintenanceListener() {
       }
     };
 
-    if (pathname === "/maintenance") {
+    if (window.location.pathname === "/maintenance") {
       window.history.pushState(null, "", window.location.href);
       window.addEventListener("popstate", lockHistory);
     }
@@ -64,10 +77,11 @@ export function MaintenanceListener() {
     return () => {
       active = false;
       clearInterval(interval);
+      document.removeEventListener("astro:page-load", handleAstroPageLoad);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("popstate", lockHistory);
     };
-  }, [pathname]);
+  }, [currentPath]);
 
   return null;
 }

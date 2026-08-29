@@ -1,9 +1,16 @@
-﻿---
+---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import HasilEntry from '@/react/pages/HasilEntry';
+
+const { type } = Astro.params;
+const indexType = (type || 'ipkp').toUpperCase();
+const typeLabel = indexType === 'IPAK' ? 'Indeks Persepsi Anti Korupsi (IPAK)' : 'Indeks Persepsi Kualitas Pelayanan (IPKP)';
+const description = `Laporan statistik dan rincian unsur ${typeLabel} pada pelayanan publik PTSP Kantor Kementerian Agama Kabupaten Barito Utara.`;
 ---
 
 <BaseLayout
+  title={`Hasil ${indexType} - SI-ARUS Kemenag Barito Utara`}
+  description={description}
 >
   <HasilEntry client:only="react" />
 </BaseLayout>

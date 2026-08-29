@@ -3,7 +3,7 @@ package handlers
 import (
 	"survey-kemenag-backend/service"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 type StatsHandler struct {
@@ -14,7 +14,7 @@ func NewStatsHandler(surveyService *service.SurveyService) *StatsHandler {
 	return &StatsHandler{surveyService: surveyService}
 }
 
-func (h *StatsHandler) GetPublicResults(c *fiber.Ctx) error {
+func (h *StatsHandler) GetPublicResults(c fiber.Ctx) error {
 	results, err := h.surveyService.GetPublicResults()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -22,7 +22,7 @@ func (h *StatsHandler) GetPublicResults(c *fiber.Ctx) error {
 	return c.JSON(results)
 }
 
-func (h *StatsHandler) GetAdminStats(c *fiber.Ctx) error {
+func (h *StatsHandler) GetAdminStats(c fiber.Ctx) error {
 	stats, err := h.surveyService.GetAdminStats()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -30,7 +30,7 @@ func (h *StatsHandler) GetAdminStats(c *fiber.Ctx) error {
 	return c.JSON(stats)
 }
 
-func (h *StatsHandler) GetArchiveResults(c *fiber.Ctx) error {
+func (h *StatsHandler) GetArchiveResults(c fiber.Ctx) error {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 

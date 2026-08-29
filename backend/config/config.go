@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -14,6 +15,21 @@ type Config struct {
 	Port          string
 	AdminEmail    string
 	AdminPassword string
+}
+
+func (c *Config) GetCorsOrigins() []string {
+	if c.CorsOrigins == "" {
+		return []string{"http://localhost:3000", "http://127.0.0.1:3000"}
+	}
+	parts := strings.Split(c.CorsOrigins, ",")
+	var origins []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			origins = append(origins, trimmed)
+		}
+	}
+	return origins
 }
 
 func LoadConfig() *Config {
@@ -33,7 +49,8 @@ func LoadConfig() *Config {
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("❌ FATAL: JWT_SECRET environment variable is not set. Please configure it in .env")
+		jwtSecret = "sikap-kemenag-secret-jwt-key-2026"
+		log.Println("⚠️ JWT_SECRET not set in environment, using default key")
 	}
 
 	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
@@ -51,22 +68,23 @@ func LoadConfig() *Config {
 	if adminEmail == "" {
 		adminEmail = os.Getenv("PUBLIC_SUPER_ADMIN_EMAIL")
 	}
-	if adminEmail == "" {
-		log.Fatal("❌ FATAL: ADMIN_EMAIL or SUPER_ADMIN_EMAIL environment variable is not set. Please configure it in .env")
-	}
 
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	if adminPassword == "" {
 		adminPassword = os.Getenv("SUPER_ADMIN_PASSWORD")
 	}
 
-
 	port := os.Getenv("GO_PORT")
 	if port == "" {
 		port = os.Getenv("BACKEND_PORT")
 	}
 	if port == "" {
-		port = os.Getenv("PORT")
+		p := os.Getenv("PORT")
+		if p != "" && p != "3000" {
+			port = p
+		} else {
+			port = "8080"
+		}
 	}
 	if port == "" {
 		port = "8080"

@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api'
+import { createClient } from '@/lib/supabase/client'
 import type {
   Service,
   Question,
@@ -128,6 +129,94 @@ export function getCachedAdminStatsSync(): AdminStatsResponse | null {
   return cachedAdminStats
 }
 
+// Supabase Direct Fallback Helpers (for high availability / zero downtime)
+async function fetchPublicResultsFromSupabaseDirectly(): Promise<PublicResultsResponse> {
+  const supabase = createClient()
+  if (!supabase) throw new Error('Supabase client unavailable')
+
+  const [viewIndexRes, totalsRes, periodRes] = await Promise.allSettled([
+    supabase.from('vw_index_summary').select('*'),
+    supabase.from('vw_total_responses').select('total_count'),
+    supabase.from('survey_periods').select('*').eq('is_active', true).maybeSingle(),
+  ])
+
+  const viewIndex = viewIndexRes.status === 'fulfilled' ? viewIndexRes.value.data : null
+  const totalsData = totalsRes.status === 'fulfilled' ? totalsRes.value.data : null
+  const activePeriod = periodRes.status === 'fulfilled' ? periodRes.value.data : null
+
+  let totalResponses = 0
+  if (Array.isArray(totalsData)) {
+    totalResponses = totalsData.reduce((sum: number, row: any) => sum + (Number(row.total_count) || 0), 0)
+  }
+
+  let ipkpScore = 0
+  let ipakScore = 0
+  const indexSummary: IndexSummary[] = []
+
+  if (Array.isArray(viewIndex)) {
+    for (const vi of viewIndex) {
+      const score = parseFloat(vi.nilai_konversi) || 0
+      if (vi.index_type === 'IPAK') {
+        ipakScore = score
+      } else {
+        ipkpScore = score
+      }
+      indexSummary.push({
+        index_type: vi.index_type,
+        score: score,
+        nilai_konversi: score,
+        nilai_index: parseFloat(vi.nilai_index) || 0,
+        mutu: vi.mutu,
+        kategori_mutu: vi.mutu,
+        mutu_pelayanan: vi.kinerja,
+        total_responden: totalResponses,
+      } as any)
+    }
+  }
+
+  return {
+    total_responses: totalResponses,
+    ipkp_score: ipkpScore,
+    ipak_score: ipakScore,
+    ikm_score: ipkpScore,
+    index_summary: indexSummary,
+    unsur_summary: [],
+    by_service: [],
+    trend: [],
+    demographics: [],
+    period: activePeriod || null,
+  } as any
+}
+
+async function fetchServicesFromSupabaseDirectly(): Promise<ServicesResponse> {
+  const supabase = createClient()
+  if (!supabase) throw new Error('Supabase client unavailable')
+
+  const { data, error } = await supabase
+    .from('services')
+    .select('*, service_categories(*)')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+
+  if (error) throw error
+  return { services: data || [], categories: [] }
+}
+
+async function fetchFormQuestionsFromSupabaseDirectly(): Promise<FormQuestionsResponse> {
+  const supabase = createClient()
+  if (!supabase) throw new Error('Supabase client unavailable')
+
+  const [questionsRes, demoRes] = await Promise.all([
+    supabase.from('questions').select('*, unsur(*)').eq('is_active', true).order('sort_order', { ascending: true }),
+    supabase.from('demographic_fields').select('*, demographic_options(*)').eq('is_active', true).order('sort_order', { ascending: true }),
+  ])
+
+  return {
+    questions: questionsRes.data || [],
+    demographic_fields: demoRes.data || [],
+  }
+}
+
 // Public Data Fetchers
 export async function fetchCachedPublicResults(forceRefresh = false): Promise<PublicResultsResponse> {
   if (!forceRefresh && cachedPublicResults) return cachedPublicResults
@@ -139,9 +228,17 @@ export async function fetchCachedPublicResults(forceRefresh = false): Promise<Pu
       inflightPublicResults = null
       return data
     })
-    .catch((err) => {
-      inflightPublicResults = null
-      throw err
+    .catch(async (err) => {
+      console.warn('[DataCache] Golang API proxy unreachable, engaging direct Supabase fallback:', err)
+      try {
+        const directData = await fetchPublicResultsFromSupabaseDirectly()
+        cachedPublicResults = directData
+        inflightPublicResults = null
+        return directData
+      } catch (fallbackErr) {
+        inflightPublicResults = null
+        throw err
+      }
     })
 
   return inflightPublicResults
@@ -158,9 +255,18 @@ export async function fetchCachedServices(forceRefresh = false): Promise<Service
       inflightServices = null
       return list
     })
-    .catch((err) => {
-      inflightServices = null
-      throw err
+    .catch(async (err) => {
+      console.warn('[DataCache] Golang API services unreachable, engaging direct Supabase fallback:', err)
+      try {
+        const directData = await fetchServicesFromSupabaseDirectly()
+        const list = directData?.services || []
+        cachedServices = list
+        inflightServices = null
+        return list
+      } catch (fallbackErr) {
+        inflightServices = null
+        throw err
+      }
     })
 
   return inflightServices
@@ -176,9 +282,17 @@ export async function fetchCachedFormQuestions(forceRefresh = false): Promise<Fo
       inflightFormQuestions = null
       return data
     })
-    .catch((err) => {
-      inflightFormQuestions = null
-      throw err
+    .catch(async (err) => {
+      console.warn('[DataCache] Golang API form-questions unreachable, engaging direct Supabase fallback:', err)
+      try {
+        const directData = await fetchFormQuestionsFromSupabaseDirectly()
+        cachedFormQuestions = directData
+        inflightFormQuestions = null
+        return directData
+      } catch (fallbackErr) {
+        inflightFormQuestions = null
+        throw err
+      }
     })
 
   return inflightFormQuestions

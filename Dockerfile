@@ -1,13 +1,13 @@
 # Multi-stage Dockerfile for SIKAP Kemenag (Golang Fiber Backend + Astro 7 Frontend)
 
 # Stage 1: Build Golang Backend
-FROM golang:1.26-alpine AS backend-builder
+FROM golang:1.24-alpine AS backend-builder
 WORKDIR /app/backend
 
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
-RUN CGO_ENABLED=0 GOOS=linux go build -o api-sikap main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o api-sikap main.go
 
 # Stage 2: Build Astro Frontend
 FROM node:22-alpine AS frontend-builder
@@ -33,4 +33,4 @@ COPY --from=frontend-builder /app/frontend/dist /app/dist
 
 EXPOSE 3000 8080
 
-CMD ["sh", "-c", "PORT=8080 /app/api-sikap & HOSTNAME=0.0.0.0 PORT=3000 node /app/dist/server/entry.mjs"]
+CMD ["sh", "-c", "GO_PORT=8080 PORT=8080 /app/api-sikap & HOSTNAME=0.0.0.0 PORT=3000 node /app/dist/server/entry.mjs"]
