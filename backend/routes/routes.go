@@ -33,6 +33,7 @@ func SetupRoutes(app *fiber.App) {
 	auditLogHandler := handlers.NewAuditLogHandler(repo)
 	demographicHandler := handlers.NewDemographicHandler(repo)
 	exportHandler := handlers.NewExportHandler(surveyService)
+	settingsHandler := handlers.NewSettingsHandler(cfg, repo)
 
 
 
@@ -70,6 +71,7 @@ func SetupRoutes(app *fiber.App) {
 	api.Post("/survey/submit", submitLimiter, responseHandler.SubmitSurvey)
 	api.Get("/survey/public-results", statsHandler.GetPublicResults)
 	api.Get("/survey/archive-results", statsHandler.GetArchiveResults)
+	api.Get("/settings", settingsHandler.GetSettings)
 
 
 
@@ -128,6 +130,10 @@ func SetupRoutes(app *fiber.App) {
 	admin.Post("/demographics/options", demographicHandler.CreateOption)
 	admin.Put("/demographics/options/:id", demographicHandler.UpdateOption)
 	admin.Delete("/demographics/options/:id", demographicHandler.DeleteOption)
+
+	// Admin - Settings
+	admin.Get("/settings", settingsHandler.GetSettings)
+	admin.Put("/settings", settingsHandler.UpdateSettings)
 
 	// Admin - Export
 	admin.Get("/export/excel", exportHandler.ExportResponsesExcel)
