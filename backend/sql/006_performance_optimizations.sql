@@ -17,7 +17,7 @@ USING gin (respondent_contact gin_trgm_ops);
 
 -- 3. Functional Date Index for Range Filtering (e.g. submitted_at::date >= date_from)
 CREATE INDEX IF NOT EXISTS idx_responses_submitted_date 
-ON kemenag_survey.responses ((submitted_at::date));
+ON kemenag_survey.responses (((submitted_at AT TIME ZONE 'UTC')::date));
 
 -- 4. Composite Covering Indexes for Fast Calculation & Aggregation
 CREATE INDEX IF NOT EXISTS idx_response_answers_comp_calc 

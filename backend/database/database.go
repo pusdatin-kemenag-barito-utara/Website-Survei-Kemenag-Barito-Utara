@@ -51,7 +51,7 @@ func ConnectDB(cfg *config.Config) {
 		indexes := []string{
 			"CREATE INDEX IF NOT EXISTS idx_responses_submitted_at ON kemenag_survey.responses (submitted_at DESC);",
 			"CREATE INDEX IF NOT EXISTS idx_responses_service_period ON kemenag_survey.responses (service_id, period_id);",
-			"CREATE INDEX IF NOT EXISTS idx_responses_submitted_date ON kemenag_survey.responses ((submitted_at::date));",
+			"CREATE INDEX IF NOT EXISTS idx_responses_submitted_date ON kemenag_survey.responses (((submitted_at AT TIME ZONE 'UTC')::date));",
 			"CREATE INDEX IF NOT EXISTS idx_responses_name_trgm ON kemenag_survey.responses USING gin (respondent_name gin_trgm_ops);",
 			"CREATE INDEX IF NOT EXISTS idx_responses_contact_trgm ON kemenag_survey.responses USING gin (respondent_contact gin_trgm_ops);",
 			"CREATE INDEX IF NOT EXISTS idx_response_answers_response_id ON kemenag_survey.response_answers (response_id);",
