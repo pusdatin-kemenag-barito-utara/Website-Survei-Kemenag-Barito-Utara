@@ -1,7 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
+	"time"
 
 	"survey-kemenag-backend/config"
 	"survey-kemenag-backend/database"
@@ -14,6 +20,8 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/recover"
 )
 
+var serverStartTime = time.Now()
+
 func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
@@ -21,10 +29,12 @@ func main() {
 	// Connect to PostgreSQL database
 	database.ConnectDB(cfg)
 
-	// Create Fiber app
+	// Create Fiber app with Proxy Header resolution for Real Client IP
 	app := fiber.New(fiber.Config{
 		AppName:      "SIKAP Kemenag REST API v1.0",
 		ServerHeader: "Fiber",
+		ProxyHeader:  fiber.HeaderXForwardedFor,
+		TrustProxy:   true,
 	})
 
 	// Global Middlewares
@@ -39,7 +49,7 @@ func main() {
 	}))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.GetCorsOrigins(),
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "CF-Connecting-IP", "X-Real-IP"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowCredentials: true,
 		MaxAge:           86400, // Cache CORS preflight requests for 24 hours
@@ -72,12 +82,21 @@ func main() {
 	// Setup Routes
 	routes.SetupRoutes(app)
 
-	// Healthcheck endpoint for Uptime Kuma monitoring & VPS health checks
+	// Enhanced Production Healthcheck with live performance metrics
 	app.Get("/health", func(c fiber.Ctx) error {
 		dbStatus := "connected"
+		var dbLatencyMs float64 = 0
+
 		if database.DB != nil {
-			if sqlDB, err := database.DB.DB(); err != nil || sqlDB.Ping() != nil {
+			if sqlDB, err := database.DB.DB(); err != nil {
 				dbStatus = "disconnected"
+			} else {
+				start := time.Now()
+				if err := sqlDB.Ping(); err != nil {
+					dbStatus = "disconnected"
+				} else {
+					dbLatencyMs = float64(time.Since(start).Microseconds()) / 1000.0
+				}
 			}
 		} else {
 			dbStatus = "uninitialized"
@@ -88,19 +107,53 @@ func main() {
 			status = fiber.StatusServiceUnavailable
 		}
 
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+
+		uptimeDuration := time.Since(serverStartTime).Round(time.Second)
+
 		return c.Status(status).JSON(fiber.Map{
-			"status":   "ok",
-			"database": dbStatus,
-			"service":  "SI-ARUS Kemenag Barito Utara Backend",
+			"status":          "ok",
+			"database":        dbStatus,
+			"db_latency":      fmt.Sprintf("%.2f ms", dbLatencyMs),
+			"service":         "SI-ARUS Kemenag Barito Utara Backend",
+			"uptime":          uptimeDuration.String(),
+			"goroutines":      runtime.NumGoroutine(),
+			"memory_alloc_mb": fmt.Sprintf("%.2f MB", float64(m.Alloc)/(1024*1024)),
 		})
 	})
 
-	// Start server
+	// Port configuration
 	port := cfg.Port
 	if port == "" {
 		port = "8080"
 	}
 
-	log.Printf("🚀 Server running on port %s", port)
-	log.Fatal(app.Listen(":" + port))
+	// Graceful Shutdown Channel
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("🚀 Server running on port %s", port)
+		if err := app.Listen(":" + port); err != nil {
+			log.Printf("ℹ️ Server listener closed: %v", err)
+		}
+	}()
+
+	// Block until OS termination signal is received
+	<-stop
+	log.Println("🛑 Graceful Shutdown signal received...")
+
+	if err := app.Shutdown(); err != nil {
+		log.Printf("⚠️ Error during server shutdown: %v", err)
+	}
+
+	if database.DB != nil {
+		if sqlDB, err := database.DB.DB(); err == nil {
+			_ = sqlDB.Close()
+			log.Println("🔒 Database connections closed cleanly.")
+		}
+	}
+
+	log.Println("✅ Server stopped gracefully.")
 }

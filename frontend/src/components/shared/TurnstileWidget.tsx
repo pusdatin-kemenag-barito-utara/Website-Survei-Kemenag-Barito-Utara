@@ -73,7 +73,7 @@ export function TurnstileWidget({
               }
             }
           },
-          theme: "auto",
+          theme: "light",
           size: "flexible",
           "response-field": false,
         });
@@ -124,5 +124,13 @@ export function TurnstileWidget({
     };
   }, [siteKey]);
 
-  return <div ref={containerRef} className={className || "min-h-[65px] flex items-center justify-center"} />;
+  return (
+    <div
+      ref={containerRef}
+      className={
+        className ||
+        "w-full flex items-center justify-center [&>iframe]:!w-full [&>iframe]:!max-w-full [&_iframe]:!w-full"
+      }
+    />
+  );
 }

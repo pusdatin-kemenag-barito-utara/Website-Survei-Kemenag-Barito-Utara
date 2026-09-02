@@ -91,6 +91,7 @@ type Repository interface {
 
 	// Auth User Operations (Database Supabase Auth)
 	GetAuthUserByEmail(email string) (*domain.AuthUserRecord, error)
+	UpdateAuthUserPassword(email string, newHashedPassword string) error
 }
 
 
@@ -708,5 +709,13 @@ func (r *gormRepository) GetAuthUserByEmail(email string) (*domain.AuthUserRecor
 		return nil, gorm.ErrRecordNotFound
 	}
 	return &user, nil
+}
+
+func (r *gormRepository) UpdateAuthUserPassword(email string, newHashedPassword string) error {
+	return r.db.Exec(`
+		UPDATE auth.users
+		SET encrypted_password = ?, updated_at = NOW()
+		WHERE email = ?
+	`, newHashedPassword, email).Error
 }
 

@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"strings"
 	"time"
 
 	"survey-kemenag-backend/config"
 	"survey-kemenag-backend/domain"
+	"survey-kemenag-backend/models"
 	"survey-kemenag-backend/repository"
+	"survey-kemenag-backend/service"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -21,6 +24,23 @@ func NewAuthHandler(cfg *config.Config, repo repository.Repository) *AuthHandler
 	return &AuthHandler{Config: cfg, Repo: repo}
 }
 
+// GetRealClientIP extracts client IP prioritizing CF-Connecting-IP and X-Forwarded-For
+func GetRealClientIP(c fiber.Ctx) string {
+	if cfIP := c.Get("CF-Connecting-IP"); cfIP != "" {
+		return strings.TrimSpace(cfIP)
+	}
+	if xRealIP := c.Get("X-Real-IP"); xRealIP != "" {
+		return strings.TrimSpace(xRealIP)
+	}
+	if xff := c.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		if len(parts) > 0 && strings.TrimSpace(parts[0]) != "" {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	return c.IP()
+}
+
 func (h *AuthHandler) Login(c fiber.Ctx) error {
 	var req domain.LoginRequest
 	if err := c.Bind().Body(&req); err != nil {
@@ -31,8 +51,18 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 
 	if req.Email == "" || req.Password == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Email and password are required",
+			"error": "Email dan kata sandi wajib diisi",
 		})
+	}
+
+	// Server-Side Cloudflare Turnstile Verification (if secret key is set)
+	if h.Config.TurnstileSecretKey != "" && req.TurnstileToken != "" {
+		clientIP := GetRealClientIP(c)
+		if !service.VerifyTurnstileToken(h.Config.TurnstileSecretKey, req.TurnstileToken, clientIP) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Verifikasi keamanan Cloudflare Turnstile gagal. Silakan coba lagi.",
+			})
+		}
 	}
 
 	authenticated := false
@@ -58,7 +88,7 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 
 	if !authenticated {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Email atau password salah",
+			"error": "Email atau kata sandi tidak sesuai",
 		})
 	}
 
@@ -89,7 +119,6 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	})
 }
 
-
 func (h *AuthHandler) Me(c fiber.Ctx) error {
 	email := c.Locals("email")
 	role := c.Locals("role")
@@ -97,5 +126,81 @@ func (h *AuthHandler) Me(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"email": email,
 		"role":  role,
+	})
+}
+
+// ChangePassword handles secure password change for authenticated administrators
+func (h *AuthHandler) ChangePassword(c fiber.Ctx) error {
+	email, ok := c.Locals("email").(string)
+	if !ok || email == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Autentikasi diperlukan",
+		})
+	}
+
+	var req domain.ChangePasswordRequest
+	if err := c.Bind().Body(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Payload data tidak valid",
+		})
+	}
+
+	if req.OldPassword == "" || req.NewPassword == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Kata sandi lama dan kata sandi baru wajib diisi",
+		})
+	}
+
+	if len(req.NewPassword) < 6 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Kata sandi baru minimal 6 karakter",
+		})
+	}
+
+	// Verify old password against database or env
+	authUser, err := h.Repo.GetAuthUserByEmail(email)
+	validOld := false
+	if err == nil && authUser != nil && authUser.EncryptedPassword != "" {
+		if bcrypt.CompareHashAndPassword([]byte(authUser.EncryptedPassword), []byte(req.OldPassword)) == nil {
+			validOld = true
+		}
+	} else if h.Config.AdminEmail == email && h.Config.AdminPassword == req.OldPassword {
+		validOld = true
+	}
+
+	if !validOld {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Kata sandi lama tidak sesuai",
+		})
+	}
+
+	// Generate bcrypt hash for new password
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Gagal mengenkripsi kata sandi baru",
+		})
+	}
+
+	// Update in database
+	if err := h.Repo.UpdateAuthUserPassword(email, string(hashedBytes)); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Gagal memperbarui kata sandi di database",
+		})
+	}
+
+	// Log audit trail
+	go func() {
+		_ = h.Repo.WriteAuditLog(&models.AuditLog{
+			UserEmail:  email,
+			Action:     "CHANGE_PASSWORD",
+			EntityName: "User",
+			EntityID:   email,
+			Details:    `{"status":"success"}`,
+		})
+	}()
+
+	return c.JSON(fiber.Map{
+		"message": "Kata sandi berhasil diperbarui",
 	})
 }

@@ -27,13 +27,19 @@ func (s *SurveyService) GetPublicResults() (fiber.Map, error) {
 		return cachedData.(fiber.Map), nil
 	}
 
-	activePeriod, _ := s.repo.GetActivePeriod()
+	// SingleFlight deduplication to prevent Thundering Herd on cache miss
+	val, err, _ := SingleFlightGroup.Do(cacheKey, func() (interface{}, error) {
+		// Double-check cache inside singleflight barrier
+		if cachedData, found := globalCache.Get(cacheKey); found {
+			return cachedData.(fiber.Map), nil
+		}
 
+		activePeriod, _ := s.repo.GetActivePeriod()
 
-	totalResponses, err := s.repo.CountTotalResponses()
-	if err != nil {
-		return nil, err
-	}
+		totalResponses, err := s.repo.CountTotalResponses()
+		if err != nil {
+			return nil, err
+		}
 
 	// --- Read from vw_index_summary (weighted NRR) ---
 	viewIndex, err := s.repo.GetViewIndexSummary()
@@ -130,12 +136,16 @@ func (s *SurveyService) GetPublicResults() (fiber.Map, error) {
 		"demographics":    demoData,
 	}
 
-	// Cache for 10 minutes (will be invalidated on new submit)
-	globalCache.Set(cacheKey, res, 10*time.Minute)
-	return res, nil
+		// Cache for 10 minutes (will be invalidated on new submit)
+		globalCache.Set(cacheKey, res, 10*time.Minute)
+		return res, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return val.(fiber.Map), nil
 }
-
-
 
 func (s *SurveyService) GetAdminStats() (fiber.Map, error) {
 	cacheKey := "admin_stats"
@@ -143,92 +153,103 @@ func (s *SurveyService) GetAdminStats() (fiber.Map, error) {
 		return cachedData.(fiber.Map), nil
 	}
 
-	var (
-		totalResponses int64
-		activeServices int64
-		totalUnsur     int64
-		activePeriod   *models.SurveyPeriod
-		results        []domain.AnswerUnsurRaw
-		errResp, errServ, errUnsur, errRes error
-	)
+	val, err, _ := SingleFlightGroup.Do(cacheKey, func() (interface{}, error) {
+		if cachedData, found := globalCache.Get(cacheKey); found {
+			return cachedData.(fiber.Map), nil
+		}
 
-	var wg sync.WaitGroup
-	wg.Add(5)
+		var (
+			totalResponses int64
+			activeServices int64
+			totalUnsur     int64
+			activePeriod   *models.SurveyPeriod
+			results        []domain.AnswerUnsurRaw
+			errResp, errServ, errUnsur, errRes error
+		)
 
-	go func() {
-		defer wg.Done()
-		totalResponses, errResp = s.repo.CountTotalResponses()
-	}()
+		var wg sync.WaitGroup
+		wg.Add(5)
 
-	go func() {
-		defer wg.Done()
-		activeServices, errServ = s.repo.CountActiveServices()
-	}()
+		go func() {
+			defer wg.Done()
+			totalResponses, errResp = s.repo.CountTotalResponses()
+		}()
 
-	go func() {
-		defer wg.Done()
-		totalUnsur, errUnsur = s.repo.CountActiveUnsur()
-	}()
+		go func() {
+			defer wg.Done()
+			activeServices, errServ = s.repo.CountActiveServices()
+		}()
 
-	go func() {
-		defer wg.Done()
-		activePeriod, _ = s.repo.GetActivePeriod()
-	}()
+		go func() {
+			defer wg.Done()
+			totalUnsur, errUnsur = s.repo.CountActiveUnsur()
+		}()
 
-	go func() {
-		defer wg.Done()
-		results, errRes = s.repo.GetAnswerUnsurRawList()
-	}()
+		go func() {
+			defer wg.Done()
+			activePeriod, _ = s.repo.GetActivePeriod()
+		}()
 
-	wg.Wait()
+		go func() {
+			defer wg.Done()
+			results, errRes = s.repo.GetAnswerUnsurRawList()
+		}()
 
-	if errResp != nil {
-		return nil, errResp
-	}
-	if errServ != nil {
-		return nil, errServ
-	}
-	if errUnsur != nil {
-		return nil, errUnsur
-	}
-	if errRes != nil {
-		results = nil
-	}
+		wg.Wait()
 
-	ipkpScore := 0.0
-	ipakScore := 0.0
+		if errResp != nil {
+			return nil, errResp
+		}
+		if errServ != nil {
+			return nil, errServ
+		}
+		if errUnsur != nil {
+			return nil, errUnsur
+		}
+		if errRes != nil {
+			results = nil
+		}
 
-	if len(results) > 0 {
-		var ipkpSum, ipakSum float64
-		var ipkpCount, ipakCount int64
-		for _, r := range results {
-			if r.IndexType == "IPAK" {
-				ipakSum += float64(r.RatingValue)
-				ipakCount++
-			} else {
-				ipkpSum += float64(r.RatingValue)
-				ipkpCount++
+		ipkpScore := 0.0
+		ipakScore := 0.0
+
+		if len(results) > 0 {
+			var ipkpSum, ipakSum float64
+			var ipkpCount, ipakCount int64
+			for _, r := range results {
+				if r.IndexType == "IPAK" {
+					ipakSum += float64(r.RatingValue)
+					ipakCount++
+				} else {
+					ipkpSum += float64(r.RatingValue)
+					ipkpCount++
+				}
+			}
+			if ipkpCount > 0 {
+				ipkpScore = domain.RoundTwoDecimals(((ipkpSum / float64(ipkpCount)) / 4.0) * 100.0)
+			}
+			if ipakCount > 0 {
+				ipakScore = domain.RoundTwoDecimals(((ipakSum / float64(ipakCount)) / 4.0) * 100.0)
 			}
 		}
-		if ipkpCount > 0 {
-			ipkpScore = domain.RoundTwoDecimals(((ipkpSum / float64(ipkpCount)) / 4.0) * 100.0)
-		}
-		if ipakCount > 0 {
-			ipakScore = domain.RoundTwoDecimals(((ipakSum / float64(ipakCount)) / 4.0) * 100.0)
-		}
-	}
 
-	result := fiber.Map{
-		"total_responses": totalResponses,
-		"active_services": activeServices,
-		"total_unsur":     totalUnsur,
-		"active_period":   activePeriod,
-		"ipkp_score":      ipkpScore,
-		"ipak_score":      ipakScore,
-	}
-	globalCache.Set(cacheKey, result, 5*time.Minute)
+		result := fiber.Map{
+			"total_responses": totalResponses,
+			"active_services": activeServices,
+			"total_unsur":     totalUnsur,
+			"active_period":   activePeriod,
+			"ipkp_score":      ipkpScore,
+			"ipak_score":      ipakScore,
+		}
+		globalCache.Set(cacheKey, result, 5*time.Minute)
 
-	return result, nil
+		return result, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return val.(fiber.Map), nil
 }
 
 func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map, error) {
@@ -634,11 +655,15 @@ func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP s
 		return uuid.Nil, err
 	}
 
-	// Feature 1: Instant Cache Invalidation so public score updates instantly
-	globalCache.Delete("public_results")
-
-	// Feature 3: Async Goroutine for non-blocking Audit Log recording
+	// Feature 1 & 3: Async Non-Blocking Cache Invalidation, Pre-warming & Audit Logging
 	go func(rID uuid.UUID) {
+		// Invalidate public and admin stats cache
+		globalCache.Delete("public_results")
+		globalCache.Delete("admin_stats")
+
+		// Pre-warm public results in background so next viewer gets instant 0ms response
+		_, _ = s.GetPublicResults()
+
 		_ = s.repo.WriteAuditLog(&models.AuditLog{
 			UserEmail:  "system@kemenag.go.id",
 			Action:     "SUBMIT_SURVEY",

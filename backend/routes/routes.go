@@ -78,6 +78,7 @@ func SetupRoutes(app *fiber.App) {
 	// --- Protected Admin Routes ---
 	admin := api.Group("/admin", middleware.Protected(cfg))
 	admin.Get("/me", authHandler.Me)
+	admin.Post("/change-password", authHandler.ChangePassword)
 	admin.Get("/stats", statsHandler.GetAdminStats)
 
 	// Admin - Audit Logs

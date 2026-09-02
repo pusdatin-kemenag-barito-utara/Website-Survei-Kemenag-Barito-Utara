@@ -34,7 +34,6 @@ func RoundTwoDecimals(val float64) float64 {
 	return math.Round(val*100) / 100
 }
 
-// DTOs
 type SubmitSurveyRequest struct {
 	ServiceID         string            `json:"service_id"`
 	IsAnonymous       bool              `json:"is_anonymous"`
@@ -45,11 +44,18 @@ type SubmitSurveyRequest struct {
 	IPAKFeedback      string            `json:"ipak_feedback"`
 	Demographics      map[string]string `json:"demographics"`
 	Answers           map[string]int    `json:"answers"` // question_id -> rating_value (1-4)
+	TurnstileToken    string            `json:"turnstile_token,omitempty"`
 }
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email          string `json:"email"`
+	Password       string `json:"password"`
+	TurnstileToken string `json:"turnstile_token,omitempty"`
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
 }
 
 type UnsurStat struct {

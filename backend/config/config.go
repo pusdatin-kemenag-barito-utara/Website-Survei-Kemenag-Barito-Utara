@@ -9,12 +9,13 @@ import (
 )
 
 type Config struct {
-	DatabaseURL   string
-	JWTSecret     string
-	CorsOrigins   string
-	Port          string
-	AdminEmail    string
-	AdminPassword string
+	DatabaseURL        string
+	JWTSecret          string
+	CorsOrigins        string
+	Port               string
+	AdminEmail         string
+	AdminPassword      string
+	TurnstileSecretKey string
 }
 
 func (c *Config) GetCorsOrigins() []string {
@@ -90,13 +91,19 @@ func LoadConfig() *Config {
 		port = "8080"
 	}
 
+	turnstileSecretKey := os.Getenv("TURNSTILE_SECRET_KEY")
+	if turnstileSecretKey == "" {
+		turnstileSecretKey = os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY")
+	}
+
 	return &Config{
-		DatabaseURL:   dbURL,
-		JWTSecret:     jwtSecret,
-		CorsOrigins:   corsOrigins,
-		Port:          port,
-		AdminEmail:    adminEmail,
-		AdminPassword: adminPassword,
+		DatabaseURL:        dbURL,
+		JWTSecret:          jwtSecret,
+		CorsOrigins:        corsOrigins,
+		Port:               port,
+		AdminEmail:         adminEmail,
+		AdminPassword:      adminPassword,
+		TurnstileSecretKey: turnstileSecretKey,
 	}
 }
 

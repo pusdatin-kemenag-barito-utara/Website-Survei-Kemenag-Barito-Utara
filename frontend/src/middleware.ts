@@ -123,6 +123,21 @@ export const onRequest = defineMiddleware(async (context, next) => {
     });
     headers.set("Host", target.host);
 
+    // Forward true client IP to backend for accurate rate-limiting and PDP logging
+    const clientIP =
+      context.request.headers.get("cf-connecting-ip") ||
+      context.request.headers.get("x-real-ip") ||
+      context.request.headers.get("x-forwarded-for") ||
+      context.clientAddress ||
+      "";
+    if (clientIP) {
+      headers.set("X-Forwarded-For", clientIP);
+      headers.set("X-Real-IP", clientIP);
+      if (context.request.headers.get("cf-connecting-ip")) {
+        headers.set("CF-Connecting-IP", context.request.headers.get("cf-connecting-ip")!);
+      }
+    }
+
     const init: RequestInit = {
       method: context.request.method,
       headers,
@@ -148,9 +163,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
         responseHeaders.set("Content-Type", res.headers.get("Content-Type")!);
       }
 
-      const bodyBuffer = await res.arrayBuffer();
       logRequest(res.status, context.request.method, pathname, performance.now() - startTime);
-      return new Response(bodyBuffer, {
+      return new Response(res.body, {
         status: res.status,
         headers: responseHeaders,
       });

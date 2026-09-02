@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type CacheItem struct {
@@ -17,9 +19,12 @@ type MemoryCache struct {
 	mu    sync.RWMutex
 }
 
-var globalCache = &MemoryCache{
-	items: make(map[string]CacheItem),
-}
+var (
+	globalCache = &MemoryCache{
+		items: make(map[string]CacheItem),
+	}
+	SingleFlightGroup singleflight.Group
+)
 
 func (c *MemoryCache) Set(key string, value interface{}, duration time.Duration) {
 	c.mu.Lock()

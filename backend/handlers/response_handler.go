@@ -29,7 +29,8 @@ func (h *ResponseHandler) SubmitSurvey(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payload request tidak valid"})
 	}
 
-	respID, err := h.surveyService.SubmitSurvey(&req, c.IP())
+	clientIP := GetRealClientIP(c)
+	respID, err := h.surveyService.SubmitSurvey(&req, clientIP)
 	if err != nil {
 		if fiberErr, ok := err.(*fiber.Error); ok {
 			return c.Status(fiberErr.Code).JSON(fiber.Map{"error": fiberErr.Message})
