@@ -65,13 +65,20 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 		}
 	}
 
+	cleanEmail := strings.ToLower(strings.TrimSpace(req.Email))
+	cleanPassword := strings.TrimSpace(req.Password)
+
 	authenticated := false
 	userID := "admin-id"
 
 	// 1. First, check database Supabase auth.users table
-	authUser, err := h.Repo.GetAuthUserByEmail(req.Email)
+	authUser, err := h.Repo.GetAuthUserByEmail(cleanEmail)
 	if err == nil && authUser != nil && authUser.EncryptedPassword != "" {
+		// Verify password (check exact and trimmed version for clipboard resilience)
 		if bcrypt.CompareHashAndPassword([]byte(authUser.EncryptedPassword), []byte(req.Password)) == nil {
+			authenticated = true
+			userID = authUser.ID
+		} else if cleanPassword != req.Password && bcrypt.CompareHashAndPassword([]byte(authUser.EncryptedPassword), []byte(cleanPassword)) == nil {
 			authenticated = true
 			userID = authUser.ID
 		}
@@ -80,7 +87,9 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	// 2. Fallback: check environment configuration
 	if !authenticated {
 		if h.Config.AdminEmail != "" && h.Config.AdminPassword != "" {
-			if req.Email == h.Config.AdminEmail && req.Password == h.Config.AdminPassword {
+			cleanConfigEmail := strings.ToLower(strings.TrimSpace(h.Config.AdminEmail))
+			cleanConfigPassword := strings.TrimSpace(h.Config.AdminPassword)
+			if cleanEmail == cleanConfigEmail && (req.Password == h.Config.AdminPassword || cleanPassword == cleanConfigPassword) {
 				authenticated = true
 			}
 		}
@@ -95,7 +104,7 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	// Create JWT Claims
 	claims := jwt.MapClaims{
 		"sub":   userID,
-		"email": req.Email,
+		"email": cleanEmail,
 		"role":  "authenticated",
 		"exp":   time.Now().Add(time.Hour * 24 * 7).Unix(), // 7 days token
 	}

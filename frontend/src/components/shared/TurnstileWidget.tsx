@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 
 declare global {
   interface Window {
@@ -21,6 +21,10 @@ declare global {
   }
 }
 
+export interface TurnstileWidgetRef {
+  reset: () => void;
+}
+
 interface TurnstileWidgetProps {
   siteKey: string;
   onSuccess: (token: string) => void;
@@ -28,19 +32,30 @@ interface TurnstileWidgetProps {
   className?: string;
 }
 
-export function TurnstileWidget({
-  siteKey,
-  onSuccess,
-  onError,
-  className,
-}: TurnstileWidgetProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const widgetIdRef = useRef<string | null>(null);
-  const onSuccessRef = useRef(onSuccess);
-  const onErrorRef = useRef(onError);
+export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetProps>(
+  function TurnstileWidget(
+    { siteKey, onSuccess, onError, className },
+    ref
+  ) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const widgetIdRef = useRef<string | null>(null);
+    const onSuccessRef = useRef(onSuccess);
+    const onErrorRef = useRef(onError);
 
-  onSuccessRef.current = onSuccess;
-  onErrorRef.current = onError;
+    onSuccessRef.current = onSuccess;
+    onErrorRef.current = onError;
+
+    useImperativeHandle(ref, () => ({
+      reset: () => {
+        if (widgetIdRef.current && window.turnstile) {
+          try {
+            window.turnstile.reset(widgetIdRef.current);
+          } catch (err) {
+            console.warn("[Turnstile reset warning]", err);
+          }
+        }
+      },
+    }));
 
   useEffect(() => {
     if (!siteKey || !containerRef.current) return;
@@ -133,4 +148,4 @@ export function TurnstileWidget({
       }
     />
   );
-}
+});

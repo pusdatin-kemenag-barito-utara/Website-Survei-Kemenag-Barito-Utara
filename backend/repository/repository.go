@@ -699,7 +699,7 @@ func (r *gormRepository) GetAuthUserByEmail(email string) (*domain.AuthUserRecor
 	err := r.db.Raw(`
 		SELECT id::text, email, encrypted_password, role
 		FROM auth.users
-		WHERE email = ?
+		WHERE LOWER(email) = LOWER(TRIM(?))
 		LIMIT 1
 	`, email).Scan(&user).Error
 	if err != nil {
@@ -715,7 +715,7 @@ func (r *gormRepository) UpdateAuthUserPassword(email string, newHashedPassword 
 	return r.db.Exec(`
 		UPDATE auth.users
 		SET encrypted_password = ?, updated_at = NOW()
-		WHERE email = ?
+		WHERE LOWER(email) = LOWER(TRIM(?))
 	`, newHashedPassword, email).Error
 }
 

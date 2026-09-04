@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useForm } from "react-hook-form";
@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
-import { TurnstileWidget } from "@/components/shared/TurnstileWidget";
+import { TurnstileWidget, type TurnstileWidgetRef } from "@/components/shared/TurnstileWidget";
 import { apiFetch } from "@/lib/api";
 import { Analytics } from "@/lib/analytics";
 import { toast } from "sonner";
@@ -44,6 +44,7 @@ export default function AdminLoginPage() {
   const [turnstileToken, setTurnstileToken] = useState<string>("");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutTime, setLockoutTime] = useState<number | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetRef>(null);
   const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || "";
 
   const {
@@ -100,6 +101,10 @@ export default function AdminLoginPage() {
       }
     } catch (err: unknown) {
       Analytics.adminLogin("failed", data.email);
+      // Reset Turnstile token & widget so next attempt uses a fresh single-use token
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
+
       setFailedAttempts((prev) => {
         const next = prev + 1;
         if (next >= 5) {
@@ -278,6 +283,7 @@ export default function AdminLoginPage() {
               {turnstileSiteKey && (
                 <div className="w-full pt-1 pb-1 flex justify-center">
                   <TurnstileWidget
+                    ref={turnstileRef}
                     siteKey={turnstileSiteKey}
                     className="w-full flex items-center justify-center [&>iframe]:!w-full [&_iframe]:!w-full"
                     onSuccess={(token: string) => setTurnstileToken(token)}
@@ -302,7 +308,7 @@ export default function AdminLoginPage() {
                 <Button
                   type="submit"
                   className="w-full h-13 sm:h-14 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-sm sm:text-base font-bold text-white hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 shadow-lg shadow-emerald-600/25 active:scale-[0.99] disabled:opacity-75 cursor-pointer pt-0.5"
-                  disabled={loading || Boolean(lockoutTime)}
+                  disabled={loading || Boolean(lockoutTime) || (Boolean(turnstileSiteKey) && !turnstileToken)}
                 >
                   {loading ? (
                     <>
