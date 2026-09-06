@@ -281,11 +281,11 @@ export default function AdminLoginPage() {
 
               {/* Cloudflare Turnstile Security Widget (Full Width matching button) */}
               {turnstileSiteKey && (
-                <div className="w-full pt-1 pb-1 flex justify-center">
+                <div className="w-full pt-1 pb-1">
                   <TurnstileWidget
                     ref={turnstileRef}
                     siteKey={turnstileSiteKey}
-                    className="w-full flex items-center justify-center [&>iframe]:!w-full [&_iframe]:!w-full"
+                    className="w-full"
                     onSuccess={(token: string) => setTurnstileToken(token)}
                     onError={() =>
                       console.warn("[Turnstile] Local fallback active")

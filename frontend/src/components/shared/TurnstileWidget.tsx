@@ -1,4 +1,5 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { cn } from "@/lib/utils";
 
 declare global {
   interface Window {
@@ -142,10 +143,11 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
   return (
     <div
       ref={containerRef}
-      className={
-        className ||
-        "w-full flex items-center justify-center [&>iframe]:!w-full [&>iframe]:!max-w-full [&_iframe]:!w-full"
-      }
+      className={cn(
+        "w-full block min-h-[65px] [&>div]:!w-full [&>div]:!max-w-full [&>div>div]:!w-full [&>div>div]:!max-w-full [&_iframe]:!w-full [&_iframe]:!max-w-full",
+        className
+      )}
+      style={{ width: "100%", minHeight: "65px" }}
     />
   );
 });
