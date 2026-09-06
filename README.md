@@ -21,6 +21,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Script | Description |
 | --- | --- |
+| `npm run install:all` | Install all dependencies (root, frontend, backend Go modules) |
+| `npm run install:frontend` | Install frontend npm packages |
+| `npm run install:backend` | Download Go backend modules (`go mod download`) |
 | `npm run dev` | Backend (air hot-reload) + frontend (astro dev) |
 | `npm run dev:no-air` | Backend (go run) + frontend |
 | `npm run build:frontend` | `astro build` → `frontend/dist` |
