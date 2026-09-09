@@ -9,7 +9,7 @@ function getEnv(key: string, fallback = '') {
 
 const SUPABASE_URL = getEnv('PUBLIC_SUPABASE_URL');
 const SUPABASE_KEY = getEnv('PUBLIC_SUPABASE_ANON_KEY');
-const SUPABASE_SCHEMA = getEnv('PUBLIC_PUSDATIN_SCHEMA', 'kemenag_survey');
+export const SUPABASE_SCHEMA = getEnv('PUBLIC_PUSDATIN_SCHEMA', 'kemenag_survey');
 
 export function createClient() {
   try {

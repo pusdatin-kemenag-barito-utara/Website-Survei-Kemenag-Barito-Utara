@@ -21,6 +21,7 @@ func ConnectDB(cfg *config.Config) {
 	if dbSchema == "" {
 		dbSchema = "kemenag_survey"
 	}
+	models.SetSchema(dbSchema)
 
 	DB, err = gorm.Open(postgres.New(postgres.Config{
 		DSN:                  cfg.DatabaseURL,

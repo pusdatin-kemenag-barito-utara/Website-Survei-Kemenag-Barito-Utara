@@ -6,6 +6,14 @@ import (
 	"github.com/google/uuid"
 )
 
+var SchemaName = "kemenag_survey"
+
+func SetSchema(s string) {
+	if s != "" {
+		SchemaName = s
+	}
+}
+
 type ServiceCategory struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	Name      string    `gorm:"type:text;not null;unique" json:"name"`
@@ -14,7 +22,7 @@ type ServiceCategory struct {
 }
 
 func (ServiceCategory) TableName() string {
-	return "kemenag_survey.service_categories"
+	return SchemaName + ".service_categories"
 }
 
 type Service struct {
@@ -29,7 +37,7 @@ type Service struct {
 }
 
 func (Service) TableName() string {
-	return "kemenag_survey.services"
+	return SchemaName + ".services"
 }
 
 type SurveyPeriod struct {
@@ -43,7 +51,7 @@ type SurveyPeriod struct {
 }
 
 func (SurveyPeriod) TableName() string {
-	return "kemenag_survey.survey_periods"
+	return SchemaName + ".survey_periods"
 }
 
 type Unsur struct {
@@ -58,7 +66,7 @@ type Unsur struct {
 }
 
 func (Unsur) TableName() string {
-	return "kemenag_survey.unsur"
+	return SchemaName + ".unsur"
 }
 
 type Question struct {
@@ -79,7 +87,7 @@ type Question struct {
 }
 
 func (Question) TableName() string {
-	return "kemenag_survey.questions"
+	return SchemaName + ".questions"
 }
 
 type DemographicField struct {
@@ -97,7 +105,7 @@ type DemographicField struct {
 }
 
 func (DemographicField) TableName() string {
-	return "kemenag_survey.demographic_fields"
+	return SchemaName + ".demographic_fields"
 }
 
 type DemographicOption struct {
@@ -110,7 +118,7 @@ type DemographicOption struct {
 }
 
 func (DemographicOption) TableName() string {
-	return "kemenag_survey.demographic_options"
+	return SchemaName + ".demographic_options"
 }
 
 type Response struct {
@@ -132,7 +140,7 @@ type Response struct {
 }
 
 func (Response) TableName() string {
-	return "kemenag_survey.responses"
+	return SchemaName + ".responses"
 }
 
 type ResponseDemographic struct {
@@ -143,7 +151,7 @@ type ResponseDemographic struct {
 }
 
 func (ResponseDemographic) TableName() string {
-	return "kemenag_survey.response_demographics"
+	return SchemaName + ".response_demographics"
 }
 
 type ResponseAnswer struct {
@@ -155,7 +163,7 @@ type ResponseAnswer struct {
 }
 
 func (ResponseAnswer) TableName() string {
-	return "kemenag_survey.response_answers"
+	return SchemaName + ".response_answers"
 }
 
 type AppSetting struct {
@@ -165,7 +173,7 @@ type AppSetting struct {
 }
 
 func (AppSetting) TableName() string {
-	return "kemenag_survey.app_settings"
+	return SchemaName + ".app_settings"
 }
 
 type AuditLog struct {
@@ -179,5 +187,5 @@ type AuditLog struct {
 }
 
 func (AuditLog) TableName() string {
-	return "kemenag_survey.audit_logs"
+	return SchemaName + ".audit_logs"
 }

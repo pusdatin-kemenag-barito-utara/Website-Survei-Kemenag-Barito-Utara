@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchCachedPublicResults, getCachedPublicResultsSync } from '@/lib/data-cache'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, SUPABASE_SCHEMA } from '@/lib/supabase/client'
 import type { IndexSummary, UnsurSummary, IndexByService } from '@/types'
 
 export interface PublicResultsData {
@@ -52,7 +52,7 @@ export function usePublicResults() {
       .channel('home-public-results-realtime')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'kemenag_survey', table: 'responses' },
+        { event: 'INSERT', schema: SUPABASE_SCHEMA, table: 'responses' },
         async () => {
           try {
             const res = await fetchCachedPublicResults(true)

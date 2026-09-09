@@ -4,6 +4,8 @@ import (
 	"math"
 	"time"
 
+	"survey-kemenag-backend/models"
+
 	"github.com/google/uuid"
 )
 
@@ -116,7 +118,7 @@ type SurveyPeriod struct {
 }
 
 func (SurveyPeriod) TableName() string {
-	return "kemenag_survey.survey_periods"
+	return models.SchemaName + ".survey_periods"
 }
 
 // IndexTrendRow maps to vw_index_trend view

@@ -48,7 +48,7 @@ export default function AdminBarcodePage() {
 
   const origin =
     typeof window !== "undefined"
-      ? window.location.origin
+      ? ((window as any).__ENV__?.PUBLIC_APP_URL || window.location.origin)
       : (import.meta.env.PUBLIC_APP_URL || "");
   const selectedSlug =
     selectedServiceId !== "all"

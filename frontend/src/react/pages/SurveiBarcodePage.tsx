@@ -23,7 +23,7 @@ export default function BarcodePage() {
   const [copied, setCopied] = useState(false)
 
   const origin = typeof window !== 'undefined'
-    ? window.location.origin
+    ? ((window as any).__ENV__?.PUBLIC_APP_URL || window.location.origin)
     : (import.meta.env.PUBLIC_APP_URL || '')
   const selectedSlug = selectedServiceId !== 'all' ? services.find(s => s.id === selectedServiceId)?.slug : null
   const targetUrl = selectedSlug ? `${origin}/survei?service=${selectedSlug}` : `${origin}/survei`

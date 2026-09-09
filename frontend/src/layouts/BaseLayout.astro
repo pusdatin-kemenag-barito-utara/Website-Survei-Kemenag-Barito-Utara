@@ -19,6 +19,7 @@ const pusdatinUrl = process.env.PUBLIC_PUSDATIN_URL || import.meta.env.PUBLIC_PU
 const supabaseUrl = process.env.PUBLIC_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.PUBLIC_SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || "";
 const pusdatinSchema = process.env.PUBLIC_PUSDATIN_SCHEMA || import.meta.env.PUBLIC_PUSDATIN_SCHEMA || "kemenag_survey";
+const superAdminEmail = process.env.PUBLIC_SUPER_ADMIN_EMAIL || import.meta.env.PUBLIC_SUPER_ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || "";
 
 const {
   title = "SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara",
@@ -242,9 +243,15 @@ const jsonLd = {
     <link rel="dns-prefetch" href="https://www.google-analytics.com" />
     <link rel="preconnect" href="https://static.cloudflareinsights.com" crossorigin="anonymous" />
     <link rel="dns-prefetch" href="https://static.cloudflareinsights.com" />
-    <link rel="preconnect" href="https://db.kemenag-baritoutara.com" crossorigin="anonymous" />
-    <link rel="preconnect" href="https://pusdatin.kemenag-baritoutara.com" />
-    <link rel="dns-prefetch" href="https://pusdatin.kemenag-baritoutara.com" />
+    {supabaseUrl && (
+      <link rel="preconnect" href={supabaseUrl.startsWith("http") ? new URL(supabaseUrl).origin : supabaseUrl} crossorigin="anonymous" />
+    )}
+    {pusdatinUrl && (
+      <>
+        <link rel="preconnect" href={pusdatinUrl.startsWith("http") ? new URL(pusdatinUrl).origin : pusdatinUrl} />
+        <link rel="dns-prefetch" href={pusdatinUrl.startsWith("http") ? new URL(pusdatinUrl).origin : pusdatinUrl} />
+      </>
+    )}
     <link rel="dns-prefetch" href="https://challenges.cloudflare.com" />
 
     <!-- Preload Maklumat Pelayanan Banner for Instant LCP -->
@@ -391,6 +398,7 @@ const jsonLd = {
         PUBLIC_GA_MEASUREMENT_ID: gaMeasurementId,
         PUBLIC_GTAG_ID: gtagId,
         PUBLIC_CF_BEACON_TOKEN: cfBeaconToken,
+        PUBLIC_SUPER_ADMIN_EMAIL: superAdminEmail,
       }
     }}>
       window.__ENV__ = Object.assign(window.__ENV__ || {}, envData);

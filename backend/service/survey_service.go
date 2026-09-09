@@ -306,12 +306,12 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 	}
 
 	var rawAnswers []CombinedRawAnswer
-	answerQuery := db.Table("kemenag_survey.response_answers ra").
+	answerQuery := db.Table(fmt.Sprintf("%s.response_answers ra", models.SchemaName)).
 		Select("ra.response_id, r.service_id, s.name as service_name, q.unsur_id, u.name as unsur_name, u.index_type, ra.rating_value, to_char(r.submitted_at, 'YYYY-MM') as bulan").
-		Joins("JOIN kemenag_survey.responses r ON ra.response_id = r.id").
-		Joins("JOIN kemenag_survey.services s ON r.service_id = s.id").
-		Joins("JOIN kemenag_survey.questions q ON ra.question_id = q.id").
-		Joins("JOIN kemenag_survey.unsur u ON q.unsur_id = u.id")
+		Joins(fmt.Sprintf("JOIN %s.responses r ON ra.response_id = r.id", models.SchemaName)).
+		Joins(fmt.Sprintf("JOIN %s.services s ON r.service_id = s.id", models.SchemaName)).
+		Joins(fmt.Sprintf("JOIN %s.questions q ON ra.question_id = q.id", models.SchemaName)).
+		Joins(fmt.Sprintf("JOIN %s.unsur u ON q.unsur_id = u.id", models.SchemaName))
 
 	if startDate != "" {
 		answerQuery = answerQuery.Where("r.submitted_at::date >= ?::date", startDate)
@@ -491,10 +491,10 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 
 	// 3. Demographics Query
 	var demoList []domain.DemographicSummaryRow
-	demoQuery := db.Table("kemenag_survey.response_demographics rd").
+	demoQuery := db.Table(fmt.Sprintf("%s.response_demographics rd", models.SchemaName)).
 		Select("df.field_key, rd.value as demographic_value, count(rd.id) as count").
-		Joins("JOIN kemenag_survey.responses r ON rd.response_id = r.id").
-		Joins("JOIN kemenag_survey.demographic_fields df ON rd.field_id = df.id").
+		Joins(fmt.Sprintf("JOIN %s.responses r ON rd.response_id = r.id", models.SchemaName)).
+		Joins(fmt.Sprintf("JOIN %s.demographic_fields df ON rd.field_id = df.id", models.SchemaName)).
 		Group("df.field_key, rd.value")
 
 	if startDate != "" {

@@ -20,7 +20,7 @@ import {
   getCachedPublicResultsSync,
   getCachedServicesSync,
 } from '@/lib/data-cache'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, SUPABASE_SCHEMA } from '@/lib/supabase/client'
 import { exportToExcel, exportToPdf } from '@/lib/export'
 import { Analytics } from '@/lib/analytics'
 import type { IndexSummary, IndexByService, IndexTrend, UnsurSummary, DemographicSummary } from '@/types'
@@ -83,7 +83,7 @@ export default function HasilPage() {
 
     const channel = supabase
       .channel('hasil-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'kemenag_survey', table: 'responses' }, async () => {
+      .on('postgres_changes', { event: 'INSERT', schema: SUPABASE_SCHEMA, table: 'responses' }, async () => {
         try {
           const publicData = await fetchCachedPublicResults(true)
           if (publicData) {

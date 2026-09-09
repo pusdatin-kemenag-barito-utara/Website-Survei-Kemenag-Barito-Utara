@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -444,17 +445,18 @@ func (r *gormRepository) CountActiveUnsur() (int64, error) {
 
 func (r *gormRepository) GetAnswerUnsurRawList() ([]domain.AnswerUnsurRaw, error) {
 	var results []domain.AnswerUnsurRaw
-	err := r.db.Raw(`
+	query := fmt.Sprintf(`
 		SELECT ra.rating_value, u.index_type
-		FROM kemenag_survey.response_answers ra
-		JOIN kemenag_survey.unsur u ON u.id = ra.unsur_id
-	`).Scan(&results).Error
+		FROM %s.response_answers ra
+		JOIN %s.unsur u ON u.id = ra.unsur_id
+	`, models.SchemaName, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
 	return results, err
 }
 
 func (r *gormRepository) GetUnsurAvgRating(unsurID uuid.UUID) (float64, error) {
 	var avgRating float64
-	err := r.db.Table("kemenag_survey.response_answers").
+	err := r.db.Table(models.SchemaName + ".response_answers").
 		Where("unsur_id = ?", unsurID).
 		Select("COALESCE(AVG(rating_value), 0)").
 		Scan(&avgRating).Error
@@ -469,11 +471,12 @@ func (r *gormRepository) GetServiceResponseCount(serviceID uuid.UUID) (int64, er
 
 func (r *gormRepository) GetServiceAvgRating(serviceID uuid.UUID, indexType string) (float64, error) {
 	var avgRating float64
-	err := r.db.Table("kemenag_survey.response_answers").
-		Joins("JOIN kemenag_survey.responses ON kemenag_survey.responses.id = kemenag_survey.response_answers.response_id").
-		Joins("JOIN kemenag_survey.unsur ON kemenag_survey.unsur.id = kemenag_survey.response_answers.unsur_id").
-		Where("kemenag_survey.responses.service_id = ? AND kemenag_survey.unsur.index_type = ?", serviceID, indexType).
-		Select("COALESCE(AVG(kemenag_survey.response_answers.rating_value), 0)").
+	s := models.SchemaName
+	err := r.db.Table(s + ".response_answers").
+		Joins(fmt.Sprintf("JOIN %s.responses ON %s.responses.id = %s.response_answers.response_id", s, s, s)).
+		Joins(fmt.Sprintf("JOIN %s.unsur ON %s.unsur.id = %s.response_answers.unsur_id", s, s, s)).
+		Where(fmt.Sprintf("%s.responses.service_id = ? AND %s.unsur.index_type = ?", s, s), serviceID, indexType).
+		Select(fmt.Sprintf("COALESCE(AVG(%s.response_answers.rating_value), 0)", s)).
 		Scan(&avgRating).Error
 	return avgRating, err
 }
@@ -531,23 +534,25 @@ func (r *gormRepository) DeleteResponseFull(id uuid.UUID) error {
 
 func (r *gormRepository) GetResponseAnswersDetail(id uuid.UUID) ([]domain.AnswerDetailResult, error) {
 	var results []domain.AnswerDetailResult
-	err := r.db.Table("kemenag_survey.response_answers").
-		Select("kemenag_survey.response_answers.id, kemenag_survey.response_answers.rating_value, kemenag_survey.questions.question_text_id, kemenag_survey.questions.question_text_en, kemenag_survey.unsur.name as unsur_name, kemenag_survey.unsur.index_type").
-		Joins("JOIN kemenag_survey.questions ON kemenag_survey.questions.id = kemenag_survey.response_answers.question_id").
-		Joins("JOIN kemenag_survey.unsur ON kemenag_survey.unsur.id = kemenag_survey.response_answers.unsur_id").
-		Where("kemenag_survey.response_answers.response_id = ?", id).
-		Order("kemenag_survey.questions.sort_order asc").
+	s := models.SchemaName
+	err := r.db.Table(s + ".response_answers").
+		Select(fmt.Sprintf("%s.response_answers.id, %s.response_answers.rating_value, %s.questions.question_text_id, %s.questions.question_text_en, %s.unsur.name as unsur_name, %s.unsur.index_type", s, s, s, s, s, s)).
+		Joins(fmt.Sprintf("JOIN %s.questions ON %s.questions.id = %s.response_answers.question_id", s, s, s)).
+		Joins(fmt.Sprintf("JOIN %s.unsur ON %s.unsur.id = %s.response_answers.unsur_id", s, s, s)).
+		Where(fmt.Sprintf("%s.response_answers.response_id = ?", s), id).
+		Order(fmt.Sprintf("%s.questions.sort_order asc", s)).
 		Scan(&results).Error
 	return results, err
 }
 
 func (r *gormRepository) GetResponseDemographicsDetail(id uuid.UUID) ([]domain.DemoDetailResult, error) {
 	var results []domain.DemoDetailResult
-	err := r.db.Table("kemenag_survey.response_demographics").
-		Select("kemenag_survey.response_demographics.id, kemenag_survey.response_demographics.value, kemenag_survey.demographic_fields.label_id, kemenag_survey.demographic_fields.label_en, kemenag_survey.demographic_fields.field_key").
-		Joins("JOIN kemenag_survey.demographic_fields ON kemenag_survey.demographic_fields.id = kemenag_survey.response_demographics.field_id").
-		Where("kemenag_survey.response_demographics.response_id = ?", id).
-		Order("kemenag_survey.demographic_fields.sort_order asc").
+	s := models.SchemaName
+	err := r.db.Table(s + ".response_demographics").
+		Select(fmt.Sprintf("%s.response_demographics.id, %s.response_demographics.value, %s.demographic_fields.label_id, %s.demographic_fields.label_en, %s.demographic_fields.field_key", s, s, s, s, s)).
+		Joins(fmt.Sprintf("JOIN %s.demographic_fields ON %s.demographic_fields.id = %s.response_demographics.field_id", s, s, s)).
+		Where(fmt.Sprintf("%s.response_demographics.response_id = ?", s), id).
+		Order(fmt.Sprintf("%s.demographic_fields.sort_order asc", s)).
 		Scan(&results).Error
 	return results, err
 }
@@ -555,20 +560,21 @@ func (r *gormRepository) GetResponseDemographicsDetail(id uuid.UUID) ([]domain.D
 // GetIndexTrend returns weekly aggregated index scores with weighted NRR per index_type
 func (r *gormRepository) GetIndexTrend() ([]domain.IndexTrendRow, error) {
 	var results []domain.IndexTrendRow
-	err := r.db.Raw(`
+	s := models.SchemaName
+	query := fmt.Sprintf(`
 		WITH weekly AS (
 			SELECT
 				date_trunc('week', r.submitted_at) AS periode_date,
 				ra.unsur_id,
 				u.index_type,
 				avg(ra.rating_value::numeric) AS avg_rating
-			FROM kemenag_survey.responses r
-			JOIN kemenag_survey.response_answers ra ON ra.response_id = r.id
-			JOIN kemenag_survey.unsur u ON u.id = ra.unsur_id
+			FROM %s.responses r
+			JOIN %s.response_answers ra ON ra.response_id = r.id
+			JOIN %s.unsur u ON u.id = ra.unsur_id
 			WHERE u.is_active = true
 			GROUP BY date_trunc('week', r.submitted_at), ra.unsur_id, u.index_type
 		), aktif_unsur AS (
-			SELECT index_type, count(*) AS total FROM kemenag_survey.unsur WHERE is_active = true GROUP BY index_type
+			SELECT index_type, count(*) AS total FROM %s.unsur WHERE is_active = true GROUP BY index_type
 		), tertimbang AS (
 			SELECT w.periode_date, w.index_type, (w.avg_rating / au.total::numeric) AS weighted
 			FROM weekly w JOIN aktif_unsur au ON au.index_type = w.index_type
@@ -580,41 +586,43 @@ func (r *gormRepository) GetIndexTrend() ([]domain.IndexTrendRow, error) {
 		FROM tertimbang t
 		GROUP BY t.periode_date, t.index_type
 		ORDER BY t.periode_date ASC
-	`).Scan(&results).Error
+	`, s, s, s, s)
+	err := r.db.Raw(query).Scan(&results).Error
 	return results, err
 }
-
 
 // GetDemographicSummary reads from vw_demographic_summary view
 func (r *gormRepository) GetDemographicSummary() ([]domain.DemographicSummaryRow, error) {
 	var results []domain.DemographicSummaryRow
-	err := r.db.Raw(`
+	query := fmt.Sprintf(`
 		SELECT
 			service_id::text,
 			service_name,
 			field_key,
 			demographic_value,
 			count
-		FROM kemenag_survey.vw_demographic_summary
+		FROM %s.vw_demographic_summary
 		ORDER BY service_name, field_key, count DESC
-	`).Scan(&results).Error
+	`, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
 	return results, err
 }
 
 // GetViewIndexSummary reads from vw_index_summary (weighted NRR calculation)
 func (r *gormRepository) GetViewIndexSummary() ([]domain.ViewIndexSummaryRow, error) {
 	var results []domain.ViewIndexSummaryRow
-	err := r.db.Raw(`
+	query := fmt.Sprintf(`
 		SELECT index_type, nilai_index, nilai_konversi, mutu, kinerja
-		FROM kemenag_survey.vw_index_summary
-	`).Scan(&results).Error
+		FROM %s.vw_index_summary
+	`, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
 	return results, err
 }
 
 // GetViewUnsurSummary reads from vw_unsur_summary view
 func (r *gormRepository) GetViewUnsurSummary() ([]domain.ViewUnsurSummaryRow, error) {
 	var results []domain.ViewUnsurSummaryRow
-	err := r.db.Raw(`
+	query := fmt.Sprintf(`
 		SELECT
 			service_id::text,
 			service_name,
@@ -626,17 +634,17 @@ func (r *gormRepository) GetViewUnsurSummary() ([]domain.ViewUnsurSummaryRow, er
 			nilai_rata_rata_unsur,
 			nilai_rata_rata_tertimbang,
 			jumlah_responden
-		FROM kemenag_survey.vw_unsur_summary
+		FROM %s.vw_unsur_summary
 		ORDER BY index_type, unsur_name
-	`).Scan(&results).Error
+	`, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
 	return results, err
 }
-
 
 // GetViewServiceStats reads from vw_index_summary_by_service view
 func (r *gormRepository) GetViewServiceStats() ([]domain.ViewServiceStatRow, error) {
 	var results []domain.ViewServiceStatRow
-	err := r.db.Raw(`
+	query := fmt.Sprintf(`
 		SELECT
 			service_id::text,
 			service_name,
@@ -645,9 +653,10 @@ func (r *gormRepository) GetViewServiceStats() ([]domain.ViewServiceStatRow, err
 			nilai_konversi,
 			mutu,
 			jumlah_responden
-		FROM kemenag_survey.vw_index_summary_by_service
+		FROM %s.vw_index_summary_by_service
 		ORDER BY service_name, index_type
-	`).Scan(&results).Error
+	`, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
 	return results, err
 }
 
