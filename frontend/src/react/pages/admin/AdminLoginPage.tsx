@@ -44,6 +44,7 @@ export default function AdminLoginPage() {
   const [turnstileToken, setTurnstileToken] = useState<string>("");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutTime, setLockoutTime] = useState<number | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetRef>(null);
   const turnstileSiteKey =
     (typeof window !== "undefined" && (window as any).__ENV__?.PUBLIC_TURNSTILE_SITE_KEY) ||
     import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ||
