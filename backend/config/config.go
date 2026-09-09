@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	DatabaseURL        string
+	DatabaseSchema     string
 	JWTSecret          string
 	CorsOrigins        string
 	Port               string
@@ -96,8 +97,17 @@ func LoadConfig() *Config {
 		turnstileSecretKey = os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY")
 	}
 
+	dbSchema := os.Getenv("PUBLIC_PUSDATIN_SCHEMA")
+	if dbSchema == "" {
+		dbSchema = os.Getenv("DB_SCHEMA")
+	}
+	if dbSchema == "" {
+		dbSchema = "kemenag_survey"
+	}
+
 	return &Config{
 		DatabaseURL:        dbURL,
+		DatabaseSchema:     dbSchema,
 		JWTSecret:          jwtSecret,
 		CorsOrigins:        corsOrigins,
 		Port:               port,

@@ -8,7 +8,10 @@ export function MaintenanceListener() {
 
   useEffect(() => {
     let active = true;
-    const pusdatinUrl = import.meta.env.PUBLIC_PUSDATIN_URL || "";
+    const pusdatinUrl =
+      (typeof window !== "undefined" && (window as any).__ENV__?.PUBLIC_PUSDATIN_URL) ||
+      import.meta.env.PUBLIC_PUSDATIN_URL ||
+      "";
     const appId = "sikap";
 
     if (!pusdatinUrl) return;

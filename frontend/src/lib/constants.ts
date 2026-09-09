@@ -1,4 +1,7 @@
-export const ADMIN_EMAIL = import.meta.env.PUBLIC_SUPER_ADMIN_EMAIL || '';
+export const ADMIN_EMAIL =
+  (typeof window !== "undefined" && (window as any).__ENV__?.PUBLIC_SUPER_ADMIN_EMAIL) ||
+  import.meta.env.PUBLIC_SUPER_ADMIN_EMAIL ||
+  "";
 
 
 
