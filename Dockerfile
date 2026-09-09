@@ -25,13 +25,18 @@ RUN npm prune --production
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates tzdata bash curl
+RUN apk add --no-cache ca-certificates tzdata bash curl && \
+    curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.alpine.sh' | bash && \
+    apk add --no-cache infisical
 
 COPY --from=backend-builder /app/backend/api-sikap /app/api-sikap
 COPY --from=frontend-builder /app/frontend/package.json /app/package.json
 COPY --from=frontend-builder /app/frontend/node_modules /app/node_modules
 COPY --from=frontend-builder /app/frontend/dist /app/dist
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 3000 8080
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["sh", "-c", "GO_PORT=8080 PORT=8080 /app/api-sikap & HOSTNAME=0.0.0.0 PORT=3000 node /app/dist/server/entry.mjs"]

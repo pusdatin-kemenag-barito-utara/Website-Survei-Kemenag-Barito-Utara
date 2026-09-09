@@ -1,8 +1,15 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
-const SUPABASE_SCHEMA = import.meta.env.PUBLIC_PUSDATIN_SCHEMA || 'kemenag_survey';
+function getEnv(key: string, fallback = '') {
+  if (typeof window !== 'undefined' && (window as any).__ENV__?.[key]) {
+    return (window as any).__ENV__[key];
+  }
+  return (import.meta.env as any)[key] || fallback;
+}
+
+const SUPABASE_URL = getEnv('PUBLIC_SUPABASE_URL');
+const SUPABASE_KEY = getEnv('PUBLIC_SUPABASE_ANON_KEY');
+const SUPABASE_SCHEMA = getEnv('PUBLIC_PUSDATIN_SCHEMA', 'kemenag_survey');
 
 export function createClient() {
   try {

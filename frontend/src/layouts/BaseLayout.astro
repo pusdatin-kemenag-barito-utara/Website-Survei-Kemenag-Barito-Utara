@@ -13,7 +13,12 @@ const appUrl = import.meta.env.PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || "
 const gaMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || process.env.PUBLIC_GA_MEASUREMENT_ID || "";
 const gtagId = import.meta.env.PUBLIC_GTAG_ID || process.env.PUBLIC_GTAG_ID || "";
 const cfBeaconToken = import.meta.env.PUBLIC_CF_BEACON_TOKEN || process.env.PUBLIC_CF_BEACON_TOKEN || "";
-const enableCfRum = import.meta.env.PUBLIC_CLOUDFLARE_RUM_ENABLED !== "false";
+const enableCfRum = (import.meta.env.PUBLIC_CLOUDFLARE_RUM_ENABLED || process.env.PUBLIC_CLOUDFLARE_RUM_ENABLED) !== "false";
+const turnstileSiteKey = process.env.PUBLIC_TURNSTILE_SITE_KEY || import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || "";
+const pusdatinUrl = process.env.PUBLIC_PUSDATIN_URL || import.meta.env.PUBLIC_PUSDATIN_URL || "";
+const supabaseUrl = process.env.PUBLIC_SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.PUBLIC_SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || "";
+const pusdatinSchema = process.env.PUBLIC_PUSDATIN_SCHEMA || import.meta.env.PUBLIC_PUSDATIN_SCHEMA || "kemenag_survey";
 
 const {
   title = "SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara",
@@ -372,6 +377,23 @@ const jsonLd = {
             });
         });
       }
+    </script>
+
+    <!-- Runtime Environment Injection for Client Components -->
+    <script is:inline define:vars={{
+      envData: {
+        PUBLIC_APP_URL: appUrl,
+        PUBLIC_TURNSTILE_SITE_KEY: turnstileSiteKey,
+        PUBLIC_PUSDATIN_URL: pusdatinUrl,
+        PUBLIC_SUPABASE_URL: supabaseUrl,
+        PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
+        PUBLIC_PUSDATIN_SCHEMA: pusdatinSchema,
+        PUBLIC_GA_MEASUREMENT_ID: gaMeasurementId,
+        PUBLIC_GTAG_ID: gtagId,
+        PUBLIC_CF_BEACON_TOKEN: cfBeaconToken,
+      }
+    }}>
+      window.__ENV__ = Object.assign(window.__ENV__ || {}, envData);
     </script>
 
     <!-- Client Router for Instant SPA Page Transitions -->
