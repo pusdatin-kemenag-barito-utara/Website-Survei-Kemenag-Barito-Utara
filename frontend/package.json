@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npx dotenv-cli -e ../.env -- astro dev --port 3000 --host",
+    "dev": "astro dev --port 3000 --host",
     "build": "astro build",
     "start": "node ./dist/server/entry.mjs",
-    "preview": "npx dotenv-cli -e ../.env -- astro preview --port 3000 --host",
+    "preview": "astro preview --port 3000 --host",
     "astro": "astro",
     "check": "astro check",
     "type-check": "tsc --noEmit",

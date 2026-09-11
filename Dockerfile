@@ -43,12 +43,6 @@ RUN apk add --no-cache ca-certificates tzdata curl wget bash dos2unix \
 # Install concurrently globally for simultaneous backend and frontend execution
 RUN npm install -g concurrently
 
-ENV NODE_ENV=production
-ENV HOSTNAME=0.0.0.0
-ENV PORT=3000
-ENV GO_PORT=8080
-ENV BACKEND_PORT=8080
-
 # Copy Go backend binary
 COPY --from=backend-builder /app/backend/api-sikap /app/api-sikap
 RUN chmod +x /app/api-sikap

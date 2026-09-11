@@ -8,11 +8,11 @@ Fullstack survey platform (IKM - Indeks Kepuasan Masyarakat) for Kemenag Barito 
 
 ## Getting Started
 
-Create a root `.env` (see Coolify EV configuration) then:
+Environment variables are managed centrally via Infisical Cloud.
 
 ```bash
 npm install          # installs root deps + frontend deps (postinstall)
-npm run dev          # Go backend (air, :8080) + Astro dev server (:3000)
+npm run dev          # Injects EV via Infisical -> Go backend (air) + Astro dev server
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -24,12 +24,12 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run install:all` | Install all dependencies (root, frontend, backend Go modules) |
 | `npm run install:frontend` | Install frontend npm packages |
 | `npm run install:backend` | Download Go backend modules (`go mod download`) |
-| `npm run dev` | Backend (air hot-reload) + frontend (astro dev) |
-| `npm run dev:no-air` | Backend (go run) + frontend |
+| `npm run dev` | Run backend (air hot-reload) + frontend (astro dev) with Infisical EV |
+| `npm run dev:no-air` | Run backend (go run) + frontend with Infisical EV |
+| `npm run dev:backend` | Run backend only with Infisical EV |
+| `npm run dev:frontend` | Run frontend only with Infisical EV |
 | `npm run build:frontend` | `astro build` → `frontend/dist` |
 | `npm run build:backend` | `go build` → `backend/bin/server` |
-
-Frontend runs with `dotenv-cli -e ../.env -- astro ...` so the single root `.env` is shared.
 
 ## Architecture Notes
 

@@ -49,10 +49,11 @@ const siteTitle = title.includes("SI-ARUS")
 
 const ogImageUrl = image.startsWith("http") ? image : `${appUrl}${image}`;
 
+const canonicalBase = appUrl || (Astro.site ? Astro.site.toString() : Astro.url.origin);
 const canonicalUrl = new URL(
   Astro.url.pathname,
-  appUrl || "https://survei.kemenag-baritoutara.com"
-).href.replace(/\/+$/, "") || appUrl;
+  canonicalBase
+).href.replace(/\/+$/, "") || canonicalBase;
 
 const jsonLd = {
   "@context": "https://schema.org",

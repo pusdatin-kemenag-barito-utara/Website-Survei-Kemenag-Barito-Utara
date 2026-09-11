@@ -4,8 +4,6 @@ import (
 	"log"
 	"os"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -21,7 +19,7 @@ type Config struct {
 
 func (c *Config) GetCorsOrigins() []string {
 	if c.CorsOrigins == "" {
-		return []string{"http://localhost:3000", "http://127.0.0.1:3000"}
+		return []string{}
 	}
 	parts := strings.Split(c.CorsOrigins, ",")
 	var origins []string
@@ -35,30 +33,19 @@ func (c *Config) GetCorsOrigins() []string {
 }
 
 func LoadConfig() *Config {
-	// Optional fallback: load .env only if file exists (e.g. offline dev)
-	if _, err := os.Stat(".env"); err == nil {
-		_ = godotenv.Load()
-	} else if _, err := os.Stat("../.env"); err == nil {
-		_ = godotenv.Load("../.env")
-	}
-
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		dbURL = "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+		log.Fatal("❌ FATAL: DATABASE_URL environment variable is required (ensure Infisical injection is active)")
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "sikap-kemenag-secret-jwt-key-2026"
-		log.Println("⚠️ JWT_SECRET not set in environment, using default key")
+		log.Fatal("❌ FATAL: JWT_SECRET environment variable is required (ensure Infisical injection is active)")
 	}
 
 	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
 	if corsOrigins == "" {
 		corsOrigins = os.Getenv("CORS_ORIGINS")
-	}
-	if corsOrigins == "" {
-		corsOrigins = "http://localhost:3000, http://127.0.0.1:3000, https://survei.kemenag-baritoutara.com"
 	}
 
 	adminEmail := os.Getenv("ADMIN_EMAIL")
@@ -114,4 +101,3 @@ func LoadConfig() *Config {
 		TurnstileSecretKey: turnstileSecretKey,
 	}
 }
-

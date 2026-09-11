@@ -15,9 +15,6 @@
 *.crt
 *.cert
 
-# Allow environment templates
-!.env.example
-!.env.*.example
 
 # ------------------------------------------------------------------------------
 # 2. DEPENDENCIES & PACKAGE MANAGERS (Root & Frontend)
