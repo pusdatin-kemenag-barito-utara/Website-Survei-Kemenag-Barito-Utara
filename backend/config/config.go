@@ -35,13 +35,11 @@ func (c *Config) GetCorsOrigins() []string {
 }
 
 func LoadConfig() *Config {
-	// Try loading from local .env or parent root ../.env
-	err := godotenv.Load()
-	if err != nil {
-		err = godotenv.Load("../.env")
-		if err != nil {
-			log.Println("⚠️ .env file not found in local or root directory, using OS env")
-		}
+	// Optional fallback: load .env only if file exists (e.g. offline dev)
+	if _, err := os.Stat(".env"); err == nil {
+		_ = godotenv.Load()
+	} else if _, err := os.Stat("../.env"); err == nil {
+		_ = godotenv.Load("../.env")
 	}
 
 	dbURL := os.Getenv("DATABASE_URL")

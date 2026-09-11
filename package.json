@@ -7,12 +7,17 @@
     "install:all": "npm install && npm run install:backend",
     "install:frontend": "npm install --prefix frontend",
     "install:backend": "cd backend && go mod download",
-    "dev": "concurrently -n \"BE,FE\" -c \"cyan.bold,magenta.bold\" \"cd backend && %USERPROFILE%\\go\\bin\\air.exe\" \"cd frontend && npm run dev\"",
-    "dev:no-air": "concurrently -n \"BE,FE\" -c \"cyan.bold,magenta.bold\" \"cd backend && go run main.go\" \"cd frontend && npm run dev\"",
-    "dev:backend": "cd backend && go run main.go",
-    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:air": "node scripts/dev.mjs",
+    "dev:no-air": "node scripts/dev.mjs --no-air",
+    "dev:backend": "node scripts/dev.mjs --backend",
+    "dev:frontend": "node scripts/dev.mjs --frontend",
+    "dev:local": "concurrently -n \"BE,FE\" -c \"cyan.bold,magenta.bold\" \"cd backend && air\" \"cd frontend && npm run dev\"",
+    "env:pull": "node scripts/dev.mjs --pull",
+    "env:pull:prod": "node scripts/dev.mjs --pull-prod",
     "build:frontend": "cd frontend && npm run build",
-    "build:backend": "cd backend && go build -o bin/server main.go"
+    "build:backend": "cd backend && go build -o bin/server main.go",
+    "build": "npm run build:frontend && npm run build:backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
