@@ -10,6 +10,7 @@ import { PublicNavbar } from '@/components/shared/PublicNavbar'
 import { Footer } from '@/components/shared/Footer'
 import PageBanner from '@/components/shared/PageBanner'
 import { createClient } from '@/lib/supabase/client'
+import { fetchCachedServices } from '@/lib/data-cache'
 import { Analytics } from '@/lib/analytics'
 import type { Service } from '@/types'
 import { toast } from 'sonner'
@@ -23,16 +24,33 @@ export default function BarcodePage() {
   const [copied, setCopied] = useState(false)
 
   const origin = typeof window !== 'undefined'
-    ? ((window as any).__ENV__?.PUBLIC_APP_URL || window.location.origin)
+    ? ((window as any).__ENV__?.PUBLIC_APP_URL || (window as any).__PUBLIC_ENV__?.PUBLIC_APP_URL || window.location.origin)
     : (import.meta.env.PUBLIC_APP_URL || '')
   const selectedSlug = selectedServiceId !== 'all' ? services.find(s => s.id === selectedServiceId)?.slug : null
   const targetUrl = selectedSlug ? `${origin}/survei?service=${selectedSlug}` : `${origin}/survei`
 
   useEffect(() => {
     async function fetchServices() {
-      const supabase = createClient()
-      const { data } = await supabase.from('services').select('*').eq('is_active', true).order('name')
-      if (data) setServices(data as Service[])
+      try {
+        const supabase = createClient()
+        if (supabase) {
+          const { data } = await supabase.from('services').select('*').eq('is_active', true).order('name')
+          if (data && data.length > 0) {
+            setServices(data as Service[])
+            return
+          }
+        }
+        const cached = await fetchCachedServices()
+        if (cached && cached.length > 0) {
+          setServices(cached)
+        }
+      } catch (err) {
+        console.warn('Failed to load services for barcode:', err)
+        try {
+          const fallback = await fetchCachedServices()
+          if (fallback) setServices(fallback)
+        } catch {}
+      }
     }
     fetchServices()
   }, [])

@@ -28,33 +28,44 @@ let cachedMaintenance: { isMaintenance: boolean; timestamp: number } = {
   isMaintenance: false,
   timestamp: 0,
 };
+let isFetchingMaintenance = false;
 
-async function getMaintenanceStatus(): Promise<boolean> {
-  const now = Date.now();
-  if (now - cachedMaintenance.timestamp < 30000) {
-    return cachedMaintenance.isMaintenance;
-  }
+function refreshMaintenanceInBackground(pusdatinUrl: string) {
+  if (isFetchingMaintenance) return;
+  isFetchingMaintenance = true;
 
-  if (!PUSDATIN_URL) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1500);
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 600);
-
-    const res = await fetch(`${PUSDATIN_URL}/api/public/apps/${APP_ID}/status`, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
+  fetch(`${pusdatinUrl}/api/public/apps/${APP_ID}/status`, {
+    signal: controller.signal,
+    headers: { Accept: "application/json" },
+  })
+    .then(async (res) => {
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        cachedMaintenance = {
+          isMaintenance: data.status === "maintenance",
+          timestamp: Date.now(),
+        };
+      }
+    })
+    .catch(() => {
+      clearTimeout(timeout);
+    })
+    .finally(() => {
+      isFetchingMaintenance = false;
     });
-    clearTimeout(timeout);
+}
 
-    if (res.ok) {
-      const data = await res.json();
-      const isMaint = data.status === "maintenance";
-      cachedMaintenance = { isMaintenance: isMaint, timestamp: now };
-      return isMaint;
-    }
-  } catch {
-    // If pusdatin is slow or times out, keep current cached state and don't block request
+function getMaintenanceStatus(): boolean {
+  const pusdatin = process.env.PUBLIC_PUSDATIN_URL || PUSDATIN_URL;
+  if (!pusdatin) return false;
+
+  const now = Date.now();
+  if (now - cachedMaintenance.timestamp > 30000) {
+    refreshMaintenanceInBackground(pusdatin);
   }
 
   return cachedMaintenance.isMaintenance;
@@ -91,8 +102,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
 
   // === MAINTENANCE CHECK (Fast non-blocking check with 30s cache) ===
-  if (PUSDATIN_URL && pathname !== "/api/health" && !pathname.startsWith("/api/v1")) {
-    const isMaintenance = await getMaintenanceStatus();
+  if (pathname !== "/api/health" && !pathname.startsWith("/api/v1")) {
+    const isMaintenance = getMaintenanceStatus();
     if (isMaintenance) {
       if (pathname !== "/maintenance") {
         logRequest(302, context.request.method, pathname, performance.now() - startTime);
@@ -117,7 +128,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const headers = new Headers();
     context.request.headers.forEach((value, key) => {
       const lowerKey = key.toLowerCase();
-      if (!["host", "connection", "accept-encoding"].includes(lowerKey)) {
+      if (!["host", "connection", "accept-encoding", "content-length"].includes(lowerKey)) {
         headers.set(key, value);
       }
     });
@@ -149,6 +160,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
     try {
       const res = await fetch(target, init);
+      const bodyBuffer = await res.arrayBuffer();
       
       const responseHeaders = new Headers();
       res.headers.forEach((value, key) => {
@@ -164,7 +176,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       }
 
       logRequest(res.status, context.request.method, pathname, performance.now() - startTime);
-      return new Response(res.body, {
+      return new Response(bodyBuffer, {
         status: res.status,
         headers: responseHeaders,
       });

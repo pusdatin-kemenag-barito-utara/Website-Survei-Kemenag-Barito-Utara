@@ -8,6 +8,7 @@ import { useI18n } from '@/components/shared/I18nProvider'
 import { PublicNavbar } from '@/components/shared/PublicNavbar'
 import { Footer } from '@/components/shared/Footer'
 import { createClient } from '@/lib/supabase/client'
+import { fetchCachedServices } from '@/lib/data-cache'
 import type { Service } from '@/types'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -21,14 +22,32 @@ export default function BarcodePage() {
 
   useEffect(() => {
     async function fetchServices() {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('services')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order')
-      if (data) setServices(data as Service[])
-      setLoading(false)
+      try {
+        const supabase = createClient()
+        if (supabase) {
+          const { data } = await supabase
+            .from('services')
+            .select('*')
+            .eq('is_active', true)
+            .order('sort_order')
+          if (data && data.length > 0) {
+            setServices(data as Service[])
+            return
+          }
+        }
+        const cached = await fetchCachedServices()
+        if (cached && cached.length > 0) {
+          setServices(cached)
+        }
+      } catch (err) {
+        console.warn('Failed to fetch services in barcode page:', err)
+        try {
+          const fallback = await fetchCachedServices()
+          if (fallback) setServices(fallback)
+        } catch {}
+      } finally {
+        setLoading(false)
+      }
     }
     fetchServices()
   }, [])

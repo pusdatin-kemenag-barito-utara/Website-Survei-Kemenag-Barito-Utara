@@ -16,9 +16,6 @@ export default defineConfig({
   integrations: [react()],
   vite: {
     envPrefix: ["PUBLIC_"],
-    define: {
-      "process.env": {},
-    },
     optimizeDeps: {
       include: [
         "@tanstack/react-query",
