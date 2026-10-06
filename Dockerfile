@@ -37,7 +37,7 @@ WORKDIR /app
 
 # Install runtime utilities and Infisical CLI
 RUN apk add --no-cache ca-certificates tzdata curl wget bash dos2unix \
-  && curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.alpine.sh' | bash \
+  && wget -qO- 'https://artifacts-cli.infisical.com/setup.apk.sh' | sh \
   && apk add --no-cache infisical
 
 # Install concurrently globally for simultaneous backend and frontend execution
