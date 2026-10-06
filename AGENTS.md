@@ -8,5 +8,6 @@
 
 ## Backend
 - **Framework**: Golang Fiber REST API v2
-- **Database**: PostgreSQL on Supabase (`schema: kemenag_survey`)
+- **Database**: PocketBase Database (`https://db-survei.kemenag-baritoutara.com`)
 - **Live Reload**: Air (`.air.toml`)
+

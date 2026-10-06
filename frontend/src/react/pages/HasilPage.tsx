@@ -20,7 +20,7 @@ import {
   getCachedPublicResultsSync,
   getCachedServicesSync,
 } from '@/lib/data-cache'
-import { createClient, SUPABASE_SCHEMA } from '@/lib/supabase/client'
+import { getPocketBase } from '@/lib/pocketbase/client'
 import { exportToExcel, exportToPdf } from '@/lib/export'
 import { Analytics } from '@/lib/analytics'
 import type { IndexSummary, IndexByService, IndexTrend, UnsurSummary, DemographicSummary } from '@/types'
@@ -78,30 +78,34 @@ export default function HasilPage() {
   }, [])
 
   useEffect(() => {
-    const supabase = createClient()
-    if (!supabase || typeof supabase.channel !== 'function') return
-
-    const channel = supabase
-      .channel('hasil-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: SUPABASE_SCHEMA, table: 'responses' }, async () => {
-        try {
-          const publicData = await fetchCachedPublicResults(true)
-          if (publicData) {
-            if (publicData.index_summary) setSummary(publicData.index_summary)
-            if (publicData.unsur_summary) setUnsurSummary(publicData.unsur_summary)
-            if (publicData.by_service) setByService(publicData.by_service)
-            if (publicData.trend) setTrend(publicData.trend)
-            if (publicData.demographics) setDemoSummary(publicData.demographics)
-          }
-        } catch { }
+    let unsubscribe: (() => void) | undefined
+    try {
+      const pb = getPocketBase()
+      pb.collection('responses').subscribe('*', async (e) => {
+        if (e.action === 'create' || e.action === 'delete') {
+          try {
+            const publicData = await fetchCachedPublicResults(true)
+            if (publicData) {
+              if (publicData.index_summary) setSummary(publicData.index_summary)
+              if (publicData.unsur_summary) setUnsurSummary(publicData.unsur_summary)
+              if (publicData.by_service) setByService(publicData.by_service)
+              if (publicData.trend) setTrend(publicData.trend)
+              if (publicData.demographics) setDemoSummary(publicData.demographics)
+            }
+          } catch {}
+        }
+      }).then((unsub) => {
+        unsubscribe = unsub
+      }).catch((err) => {
+        console.warn('[PocketBase] Realtime subscribe error:', err)
       })
-      .subscribe()
+    } catch {}
 
     return () => {
-      if (channel && supabase && typeof supabase.removeChannel === 'function') {
-        try {
-          supabase.removeChannel(channel)
-        } catch {}
+      if (unsubscribe) {
+        try { unsubscribe() } catch {}
+      } else {
+        try { getPocketBase().collection('responses').unsubscribe('*') } catch {}
       }
     }
   }, [])

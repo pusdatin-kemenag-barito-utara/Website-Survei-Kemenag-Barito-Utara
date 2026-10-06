@@ -9,11 +9,8 @@ interface ImportMetaEnv {
   readonly PUBLIC_GTAG_ID?: string
   readonly PUBLIC_GOOGLE_SITE_VERIFICATION?: string
 
-  // Supabase Database & Pusdatin
-  readonly PUBLIC_SUPABASE_URL?: string
-  readonly PUBLIC_SUPABASE_ANON_KEY?: string
-  readonly PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string
-  readonly PUBLIC_PUSDATIN_SCHEMA?: string
+  // PocketBase Database & Pusdatin
+  readonly PUBLIC_POCKETBASE_URL?: string
   readonly PUBLIC_PUSDATIN_URL?: string
 
   // Security & Cloudflare Turnstile

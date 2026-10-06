@@ -28,7 +28,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DatePicker } from '@/components/ui/date-picker'
 import { apiFetch } from '@/lib/api'
 import { toast } from 'sonner'
-import { fetchCachedAdminPeriods, getCachedAdminPeriodsSync } from '@/lib/data-cache'
+import { fetchCachedAdminPeriods, getCachedAdminPeriodsSync, invalidateClientCache } from '@/lib/data-cache'
 import type { SurveyPeriod } from '@/types'
 
 
@@ -200,13 +200,19 @@ export default function AdminPeriodePage() {
 
   async function confirmDelete() {
     if (!deleteDialog) return
+    const target = deleteDialog
     setDeleting(true)
+    // Optimistic instant UI update
+    setPeriods((prev) => prev.filter((p) => p.id !== target.id))
+    setDeleteDialog(null)
     try {
-      await apiFetch(`/admin/periods/${deleteDialog.id}`, { method: 'DELETE' })
+      await apiFetch(`/admin/periods/${target.id}`, { method: 'DELETE' })
       toast.success('Periode survei berhasil dihapus')
-      setDeleteDialog(null)
+      invalidateClientCache()
       fetchPeriods(true)
     } catch (err: unknown) {
+      // Revert if error
+      setPeriods((prev) => [...prev, target])
       const errorMsg = err instanceof Error ? err.message : 'Error server'
       toast.error('Gagal menghapus: ' + errorMsg)
     } finally {

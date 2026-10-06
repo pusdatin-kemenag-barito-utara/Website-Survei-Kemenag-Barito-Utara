@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -258,19 +259,8 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 		return cachedData.(fiber.Map), nil
 	}
 
-	db := s.repo.DB()
-
-	// 1. Check total responses in range
-	respQuery := db.Model(&models.Response{})
-	if startDate != "" {
-		respQuery = respQuery.Where("submitted_at::date >= ?::date", startDate)
-	}
-	if endDate != "" {
-		respQuery = respQuery.Where("submitted_at::date <= ?::date", endDate)
-	}
-
-	var totalResponses int64
-	if err := respQuery.Count(&totalResponses).Error; err != nil {
+	totalResponses, rawAnswers, err := s.repo.GetArchiveRawAnswers(startDate, endDate)
+	if err != nil {
 		return nil, err
 	}
 
@@ -291,37 +281,6 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 	if totalResponses == 0 {
 		globalCache.Set(cacheKey, emptyResult, 10*time.Minute)
 		return emptyResult, nil
-	}
-
-	// 2. Fetch all raw answer points in 1 unified query
-	type CombinedRawAnswer struct {
-		ResponseID  uuid.UUID `gorm:"column:response_id"`
-		ServiceID   uuid.UUID `gorm:"column:service_id"`
-		ServiceName string    `gorm:"column:service_name"`
-		UnsurID     uuid.UUID `gorm:"column:unsur_id"`
-		UnsurName   string    `gorm:"column:unsur_name"`
-		IndexType   string    `gorm:"column:index_type"`
-		RatingValue int       `gorm:"column:rating_value"`
-		Bulan       string    `gorm:"column:bulan"`
-	}
-
-	var rawAnswers []CombinedRawAnswer
-	answerQuery := db.Table(fmt.Sprintf("%s.response_answers ra", models.SchemaName)).
-		Select("ra.response_id, r.service_id, s.name as service_name, q.unsur_id, u.name as unsur_name, u.index_type, ra.rating_value, to_char(r.submitted_at, 'YYYY-MM') as bulan").
-		Joins(fmt.Sprintf("JOIN %s.responses r ON ra.response_id = r.id", models.SchemaName)).
-		Joins(fmt.Sprintf("JOIN %s.services s ON r.service_id = s.id", models.SchemaName)).
-		Joins(fmt.Sprintf("JOIN %s.questions q ON ra.question_id = q.id", models.SchemaName)).
-		Joins(fmt.Sprintf("JOIN %s.unsur u ON q.unsur_id = u.id", models.SchemaName))
-
-	if startDate != "" {
-		answerQuery = answerQuery.Where("r.submitted_at::date >= ?::date", startDate)
-	}
-	if endDate != "" {
-		answerQuery = answerQuery.Where("r.submitted_at::date <= ?::date", endDate)
-	}
-
-	if err := answerQuery.Scan(&rawAnswers).Error; err != nil {
-		return nil, err
 	}
 
 	// Calculate everything in-memory from rawAnswers in CPU
@@ -489,21 +448,11 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 		})
 	}
 
-	// 3. Demographics Query
-	var demoList []domain.DemographicSummaryRow
-	demoQuery := db.Table(fmt.Sprintf("%s.response_demographics rd", models.SchemaName)).
-		Select("df.field_key, rd.value as demographic_value, count(rd.id) as count").
-		Joins(fmt.Sprintf("JOIN %s.responses r ON rd.response_id = r.id", models.SchemaName)).
-		Joins(fmt.Sprintf("JOIN %s.demographic_fields df ON rd.field_id = df.id", models.SchemaName)).
-		Group("df.field_key, rd.value")
-
-	if startDate != "" {
-		demoQuery = demoQuery.Where("r.submitted_at::date >= ?::date", startDate)
+	// 3. Demographics Summary
+	demoList, _ := s.repo.GetDemographicSummary()
+	if demoList == nil {
+		demoList = []domain.DemographicSummaryRow{}
 	}
-	if endDate != "" {
-		demoQuery = demoQuery.Where("r.submitted_at::date <= ?::date", endDate)
-	}
-	_ = demoQuery.Scan(&demoList).Error
 
 	indexSummary := []domain.ViewIndexSummaryRow{
 		{
@@ -555,18 +504,16 @@ func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP s
 		globalCache.Set("survey_active_period", activePeriod, 10*time.Minute)
 	}
 
-	serviceID, err := uuid.Parse(req.ServiceID)
-	if err != nil {
+	serviceID := domain.PbIDToUUID(req.ServiceID)
+	if serviceID == uuid.Nil {
 		return uuid.Nil, fiber.NewError(fiber.StatusBadRequest, "Service ID tidak valid")
 	}
-
-	db := s.repo.DB()
-	tx := db.Begin()
 
 	// Feature 4: IP Hashing for PDP Law Compliance (Privacy Anonymization)
 	hashedIP := HashIP(clientIP)
 
 	resp := models.Response{
+		ID:                uuid.New(),
 		ServiceID:         serviceID,
 		PeriodID:          activePeriod.ID,
 		IsAnonymous:       req.IsAnonymous,
@@ -582,27 +529,17 @@ func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP s
 		resp.Locale = "id"
 	}
 
-	if err := tx.Create(&resp).Error; err != nil {
-		tx.Rollback()
-		return uuid.Nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal menyimpan data respon survei")
-	}
-
-	// 1. Bulk insert demographics
+	// 1. Prepare demographics
 	var demoList []models.ResponseDemographic
 	for fieldIDStr, val := range req.Demographics {
-		fieldID, err := uuid.Parse(fieldIDStr)
-		if err == nil && val != "" {
+		fieldID := domain.PbIDToUUID(fieldIDStr)
+		if fieldID != uuid.Nil && val != "" {
 			demoList = append(demoList, models.ResponseDemographic{
+				ID:         uuid.New(),
 				ResponseID: resp.ID,
 				FieldID:    fieldID,
 				Value:      val,
 			})
-		}
-	}
-	if len(demoList) > 0 {
-		if err := tx.Create(&demoList).Error; err != nil {
-			tx.Rollback()
-			return uuid.Nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal menyimpan demografi respon")
 		}
 	}
 
@@ -619,23 +556,33 @@ func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP s
 		var err error
 		allQuestions, err = s.repo.ListActiveQuestions()
 		if err != nil {
-			tx.Rollback()
 			return uuid.Nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal memuat pertanyaan survei")
 		}
 	}
 
-	questionMap := make(map[uuid.UUID]models.Question, len(allQuestions))
+	questionMap := make(map[string]models.Question, len(allQuestions))
 	for _, q := range allQuestions {
-		questionMap[q.ID] = q
+		questionMap[q.ID.String()] = q
+		questionMap[domain.UUIDToPbID(q.ID.String())] = q
 	}
 
-	// 3. Bulk insert response answers
+	// 3. Prepare response answers
 	var answerList []models.ResponseAnswer
 	for qIDStr, rating := range req.Answers {
-		qID, err := uuid.Parse(qIDStr)
-		if err == nil && rating >= 1 && rating <= 4 {
-			if q, exists := questionMap[qID]; exists {
+		if rating >= 1 && rating <= 4 {
+			qUID := domain.PbIDToUUID(qIDStr)
+			pbQID := domain.UUIDToPbID(qIDStr)
+			if q, exists := questionMap[qUID.String()]; exists {
 				answerList = append(answerList, models.ResponseAnswer{
+					ID:          uuid.New(),
+					ResponseID:  resp.ID,
+					QuestionID:  q.ID,
+					UnsurID:     q.UnsurID,
+					RatingValue: rating,
+				})
+			} else if q, exists := questionMap[pbQID]; exists {
+				answerList = append(answerList, models.ResponseAnswer{
+					ID:          uuid.New(),
 					ResponseID:  resp.ID,
 					QuestionID:  q.ID,
 					UnsurID:     q.UnsurID,
@@ -644,15 +591,9 @@ func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP s
 			}
 		}
 	}
-	if len(answerList) > 0 {
-		if err := tx.Create(&answerList).Error; err != nil {
-			tx.Rollback()
-			return uuid.Nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal menyimpan jawaban survei")
-		}
-	}
 
-	if err := tx.Commit().Error; err != nil {
-		return uuid.Nil, err
+	if err := s.repo.SaveResponseFull(&resp, demoList, answerList); err != nil {
+		return uuid.Nil, fiber.NewError(fiber.StatusInternalServerError, "Gagal menyimpan respon survei")
 	}
 
 	// Feature 1 & 3: Async Non-Blocking Cache Invalidation, Pre-warming & Audit Logging
@@ -674,5 +615,19 @@ func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP s
 	}(resp.ID)
 
 	return resp.ID, nil
+}
+
+// PrewarmCache warms up all public survey caches in the background on startup
+func (s *SurveyService) PrewarmCache() {
+	go func() {
+		log.Println("🔥 [Cache] Background pre-warming public results, services, and form questions...")
+		start := time.Now()
+		_, _ = s.GetPublicResults()
+		_, _ = s.repo.ListActiveServices()
+		_, _ = s.repo.ListActiveQuestions()
+		_, _ = s.repo.ListActiveDemographicFields()
+		_, _ = s.repo.GetActivePeriod()
+		log.Printf("⚡ [Cache] Pre-warming completed in %v! All public endpoints are now instant (0ms).\n", time.Since(start))
+	}()
 }
 

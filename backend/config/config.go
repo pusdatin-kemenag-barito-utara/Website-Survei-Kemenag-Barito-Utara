@@ -7,40 +7,66 @@ import (
 )
 
 type Config struct {
-	DatabaseURL        string
-	DatabaseSchema     string
-	JWTSecret          string
-	CorsOrigins        string
-	Port               string
-	AdminEmail         string
-	AdminPassword      string
-	TurnstileSecretKey string
+	DatabaseURL             string
+	DatabaseSchema          string
+	PocketBaseURL           string
+	PocketBaseAdminEmail    string
+	PocketBaseAdminPassword string
+	JWTSecret               string
+	CorsOrigins             string
+	Port                    string
+	AdminEmail              string
+	AdminPassword           string
+	TurnstileSecretKey      string
 }
 
 func (c *Config) GetCorsOrigins() []string {
-	if c.CorsOrigins == "" {
-		return []string{}
+	origins := []string{
+		"http://localhost:3000",
+		"http://127.0.0.1:3000",
+		"https://survei.kemenag-baritoutara.com",
 	}
-	parts := strings.Split(c.CorsOrigins, ",")
-	var origins []string
-	for _, p := range parts {
-		trimmed := strings.TrimSpace(p)
-		if trimmed != "" {
-			origins = append(origins, trimmed)
+	if c.CorsOrigins != "" {
+		parts := strings.Split(c.CorsOrigins, ",")
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" && trimmed != "*" {
+				found := false
+				for _, o := range origins {
+					if o == trimmed {
+						found = true
+						break
+					}
+				}
+				if !found {
+					origins = append(origins, trimmed)
+				}
+			}
 		}
 	}
 	return origins
 }
 
 func LoadConfig() *Config {
+	pbURL := os.Getenv("POCKETBASE_URL")
+	if pbURL == "" {
+		pbURL = os.Getenv("PUBLIC_POCKETBASE_URL")
+	}
+
+	pbEmail := os.Getenv("POCKETBASE_ADMIN_EMAIL")
+	pbPassword := os.Getenv("POCKETBASE_ADMIN_PASSWORD")
+
 	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("❌ FATAL: DATABASE_URL environment variable is required (ensure Infisical injection is active)")
+	if pbURL == "" && dbURL == "" {
+		log.Println("⚠️ Warning: Neither POCKETBASE_URL nor DATABASE_URL environment variable is provided from Infisical")
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("❌ FATAL: JWT_SECRET environment variable is required (ensure Infisical injection is active)")
+		jwtSecret = os.Getenv("APP_JWT_SECRET")
+	}
+	if jwtSecret == "" {
+		log.Println("⚠️ Warning: JWT_SECRET environment variable is not set from Infisical")
 	}
 
 	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
@@ -55,10 +81,16 @@ func LoadConfig() *Config {
 	if adminEmail == "" {
 		adminEmail = os.Getenv("PUBLIC_SUPER_ADMIN_EMAIL")
 	}
+	if adminEmail == "" {
+		adminEmail = pbEmail
+	}
 
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	if adminPassword == "" {
 		adminPassword = os.Getenv("SUPER_ADMIN_PASSWORD")
+	}
+	if adminPassword == "" {
+		adminPassword = pbPassword
 	}
 
 	port := os.Getenv("GO_PORT")
@@ -91,13 +123,16 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		DatabaseURL:        dbURL,
-		DatabaseSchema:     dbSchema,
-		JWTSecret:          jwtSecret,
-		CorsOrigins:        corsOrigins,
-		Port:               port,
-		AdminEmail:         adminEmail,
-		AdminPassword:      adminPassword,
-		TurnstileSecretKey: turnstileSecretKey,
+		DatabaseURL:             dbURL,
+		DatabaseSchema:          dbSchema,
+		PocketBaseURL:           pbURL,
+		PocketBaseAdminEmail:    pbEmail,
+		PocketBaseAdminPassword: pbPassword,
+		JWTSecret:               jwtSecret,
+		CorsOrigins:             corsOrigins,
+		Port:                    port,
+		AdminEmail:              adminEmail,
+		AdminPassword:           adminPassword,
+		TurnstileSecretKey:      turnstileSecretKey,
 	}
 }

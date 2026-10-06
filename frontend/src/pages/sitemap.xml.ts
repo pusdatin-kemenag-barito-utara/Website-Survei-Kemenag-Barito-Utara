@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { getPocketBase } from "@/lib/pocketbase/client";
 
 export async function GET() {
   const baseUrl = (
@@ -95,21 +95,19 @@ export async function GET() {
   // 2. Dynamic Service Routes (from Database)
   const serviceRoutes: RouteItem[] = [];
   try {
-    const supabase = createClient();
-    if (supabase) {
-      const { data: services } = await supabase
-        .from("services")
-        .select("id, name")
-        .eq("is_active", true);
+    const pb = getPocketBase();
+    const services = await pb.collection("services").getFullList({
+      filter: "is_active = true",
+      fields: "id,original_id,name",
+    });
 
-      if (Array.isArray(services)) {
-        for (const s of services) {
-          serviceRoutes.push({
-            path: `/survei/layanan/${s.id}`,
-            freq: "weekly",
-            priority: "0.8",
-          });
-        }
+    if (Array.isArray(services)) {
+      for (const s of services) {
+        serviceRoutes.push({
+          path: `/survei/layanan/${s.original_id || s.id}`,
+          freq: "weekly",
+          priority: "0.8",
+        });
       }
     }
   } catch {

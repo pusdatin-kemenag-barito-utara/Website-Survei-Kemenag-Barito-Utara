@@ -1,0 +1,689 @@
+package repository
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"survey-kemenag-backend/domain"
+	"survey-kemenag-backend/models"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+type gormRepository struct {
+	db *gorm.DB
+}
+
+func NewGormRepository(db *gorm.DB) Repository {
+	return &gormRepository{db: db}
+}
+
+func (r *gormRepository) DB() *gorm.DB {
+	return r.db
+}
+
+// Period Repository Methods
+func (r *gormRepository) GetActivePeriod() (*models.SurveyPeriod, error) {
+	now := time.Now().Format("2006-01-02")
+	var period models.SurveyPeriod
+
+	// 1. Check if there is a designated active period
+	err := r.db.Where("is_active = ?", true).First(&period).Error
+	if err == nil {
+		pStart := strings.Split(period.StartDate, "T")[0]
+		pEnd := strings.Split(period.EndDate, "T")[0]
+
+		if now >= pStart && now <= pEnd {
+			return &period, nil
+		}
+		r.db.Model(&models.SurveyPeriod{}).Where("id = ?", period.ID).Update("is_active", false)
+	}
+
+	// 2. Automatically find and activate the period matching TODAY's date (prioritize triwulan)
+	var currentPeriod models.SurveyPeriod
+	err = r.db.Where("start_date <= ? AND end_date >= ? AND period_type = ?", now, now, "triwulan").
+		Order("start_date desc").First(&currentPeriod).Error
+
+	if err != nil {
+		err = r.db.Where("start_date <= ? AND end_date >= ?", now, now).
+			Order("start_date desc").First(&currentPeriod).Error
+	}
+
+	if err == nil {
+		r.db.Model(&models.SurveyPeriod{}).Where("1 = 1").Update("is_active", false)
+		r.db.Model(&models.SurveyPeriod{}).Where("id = ?", currentPeriod.ID).Update("is_active", true)
+		currentPeriod.IsActive = true
+		return &currentPeriod, nil
+	}
+
+	var latestPeriod models.SurveyPeriod
+	if err := r.db.Order("end_date desc, created_at desc").First(&latestPeriod).Error; err == nil {
+		return &latestPeriod, nil
+	}
+
+	return nil, err
+}
+
+func (r *gormRepository) ListPeriods() ([]models.SurveyPeriod, error) {
+	_, _ = r.GetActivePeriod()
+	var periods []models.SurveyPeriod
+	err := r.db.Order("start_date asc, created_at desc").Find(&periods).Error
+	return periods, err
+}
+
+func (r *gormRepository) CreatePeriod(period *models.SurveyPeriod) error {
+	if period.IsActive {
+		r.db.Model(&models.SurveyPeriod{}).Where("id != ?", uuid.Nil).Update("is_active", false)
+	}
+	return r.db.Create(period).Error
+}
+
+func (r *gormRepository) UpdatePeriod(id uuid.UUID, period *models.SurveyPeriod) (*models.SurveyPeriod, error) {
+	tx := r.db.Begin()
+	if period.IsActive {
+		tx.Model(&models.SurveyPeriod{}).Where("1 = 1").Update("is_active", false)
+	}
+
+	var existing models.SurveyPeriod
+	if err := tx.First(&existing, id).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	existing.PeriodType = period.PeriodType
+	existing.Label = period.Label
+	existing.StartDate = period.StartDate
+	existing.EndDate = period.EndDate
+	existing.IsActive = period.IsActive
+
+	if err := tx.Save(&existing).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
+	}
+
+	return &existing, nil
+}
+
+func (r *gormRepository) SetPeriodActive(id uuid.UUID) error {
+	tx := r.db.Begin()
+	tx.Model(&models.SurveyPeriod{}).Where("1 = 1").Update("is_active", false)
+	if err := tx.Model(&models.SurveyPeriod{}).Where("id = ?", id).Update("is_active", true).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit().Error
+}
+
+func (r *gormRepository) DeletePeriod(id uuid.UUID) error {
+	return r.db.Delete(&models.SurveyPeriod{}, id).Error
+}
+
+// Service Repository Methods
+func (r *gormRepository) ListActiveServices() ([]models.Service, error) {
+	var services []models.Service
+	err := r.db.Where("is_active = ?", true).Order("sort_order asc").Find(&services).Error
+	return services, err
+}
+
+func (r *gormRepository) ListAllServicesAdmin() ([]models.Service, error) {
+	var services []models.Service
+	err := r.db.Order("sort_order asc").Find(&services).Error
+	return services, err
+}
+
+func (r *gormRepository) ListServiceCategories() ([]models.ServiceCategory, error) {
+	var categories []models.ServiceCategory
+	err := r.db.Order("sort_order asc").Find(&categories).Error
+	return categories, err
+}
+
+func (r *gormRepository) CreateService(service *models.Service) error {
+	return r.db.Create(service).Error
+}
+
+func (r *gormRepository) UpdateService(id uuid.UUID, service *models.Service) (*models.Service, error) {
+	var s models.Service
+	if err := r.db.First(&s, id).Error; err != nil {
+		return nil, err
+	}
+	service.ID = s.ID
+	if err := r.db.Save(service).Error; err != nil {
+		return nil, err
+	}
+	return service, nil
+}
+
+func (r *gormRepository) DeleteService(id uuid.UUID) error {
+	return r.db.Delete(&models.Service{}, id).Error
+}
+
+// Unsur Repository Methods
+func (r *gormRepository) ListUnsur() ([]models.Unsur, error) {
+	var list []models.Unsur
+	err := r.db.Order("sort_order asc").Find(&list).Error
+	return list, err
+}
+
+func (r *gormRepository) CreateUnsur(item *models.Unsur) error {
+	return r.db.Create(item).Error
+}
+
+func (r *gormRepository) UpdateUnsur(id uuid.UUID, item *models.Unsur) (*models.Unsur, error) {
+	var existing models.Unsur
+	if err := r.db.First(&existing, id).Error; err != nil {
+		return nil, err
+	}
+	item.ID = existing.ID
+	if err := r.db.Save(item).Error; err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
+func (r *gormRepository) DeleteUnsur(id uuid.UUID) error {
+	return r.db.Delete(&models.Unsur{}, id).Error
+}
+
+// Questions Repository Methods
+func (r *gormRepository) ListActiveQuestions() ([]models.Question, error) {
+	var questions []models.Question
+	err := r.db.Preload("Unsur").Where("is_active = ?", true).Order("sort_order asc").Find(&questions).Error
+	return questions, err
+}
+
+func (r *gormRepository) ListAllQuestions() ([]models.Question, error) {
+	var list []models.Question
+	err := r.db.Preload("Unsur").Order("sort_order asc").Find(&list).Error
+	return list, err
+}
+
+func (r *gormRepository) CreateQuestion(q *models.Question) error {
+	return r.db.Create(q).Error
+}
+
+func (r *gormRepository) UpdateQuestion(id uuid.UUID, q *models.Question) (*models.Question, error) {
+	var existing models.Question
+	if err := r.db.First(&existing, id).Error; err != nil {
+		return nil, err
+	}
+	q.ID = existing.ID
+	if err := r.db.Save(q).Error; err != nil {
+		return nil, err
+	}
+	return q, nil
+}
+
+func (r *gormRepository) DeleteQuestion(id uuid.UUID) error {
+	return r.db.Delete(&models.Question{}, id).Error
+}
+
+// Demographic Fields Repository Methods
+func (r *gormRepository) ListActiveDemographicFields() ([]models.DemographicField, error) {
+	var demoFields []models.DemographicField
+	err := r.db.Preload("Options", func(db *gorm.DB) *gorm.DB {
+		return db.Order("sort_order asc")
+	}).Where("is_active = ?", true).Order("sort_order asc").Find(&demoFields).Error
+	return demoFields, err
+}
+
+func (r *gormRepository) ListAllDemographicFieldsAdmin() ([]models.DemographicField, error) {
+	var demoFields []models.DemographicField
+	err := r.db.Preload("Options", func(db *gorm.DB) *gorm.DB {
+		return db.Order("sort_order asc")
+	}).Order("sort_order asc").Find(&demoFields).Error
+	return demoFields, err
+}
+
+func (r *gormRepository) CreateDemographicField(field *models.DemographicField) error {
+	return r.db.Create(field).Error
+}
+
+func (r *gormRepository) UpdateDemographicField(id uuid.UUID, field *models.DemographicField) (*models.DemographicField, error) {
+	var existing models.DemographicField
+	if err := r.db.First(&existing, id).Error; err != nil {
+		return nil, err
+	}
+	existing.FieldKey = field.FieldKey
+	existing.LabelID = field.LabelID
+	existing.LabelEN = field.LabelEN
+	existing.FieldType = field.FieldType
+	existing.IsRequired = field.IsRequired
+	existing.IsActive = field.IsActive
+	existing.SortOrder = field.SortOrder
+
+	if err := r.db.Save(&existing).Error; err != nil {
+		return nil, err
+	}
+	return &existing, nil
+}
+
+func (r *gormRepository) DeleteDemographicField(id uuid.UUID) error {
+	tx := r.db.Begin()
+	if err := tx.Where("field_id = ?", id).Delete(&models.DemographicOption{}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := tx.Delete(&models.DemographicField{}, id).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit().Error
+}
+
+func (r *gormRepository) ListDemographicOptionsByField(fieldID uuid.UUID) ([]models.DemographicOption, error) {
+	var options []models.DemographicOption
+	err := r.db.Where("field_id = ?", fieldID).Order("sort_order asc").Find(&options).Error
+	return options, err
+}
+
+func (r *gormRepository) CreateDemographicOption(opt *models.DemographicOption) error {
+	return r.db.Create(opt).Error
+}
+
+func (r *gormRepository) UpdateDemographicOption(id uuid.UUID, opt *models.DemographicOption) (*models.DemographicOption, error) {
+	var existing models.DemographicOption
+	if err := r.db.First(&existing, id).Error; err != nil {
+		return nil, err
+	}
+	existing.Value = opt.Value
+	existing.LabelID = opt.LabelID
+	existing.LabelEN = opt.LabelEN
+	existing.SortOrder = opt.SortOrder
+
+	if err := r.db.Save(&existing).Error; err != nil {
+		return nil, err
+	}
+	return &existing, nil
+}
+
+func (r *gormRepository) DeleteDemographicOption(id uuid.UUID) error {
+	return r.db.Delete(&models.DemographicOption{}, id).Error
+}
+
+// App Settings Repository Methods
+func (r *gormRepository) GetAppSettingsMap() (map[string]string, error) {
+	var settings []models.AppSetting
+	if err := r.db.Find(&settings).Error; err != nil {
+		return nil, err
+	}
+	result := make(map[string]string)
+	for _, s := range settings {
+		result[s.Key] = s.Value
+	}
+	return result, nil
+}
+
+func (r *gormRepository) UpdateAppSettings(body map[string]string) error {
+	for k, v := range body {
+		setting := models.AppSetting{Key: k, Value: v}
+		if err := r.db.Save(&setting).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Response & Stats Repository Methods
+func (r *gormRepository) CountTotalResponses() (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Response{}).Count(&count).Error
+	return count, err
+}
+
+func (r *gormRepository) CountActiveServices() (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Service{}).Where("is_active = ?", true).Count(&count).Error
+	return count, err
+}
+
+func (r *gormRepository) CountActiveUnsur() (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Unsur{}).Where("is_active = ?", true).Count(&count).Error
+	return count, err
+}
+
+func (r *gormRepository) GetAnswerUnsurRawList() ([]domain.AnswerUnsurRaw, error) {
+	var results []domain.AnswerUnsurRaw
+	query := fmt.Sprintf(`
+		SELECT ra.rating_value, u.index_type
+		FROM %s.response_answers ra
+		JOIN %s.unsur u ON u.id = ra.unsur_id
+	`, models.SchemaName, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
+	return results, err
+}
+
+func (r *gormRepository) GetUnsurAvgRating(unsurID uuid.UUID) (float64, error) {
+	var avgRating float64
+	err := r.db.Table(models.SchemaName + ".response_answers").
+		Where("unsur_id = ?", unsurID).
+		Select("COALESCE(AVG(rating_value), 0)").
+		Scan(&avgRating).Error
+	return avgRating, err
+}
+
+func (r *gormRepository) GetServiceResponseCount(serviceID uuid.UUID) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.Response{}).Where("service_id = ?", serviceID).Count(&count).Error
+	return count, err
+}
+
+func (r *gormRepository) GetServiceAvgRating(serviceID uuid.UUID, indexType string) (float64, error) {
+	var avgRating float64
+	s := models.SchemaName
+	err := r.db.Table(s + ".response_answers").
+		Joins(fmt.Sprintf("JOIN %s.responses ON %s.responses.id = %s.response_answers.response_id", s, s, s)).
+		Joins(fmt.Sprintf("JOIN %s.unsur ON %s.unsur.id = %s.response_answers.unsur_id", s, s, s)).
+		Where(fmt.Sprintf("%s.responses.service_id = ? AND %s.unsur.index_type = ?", s, s), serviceID, indexType).
+		Select(fmt.Sprintf("COALESCE(AVG(%s.response_answers.rating_value), 0)", s)).
+		Scan(&avgRating).Error
+	return avgRating, err
+}
+
+func (r *gormRepository) ListResponsesPaginated(serviceID, periodID, dateFrom, dateTo, search string, limit, offset int) ([]models.Response, int64, error) {
+	query := r.db.Model(&models.Response{})
+	if serviceID != "" {
+		query = query.Where("service_id = ?", serviceID)
+	}
+	if periodID != "" {
+		query = query.Where("period_id = ?", periodID)
+	}
+	if dateFrom != "" {
+		query = query.Where("submitted_at::date >= ?::date", dateFrom)
+	}
+	if dateTo != "" {
+		query = query.Where("submitted_at::date <= ?::date", dateTo)
+	}
+
+	if search != "" {
+		query = query.Where("respondent_name ILIKE ? OR respondent_contact ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var responses []models.Response
+	err := query.Preload("Service").Preload("Period").Order("submitted_at desc").Limit(limit).Offset(offset).Find(&responses).Error
+	return responses, total, err
+}
+
+func (r *gormRepository) DeleteResponseFull(id uuid.UUID) error {
+	tx := r.db.Begin()
+
+	if err := tx.Where("response_id = ?", id).Delete(&models.ResponseAnswer{}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Where("response_id = ?", id).Delete(&models.ResponseDemographic{}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Where("id = ?", id).Delete(&models.Response{}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
+}
+
+func (r *gormRepository) GetResponseAnswersDetail(id uuid.UUID) ([]domain.AnswerDetailResult, error) {
+	var results []domain.AnswerDetailResult
+	s := models.SchemaName
+	err := r.db.Table(s + ".response_answers").
+		Select(fmt.Sprintf("%s.response_answers.id, %s.response_answers.rating_value, %s.questions.question_text_id, %s.questions.question_text_en, %s.unsur.name as unsur_name, %s.unsur.index_type", s, s, s, s, s, s)).
+		Joins(fmt.Sprintf("JOIN %s.questions ON %s.questions.id = %s.response_answers.question_id", s, s, s)).
+		Joins(fmt.Sprintf("JOIN %s.unsur ON %s.unsur.id = %s.response_answers.unsur_id", s, s, s)).
+		Where(fmt.Sprintf("%s.response_answers.response_id = ?", s), id).
+		Order(fmt.Sprintf("%s.questions.sort_order asc", s)).
+		Scan(&results).Error
+	return results, err
+}
+
+func (r *gormRepository) GetResponseDemographicsDetail(id uuid.UUID) ([]domain.DemoDetailResult, error) {
+	var results []domain.DemoDetailResult
+	s := models.SchemaName
+	err := r.db.Table(s + ".response_demographics").
+		Select(fmt.Sprintf("%s.response_demographics.id, %s.response_demographics.value, %s.demographic_fields.label_id, %s.demographic_fields.label_en, %s.demographic_fields.field_key", s, s, s, s, s)).
+		Joins(fmt.Sprintf("JOIN %s.demographic_fields ON %s.demographic_fields.id = %s.response_demographics.field_id", s, s, s)).
+		Where(fmt.Sprintf("%s.response_demographics.response_id = ?", s), id).
+		Order(fmt.Sprintf("%s.demographic_fields.sort_order asc", s)).
+		Scan(&results).Error
+	return results, err
+}
+
+// GetIndexTrend returns weekly aggregated index scores with weighted NRR per index_type
+func (r *gormRepository) GetIndexTrend() ([]domain.IndexTrendRow, error) {
+	var results []domain.IndexTrendRow
+	s := models.SchemaName
+	query := fmt.Sprintf(`
+		WITH weekly AS (
+			SELECT
+				date_trunc('week', r.submitted_at) AS periode_date,
+				ra.unsur_id,
+				u.index_type,
+				avg(ra.rating_value::numeric) AS avg_rating
+			FROM %s.responses r
+			JOIN %s.response_answers ra ON ra.response_id = r.id
+			JOIN %s.unsur u ON u.id = ra.unsur_id
+			WHERE u.is_active = true
+			GROUP BY date_trunc('week', r.submitted_at), ra.unsur_id, u.index_type
+		), aktif_unsur AS (
+			SELECT index_type, count(*) AS total FROM %s.unsur WHERE is_active = true GROUP BY index_type
+		), tertimbang AS (
+			SELECT w.periode_date, w.index_type, (w.avg_rating / au.total::numeric) AS weighted
+			FROM weekly w JOIN aktif_unsur au ON au.index_type = w.index_type
+		)
+		SELECT
+			TO_CHAR(t.periode_date, 'YYYY-MM-DD') AS bulan,
+			t.index_type,
+			round((sum(t.weighted) * 25::numeric), 2) AS nilai_konversi
+		FROM tertimbang t
+		GROUP BY t.periode_date, t.index_type
+		ORDER BY t.periode_date ASC
+	`, s, s, s, s)
+	err := r.db.Raw(query).Scan(&results).Error
+	return results, err
+}
+
+func (r *gormRepository) GetDemographicSummary() ([]domain.DemographicSummaryRow, error) {
+	var results []domain.DemographicSummaryRow
+	query := fmt.Sprintf(`
+		SELECT
+			service_id::text,
+			service_name,
+			field_key,
+			demographic_value,
+			count
+		FROM %s.vw_demographic_summary
+		ORDER BY service_name, field_key, count DESC
+	`, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
+	return results, err
+}
+
+// GetViewIndexSummary reads from vw_index_summary (weighted NRR calculation)
+func (r *gormRepository) GetViewIndexSummary() ([]domain.ViewIndexSummaryRow, error) {
+	var results []domain.ViewIndexSummaryRow
+	query := fmt.Sprintf(`
+		SELECT index_type, nilai_index, nilai_konversi, mutu, kinerja
+		FROM %s.vw_index_summary
+	`, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
+	return results, err
+}
+
+func (r *gormRepository) GetViewUnsurSummary() ([]domain.ViewUnsurSummaryRow, error) {
+	var results []domain.ViewUnsurSummaryRow
+	query := fmt.Sprintf(`
+		SELECT
+			service_id::text,
+			service_name,
+			unsur_id::text,
+			unsur_name,
+			index_type,
+			jumlah_pertanyaan,
+			total_nilai,
+			nilai_rata_rata_unsur,
+			nilai_rata_rata_tertimbang,
+			jumlah_responden
+		FROM %s.vw_unsur_summary
+		ORDER BY index_type, unsur_name
+	`, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
+	return results, err
+}
+
+func (r *gormRepository) GetViewServiceStats() ([]domain.ViewServiceStatRow, error) {
+	var results []domain.ViewServiceStatRow
+	query := fmt.Sprintf(`
+		SELECT
+			service_id::text,
+			service_name,
+			index_type,
+			nilai_index,
+			nilai_konversi,
+			mutu,
+			jumlah_responden
+		FROM %s.vw_index_summary_by_service
+		ORDER BY service_name, index_type
+	`, models.SchemaName)
+	err := r.db.Raw(query).Scan(&results).Error
+	return results, err
+}
+
+func (r *gormRepository) CreateServiceCategory(cat *models.ServiceCategory) error {
+	return r.db.Create(cat).Error
+}
+
+func (r *gormRepository) UpdateServiceCategory(id uuid.UUID, cat *models.ServiceCategory) (*models.ServiceCategory, error) {
+	var existing models.ServiceCategory
+	if err := r.db.First(&existing, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	existing.Name = cat.Name
+	existing.SortOrder = cat.SortOrder
+	if err := r.db.Save(&existing).Error; err != nil {
+		return nil, err
+	}
+	return &existing, nil
+}
+
+func (r *gormRepository) DeleteServiceCategory(id uuid.UUID) error {
+	return r.db.Delete(&models.ServiceCategory{}, "id = ?", id).Error
+}
+
+func (r *gormRepository) WriteAuditLog(log *models.AuditLog) error {
+	if log.Details == "" {
+		log.Details = "{}"
+	}
+	return r.db.Create(log).Error
+}
+
+func (r *gormRepository) ListAuditLogs(limit, offset int) ([]models.AuditLog, int64, error) {
+	var logs []models.AuditLog
+	var total int64
+	if err := r.db.Model(&models.AuditLog{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := r.db.Order("created_at desc").Limit(limit).Offset(offset).Find(&logs).Error
+	return logs, total, err
+}
+
+func (r *gormRepository) GetAuthUserByEmail(email string) (*domain.AuthUserRecord, error) {
+	var user domain.AuthUserRecord
+	err := r.db.Raw(`
+		SELECT id::text, email, encrypted_password, role
+		FROM auth.users
+		WHERE LOWER(email) = LOWER(TRIM(?))
+		LIMIT 1
+	`, email).Scan(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	if user.ID == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return &user, nil
+}
+
+func (r *gormRepository) UpdateAuthUserPassword(email string, newHashedPassword string) error {
+	return r.db.Exec(`
+		UPDATE auth.users
+		SET encrypted_password = ?, updated_at = NOW()
+		WHERE LOWER(email) = LOWER(TRIM(?))
+	`, newHashedPassword, email).Error
+}
+
+func (r *gormRepository) SaveResponseFull(resp *models.Response, demoList []models.ResponseDemographic, answerList []models.ResponseAnswer) error {
+	tx := r.db.Begin()
+	if err := tx.Create(resp).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	for i := range demoList {
+		demoList[i].ResponseID = resp.ID
+	}
+	if len(demoList) > 0 {
+		if err := tx.Create(&demoList).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	for i := range answerList {
+		answerList[i].ResponseID = resp.ID
+	}
+	if len(answerList) > 0 {
+		if err := tx.Create(&answerList).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit().Error
+}
+
+func (r *gormRepository) GetArchiveRawAnswers(startDate, endDate string) (int64, []domain.CombinedRawAnswer, error) {
+	respQuery := r.db.Model(&models.Response{})
+	if startDate != "" {
+		respQuery = respQuery.Where("submitted_at::date >= ?::date", startDate)
+	}
+	if endDate != "" {
+		respQuery = respQuery.Where("submitted_at::date <= ?::date", endDate)
+	}
+	var totalResponses int64
+	if err := respQuery.Count(&totalResponses).Error; err != nil {
+		return 0, nil, err
+	}
+	if totalResponses == 0 {
+		return 0, []domain.CombinedRawAnswer{}, nil
+	}
+
+	var rawAnswers []domain.CombinedRawAnswer
+	answerQuery := r.db.Table(fmt.Sprintf("%s.response_answers ra", models.SchemaName)).
+		Select("ra.response_id, r.service_id, s.name as service_name, q.unsur_id, u.name as unsur_name, u.index_type, ra.rating_value, to_char(r.submitted_at, 'YYYY-MM') as bulan").
+		Joins(fmt.Sprintf("JOIN %s.responses r ON ra.response_id = r.id", models.SchemaName)).
+		Joins(fmt.Sprintf("JOIN %s.services s ON r.service_id = s.id", models.SchemaName)).
+		Joins(fmt.Sprintf("JOIN %s.questions q ON ra.question_id = q.id", models.SchemaName)).
+		Joins(fmt.Sprintf("JOIN %s.unsur u ON q.unsur_id = u.id", models.SchemaName))
+
+	if startDate != "" {
+		answerQuery = answerQuery.Where("r.submitted_at::date >= ?::date", startDate)
+	}
+	if endDate != "" {
+		answerQuery = answerQuery.Where("r.submitted_at::date <= ?::date", endDate)
+	}
+
+	if err := answerQuery.Scan(&rawAnswers).Error; err != nil {
+		return totalResponses, nil, err
+	}
+	return totalResponses, rawAnswers, nil
+}

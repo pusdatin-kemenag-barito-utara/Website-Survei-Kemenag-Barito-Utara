@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label'
 import { PublicNavbar } from '@/components/shared/PublicNavbar'
 import { Footer } from '@/components/shared/Footer'
 import PageBanner from '@/components/shared/PageBanner'
-import { createClient } from '@/lib/supabase/client'
 import { fetchCachedServices } from '@/lib/data-cache'
 import { Analytics } from '@/lib/analytics'
 import type { Service } from '@/types'
@@ -32,24 +31,12 @@ export default function BarcodePage() {
   useEffect(() => {
     async function fetchServices() {
       try {
-        const supabase = createClient()
-        if (supabase) {
-          const { data } = await supabase.from('services').select('*').eq('is_active', true).order('name')
-          if (data && data.length > 0) {
-            setServices(data as Service[])
-            return
-          }
-        }
         const cached = await fetchCachedServices()
         if (cached && cached.length > 0) {
           setServices(cached)
         }
       } catch (err) {
         console.warn('Failed to load services for barcode:', err)
-        try {
-          const fallback = await fetchCachedServices()
-          if (fallback) setServices(fallback)
-        } catch {}
       }
     }
     fetchServices()

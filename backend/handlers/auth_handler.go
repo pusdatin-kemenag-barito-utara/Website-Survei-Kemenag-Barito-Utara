@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"survey-kemenag-backend/config"
+	"survey-kemenag-backend/database"
 	"survey-kemenag-backend/domain"
 	"survey-kemenag-backend/models"
 	"survey-kemenag-backend/repository"
@@ -68,19 +69,31 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	cleanEmail := strings.ToLower(strings.TrimSpace(req.Email))
 	cleanPassword := strings.TrimSpace(req.Password)
 
+	var userID string
 	authenticated := false
-	userID := "admin-id"
+	// 1. If PocketBase is active, authenticate against PocketBase collections
+	if database.PB != nil {
+		if ok, id, _ := database.PB.AuthWithPassword("users", cleanEmail, req.Password); ok {
+			authenticated = true
+			userID = id
+		} else if ok, id, _ := database.PB.AuthWithPassword("_superusers", cleanEmail, req.Password); ok {
+			authenticated = true
+			userID = id
+		}
+	}
 
-	// 1. First, check database Supabase auth.users table
-	authUser, err := h.Repo.GetAuthUserByEmail(cleanEmail)
-	if err == nil && authUser != nil && authUser.EncryptedPassword != "" {
-		// Verify password (check exact and trimmed version for clipboard resilience)
-		if bcrypt.CompareHashAndPassword([]byte(authUser.EncryptedPassword), []byte(req.Password)) == nil {
-			authenticated = true
-			userID = authUser.ID
-		} else if cleanPassword != req.Password && bcrypt.CompareHashAndPassword([]byte(authUser.EncryptedPassword), []byte(cleanPassword)) == nil {
-			authenticated = true
-			userID = authUser.ID
+	// 2. Check database auth.users table (if Postgres is active)
+	if !authenticated {
+		authUser, err := h.Repo.GetAuthUserByEmail(cleanEmail)
+		if err == nil && authUser != nil && authUser.EncryptedPassword != "" {
+			// Verify password (check exact and trimmed version for clipboard resilience)
+			if bcrypt.CompareHashAndPassword([]byte(authUser.EncryptedPassword), []byte(req.Password)) == nil {
+				authenticated = true
+				userID = authUser.ID
+			} else if cleanPassword != req.Password && bcrypt.CompareHashAndPassword([]byte(authUser.EncryptedPassword), []byte(cleanPassword)) == nil {
+				authenticated = true
+				userID = authUser.ID
+			}
 		}
 	}
 

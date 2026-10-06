@@ -23,7 +23,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { apiFetch } from '@/lib/api'
 import { toast } from 'sonner'
-import { fetchCachedAdminDemographics, getCachedAdminDemographicsSync } from '@/lib/data-cache'
+import { fetchCachedAdminDemographics, getCachedAdminDemographicsSync, invalidateClientCache } from '@/lib/data-cache'
 import type { DemographicField, DemographicOption } from '@/types'
 
 
@@ -476,13 +476,19 @@ export default function AdminDemografiPage() {
 
   async function confirmDelete() {
     if (!deleteDialog) return
+    const target = deleteDialog
     setDeleting(true)
+    // Optimistic instant UI update
+    setFields((prev) => prev.filter((f) => f.id !== target.id))
+    setDeleteDialog(null)
     try {
-      await apiFetch(`/admin/demographics/${deleteDialog.id}`, { method: 'DELETE' })
+      await apiFetch(`/admin/demographics/${target.id}`, { method: 'DELETE' })
       toast.success('Field demografi berhasil dihapus')
-      setDeleteDialog(null)
+      invalidateClientCache()
       fetchFields(true)
     } catch {
+      // Revert if error
+      setFields((prev) => [...prev, target])
       toast.error('Gagal menghapus field')
     } finally {
       setDeleting(false)
@@ -567,17 +573,22 @@ export default function AdminDemografiPage() {
   }
 
   async function deleteOption(optionId: string, fieldId: string) {
+    const prevOptions = [...options]
+    // Optimistic instant UI update
+    setOptions((prev) => prev.filter((o) => o.id !== optionId))
     try {
       await apiFetch(`/admin/demographics/options/${optionId}`, { method: 'DELETE' })
       toast.success('Opsi berhasil dihapus')
       if (editingOption?.id === optionId) {
         cancelEditOption()
       }
-      
+      invalidateClientCache()
       const data = await apiFetch<DemographicOption[]>(`/admin/demographics/${fieldId}/options`)
       setOptions(Array.isArray(data) ? data : [])
-      fetchFields()
+      fetchFields(true)
     } catch {
+      // Revert if error
+      setOptions(prevOptions)
       toast.error('Gagal menghapus opsi')
     }
   }

@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api'
-import { createClient } from '@/lib/supabase/client'
+import { getPocketBase } from '@/lib/pocketbase/client'
 import type {
   Service,
   Question,
@@ -129,91 +129,127 @@ export function getCachedAdminStatsSync(): AdminStatsResponse | null {
   return cachedAdminStats
 }
 
-// Supabase Direct Fallback Helpers (for high availability / zero downtime)
-async function fetchPublicResultsFromSupabaseDirectly(): Promise<PublicResultsResponse> {
-  const supabase = createClient()
-  if (!supabase) throw new Error('Supabase client unavailable')
-
-  const [viewIndexRes, totalsRes, periodRes] = await Promise.allSettled([
-    supabase.from('vw_index_summary').select('*'),
-    supabase.from('vw_total_responses').select('total_count'),
-    supabase.from('survey_periods').select('*').eq('is_active', true).maybeSingle(),
+// PocketBase Direct Fallback Helpers (for high availability / zero downtime)
+async function fetchPublicResultsFromPocketBaseDirectly(): Promise<PublicResultsResponse> {
+  const pb = getPocketBase()
+  const [totalsRes, periodRes] = await Promise.allSettled([
+    pb.collection('responses').getList(1, 1),
+    pb.collection('survey_periods').getFirstListItem('is_active = true'),
   ])
 
-  const viewIndex = viewIndexRes.status === 'fulfilled' ? viewIndexRes.value.data : null
-  const totalsData = totalsRes.status === 'fulfilled' ? totalsRes.value.data : null
-  const activePeriod = periodRes.status === 'fulfilled' ? periodRes.value.data : null
-
-  let totalResponses = 0
-  if (Array.isArray(totalsData)) {
-    totalResponses = totalsData.reduce((sum: number, row: any) => sum + (Number(row.total_count) || 0), 0)
-  }
-
-  let ipkpScore = 0
-  let ipakScore = 0
-  const indexSummary: IndexSummary[] = []
-
-  if (Array.isArray(viewIndex)) {
-    for (const vi of viewIndex) {
-      const score = parseFloat(vi.nilai_konversi) || 0
-      if (vi.index_type === 'IPAK') {
-        ipakScore = score
-      } else {
-        ipkpScore = score
-      }
-      indexSummary.push({
-        index_type: vi.index_type,
-        score: score,
-        nilai_konversi: score,
-        nilai_index: parseFloat(vi.nilai_index) || 0,
-        mutu: vi.mutu,
-        kategori_mutu: vi.mutu,
-        mutu_pelayanan: vi.kinerja,
-        total_responden: totalResponses,
-      } as any)
-    }
-  }
+  const totalResponses = totalsRes.status === 'fulfilled' ? totalsRes.value.totalItems : 0
+  const activePeriod = periodRes.status === 'fulfilled' ? periodRes.value : null
 
   return {
     total_responses: totalResponses,
-    ipkp_score: ipkpScore,
-    ipak_score: ipakScore,
-    ikm_score: ipkpScore,
-    index_summary: indexSummary,
+    ipkp_score: 0,
+    ipak_score: 0,
+    ikm_score: 0,
+    index_summary: [],
     unsur_summary: [],
     by_service: [],
     trend: [],
     demographics: [],
-    period: activePeriod || null,
+    period: (activePeriod as any) || null,
   } as any
 }
 
-async function fetchServicesFromSupabaseDirectly(): Promise<ServicesResponse> {
-  const supabase = createClient()
-  if (!supabase) throw new Error('Supabase client unavailable')
+async function fetchServicesFromPocketBaseDirectly(): Promise<ServicesResponse> {
+  const pb = getPocketBase()
+  const records = await pb.collection('services').getFullList({
+    filter: 'is_active = true',
+    sort: 'sort_order',
+    expand: 'category_id',
+  })
 
-  const { data, error } = await supabase
-    .from('services')
-    .select('*, service_categories(*)')
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true })
+  const services = records.map((r: any) => ({
+    id: r.original_id || r.id,
+    name: r.name,
+    category_id: r.expand?.category_id?.original_id || r.category_id,
+    slug: r.slug,
+    description: r.description,
+    is_active: r.is_active,
+    sort_order: r.sort_order,
+    created_at: r.created,
+    service_categories: r.expand?.category_id ? {
+      id: r.expand.category_id.original_id || r.expand.category_id.id,
+      name: r.expand.category_id.name,
+      sort_order: r.expand.category_id.sort_order,
+    } : undefined,
+  }))
 
-  if (error) throw error
-  return { services: data || [], categories: [] }
+  return { services: services as any, categories: [] }
 }
 
-async function fetchFormQuestionsFromSupabaseDirectly(): Promise<FormQuestionsResponse> {
-  const supabase = createClient()
-  if (!supabase) throw new Error('Supabase client unavailable')
-
-  const [questionsRes, demoRes] = await Promise.all([
-    supabase.from('questions').select('*, unsur(*)').eq('is_active', true).order('sort_order', { ascending: true }),
-    supabase.from('demographic_fields').select('*, demographic_options(*)').eq('is_active', true).order('sort_order', { ascending: true }),
+async function fetchFormQuestionsFromPocketBaseDirectly(): Promise<FormQuestionsResponse> {
+  const pb = getPocketBase()
+  const [questionsRecords, demoFieldsRecords, demoOptionsRecords] = await Promise.all([
+    pb.collection('questions').getFullList({
+      filter: 'is_active = true',
+      sort: 'sort_order',
+      expand: 'unsur_id',
+    }),
+    pb.collection('demographic_fields').getFullList({
+      filter: 'is_active = true',
+      sort: 'sort_order',
+    }),
+    pb.collection('demographic_options').getFullList({
+      sort: 'sort_order',
+    }),
   ])
 
+  const optionsByField = new Map<string, any[]>()
+  for (const opt of demoOptionsRecords as any[]) {
+    const fId = opt.field || opt.field_id
+    if (!optionsByField.has(fId)) {
+      optionsByField.set(fId, [])
+    }
+    optionsByField.get(fId)!.push({
+      id: opt.original_id || opt.id,
+      field_id: opt.field || opt.field_id,
+      label_id: opt.label_id || opt.label || '',
+      label_en: opt.label_en || opt.label || '',
+      value: opt.value,
+      sort_order: opt.sort_order,
+    })
+  }
+
+  const questions = (questionsRecords as any[]).map((q) => ({
+    id: q.original_id || q.id,
+    unsur_id: q.expand?.unsur_id?.original_id || q.unsur_id || q.unsur,
+    text: q.question_text_id || q.question_text || q.text,
+    question_text: q.question_text_id || q.question_text || q.text,
+    question_text_id: q.question_text_id || q.question_text || q.text,
+    question_text_en: q.question_text_en || q.question_text || q.text,
+    service_id: q.service_id || q.service,
+    is_active: q.is_active,
+    sort_order: q.sort_order,
+    unsur: (q.expand?.unsur_id || q.expand?.unsur) ? {
+      id: (q.expand?.unsur_id || q.expand?.unsur).original_id || (q.expand?.unsur_id || q.expand?.unsur).id,
+      name: (q.expand?.unsur_id || q.expand?.unsur).name,
+      index_type: (q.expand?.unsur_id || q.expand?.unsur).index_type,
+    } : undefined,
+  }))
+
+  const demographic_fields = (demoFieldsRecords as any[]).map((df) => {
+    const opts = optionsByField.get(df.id) || optionsByField.get(df.original_id) || []
+    return {
+      id: df.original_id || df.id,
+      field_key: df.field_key,
+      label_id: df.label_id || df.label || '',
+      label_en: df.label_en || df.label || '',
+      field_type: df.field_type,
+      is_required: df.is_required,
+      is_active: df.is_active,
+      sort_order: df.sort_order,
+      options: opts,
+      demographic_options: opts,
+    }
+  })
+
   return {
-    questions: questionsRes.data || [],
-    demographic_fields: demoRes.data || [],
+    questions: questions as any,
+    demographic_fields: demographic_fields as any,
   }
 }
 
@@ -229,9 +265,9 @@ export async function fetchCachedPublicResults(forceRefresh = false): Promise<Pu
       return data
     })
     .catch(async (err) => {
-      console.warn('[DataCache] Golang API proxy unreachable, engaging direct Supabase fallback:', err)
+      console.warn('[DataCache] Golang API proxy unreachable, engaging direct PocketBase fallback:', err)
       try {
-        const directData = await fetchPublicResultsFromSupabaseDirectly()
+        const directData = await fetchPublicResultsFromPocketBaseDirectly()
         cachedPublicResults = directData
         inflightPublicResults = null
         return directData
@@ -256,9 +292,9 @@ export async function fetchCachedServices(forceRefresh = false): Promise<Service
       return list
     })
     .catch(async (err) => {
-      console.warn('[DataCache] Golang API services unreachable, engaging direct Supabase fallback:', err)
+      console.warn('[DataCache] Golang API services unreachable, engaging direct PocketBase fallback:', err)
       try {
-        const directData = await fetchServicesFromSupabaseDirectly()
+        const directData = await fetchServicesFromPocketBaseDirectly()
         const list = directData?.services || []
         cachedServices = list
         inflightServices = null
@@ -283,9 +319,9 @@ export async function fetchCachedFormQuestions(forceRefresh = false): Promise<Fo
       return data
     })
     .catch(async (err) => {
-      console.warn('[DataCache] Golang API form-questions unreachable, engaging direct Supabase fallback:', err)
+      console.warn('[DataCache] Golang API form-questions unreachable, engaging direct PocketBase fallback:', err)
       try {
-        const directData = await fetchFormQuestionsFromSupabaseDirectly()
+        const directData = await fetchFormQuestionsFromPocketBaseDirectly()
         cachedFormQuestions = directData
         inflightFormQuestions = null
         return directData

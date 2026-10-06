@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchCachedPublicResults, getCachedPublicResultsSync } from '@/lib/data-cache'
-import { createClient, SUPABASE_SCHEMA } from '@/lib/supabase/client'
+import { getPocketBase } from '@/lib/pocketbase/client'
 import type { IndexSummary, UnsurSummary, IndexByService } from '@/types'
 
 export interface PublicResultsData {
@@ -43,31 +43,31 @@ export function usePublicResults() {
     return () => { isMounted = false }
   }, [])
 
-  // Realtime refresh
+  // Realtime refresh via PocketBase SSE
   useEffect(() => {
-    const supabase = createClient()
-    if (!supabase || typeof supabase.channel !== 'function') return
-
-    const channel = supabase
-      .channel('home-public-results-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: SUPABASE_SCHEMA, table: 'responses' },
-        async () => {
+    let unsubscribe: (() => void) | undefined
+    try {
+      const pb = getPocketBase()
+      pb.collection('responses').subscribe('*', async (e) => {
+        if (e.action === 'create' || e.action === 'delete') {
           try {
             const res = await fetchCachedPublicResults(true)
             setData(res as PublicResultsData)
             setError(null)
           } catch {}
         }
-      )
-      .subscribe()
+      }).then((unsub) => {
+        unsubscribe = unsub
+      }).catch((err) => {
+        console.warn('[PocketBase] Realtime subscribe error:', err)
+      })
+    } catch {}
 
     return () => {
-      if (channel && supabase && typeof supabase.removeChannel === 'function') {
-        try {
-          supabase.removeChannel(channel)
-        } catch {}
+      if (unsubscribe) {
+        try { unsubscribe() } catch {}
+      } else {
+        try { getPocketBase().collection('responses').unsubscribe('*') } catch {}
       }
     }
   }, [])

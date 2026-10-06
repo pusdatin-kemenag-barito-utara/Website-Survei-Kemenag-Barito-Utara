@@ -1,5 +1,4 @@
 import { defineMiddleware } from "astro:middleware";
-import { createServerClient } from "@supabase/ssr";
 
 const PUSDATIN_URL =
   process.env.PUBLIC_PUSDATIN_URL ||
@@ -193,56 +192,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
   }
 
-  // === SUPABASE SESSION REFRESH (Only for /admin routes with existing auth cookie) ===
-  const hasAuthCookie = context.request.headers.get("cookie")?.includes("sb-survey-auth-token");
-  if (pathname.startsWith("/admin") && hasAuthCookie) {
-    try {
-      const supabaseUrl =
-        process.env.PUBLIC_SUPABASE_URL ||
-        import.meta.env.PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey =
-        process.env.PUBLIC_SUPABASE_ANON_KEY ||
-        import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
-      if (supabaseUrl && supabaseAnonKey) {
-        const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-          db: {
-            schema:
-              process.env.PUBLIC_PUSDATIN_SCHEMA ||
-              import.meta.env.PUBLIC_PUSDATIN_SCHEMA ||
-              "kemenag_survey",
-          },
-          cookieOptions: {
-            name: "sb-survey-auth-token",
-          },
-          cookies: {
-            getAll() {
-              return parseRequestCookies(context.request);
-            },
-            setAll(cookiesToSet) {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                context.cookies.set(name, value, {
-                  path: options?.path ?? "/",
-                  maxAge: options?.maxAge,
-                  domain: options?.domain,
-                  secure: options?.secure,
-                  httpOnly: options?.httpOnly,
-                  sameSite: options?.sameSite as
-                    "lax" | "strict" | "none" | undefined,
-                });
-              });
-            },
-          },
-        });
-
-        await supabase.auth.getUser().catch((err) => {
-          console.warn("[MIDDLEWARE] Supabase getUser error:", err);
-        });
-      }
-    } catch (err) {
-      console.error("[MIDDLEWARE] Supabase auth refresh error:", err);
-    }
-  }
 
   const response = await next();
 

@@ -59,7 +59,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
-import { fetchCachedAdminServices, getCachedAdminServicesSync } from "@/lib/data-cache";
+import { fetchCachedAdminServices, getCachedAdminServicesSync, invalidateClientCache } from "@/lib/data-cache";
 import type { Service, ServiceCategory } from "@/types";
 
 import {
@@ -367,15 +367,21 @@ export default function AdminLayananPage() {
 
   async function confirmDelete() {
     if (!deleteDialog) return;
+    const target = deleteDialog;
     setDeleting(true);
+    // Optimistic instant UI update
+    setServices((prev) => prev.filter((s) => s.id !== target.id));
+    setDeleteDialog(null);
     try {
-      await apiFetch(`/admin/services/${deleteDialog.id}`, {
+      await apiFetch(`/admin/services/${target.id}`, {
         method: "DELETE",
       });
       toast.success("Layanan berhasil dihapus");
-      setDeleteDialog(null);
+      invalidateClientCache();
       fetchServices(true);
     } catch (err: unknown) {
+      // Revert if error
+      setServices((prev) => [...prev, target]);
       const errorMsg = err instanceof Error ? err.message : "Error server";
       toast.error("Gagal menghapus layanan: " + errorMsg);
     } finally {

@@ -4,7 +4,7 @@ Fullstack survey platform (IKM - Indeks Kepuasan Masyarakat) for Kemenag Barito 
 
 - **Frontend**: Astro 7 (SSR, node adapter) + React 19 islands + Tailwind CSS v4 + shadcn/ui
 - **Backend**: Go 1.26 + Fiber v2 REST API
-- **Database**: PostgreSQL (Supabase-compatible), schema `kemenag_survey`
+- **Database**: PocketBase Dedicated Database (`https://db-survei.kemenag-baritoutara.com`)
 
 ## Getting Started
 
@@ -36,7 +36,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - All UI components live in `frontend/src/react/` and are mounted per-page as React islands (`client:only="react"`).
 - Next.js compatibility is provided by the `frontend/src/next/` shim layer (`navigation`, `link`, `image`, `server`), so React code stays framework-agnostic.
 - Client-side env vars use `PUBLIC_*` names (read via `import.meta.env`); server-side code uses `process.env`.
-- Middleware (`frontend/src/middleware.ts`) handles maintenance mode, optional same-origin `/api/v1` proxy to the Go backend, and Supabase session refresh.
+- Middleware (`frontend/src/middleware.ts`) handles maintenance mode, Pusdatin SSO sync, and optional same-origin `/api/v1` proxy to the Go backend.
 - Deploy via `Dockerfile` (Astro standalone SSR on :3000, Go API on :8080).
 
 ## Learn More

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,14 +21,20 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/recover"
 )
 
+// Server start time for uptime tracking
 var serverStartTime = time.Now()
 
 func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
 
-	// Connect to PostgreSQL database
-	database.ConnectDB(cfg)
+	// Connect to database (PocketBase prioritized, with PostgreSQL fallback)
+	if cfg.PocketBaseURL != "" {
+		_ = database.ConnectPocketBase(cfg)
+	}
+	if cfg.DatabaseURL != "" && database.PB == nil {
+		database.ConnectDB(cfg)
+	}
 
 	// Create Fiber app with Proxy Header resolution for Real Client IP
 	app := fiber.New(fiber.Config{
@@ -87,7 +94,15 @@ func main() {
 		dbStatus := "connected"
 		var dbLatencyMs float64 = 0
 
-		if database.DB != nil {
+		if database.PB != nil {
+			ok, latency, err := database.PB.Health()
+			if ok && err == nil {
+				dbStatus = "connected (pocketbase)"
+				dbLatencyMs = latency
+			} else {
+				dbStatus = "disconnected (pocketbase)"
+			}
+		} else if database.DB != nil {
 			if sqlDB, err := database.DB.DB(); err != nil {
 				dbStatus = "disconnected"
 			} else {
@@ -103,7 +118,7 @@ func main() {
 		}
 
 		status := fiber.StatusOK
-		if dbStatus != "connected" {
+		if !strings.HasPrefix(dbStatus, "connected") {
 			status = fiber.StatusServiceUnavailable
 		}
 

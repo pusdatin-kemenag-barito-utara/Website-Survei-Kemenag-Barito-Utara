@@ -21,6 +21,9 @@ func SetupRoutes(app *fiber.App) {
 	repo := repository.NewRepository(database.DB)
 	surveyService := service.NewSurveyService(repo)
 
+	// Pre-warm Cache asynchronously in background so first user request is instant (0ms)
+	surveyService.PrewarmCache()
+
 	// Initialize Handlers with Dependency Injection
 	authHandler := handlers.NewAuthHandler(cfg, repo)
 

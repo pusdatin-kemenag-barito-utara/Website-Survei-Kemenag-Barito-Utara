@@ -1,6 +1,6 @@
 -- ============================================================
 -- MIGRATION: 005_fix_advisors_and_security.sql
--- FIX: Supabase Performance & Security Advisor Warnings and Errors
+-- FIX: Database Performance & Security Advisor Warnings and Errors
 -- ============================================================
 
 -- ------------------------------------------------------------

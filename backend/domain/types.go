@@ -181,11 +181,23 @@ type AuditLog struct {
 	Details    string `gorm:"column:details;type:jsonb" json:"details,omitempty"`
 }
 
-// AuthUserRecord maps to auth.users table in Supabase PostgreSQL
+// AuthUserRecord represents authentication user record
 type AuthUserRecord struct {
 	ID                string `gorm:"column:id"`
 	Email             string `gorm:"column:email"`
 	EncryptedPassword string `gorm:"column:encrypted_password"`
 	Role              string `gorm:"column:role"`
 }
+
+type CombinedRawAnswer struct {
+	ResponseID  uuid.UUID `gorm:"column:response_id"`
+	ServiceID   uuid.UUID `gorm:"column:service_id"`
+	ServiceName string    `gorm:"column:service_name"`
+	UnsurID     uuid.UUID `gorm:"column:unsur_id"`
+	UnsurName   string    `gorm:"column:unsur_name"`
+	IndexType   string    `gorm:"column:index_type"`
+	RatingValue int       `gorm:"column:rating_value"`
+	Bulan       string    `gorm:"column:bulan"`
+}
+
 

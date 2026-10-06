@@ -182,7 +182,8 @@ export default function SurveiPage() {
         if (field.field_type === 'toggle') {
           const val = demographics[field.id] || ''
           if (val.startsWith('Ya')) {
-            if (field.demographic_options && field.demographic_options.length > 0) {
+            const opts = field.options || field.demographic_options
+            if (opts && opts.length > 0) {
               if (!val.includes('(') || !val.includes(')')) {
                 return false
               }
@@ -223,7 +224,8 @@ export default function SurveiPage() {
         if (field.field_type === 'toggle') {
           const val = demographics[field.id] || ''
           if (val.startsWith('Ya')) {
-            if (field.demographic_options && field.demographic_options.length > 0) {
+            const opts = field.options || field.demographic_options
+            if (opts && opts.length > 0) {
               if (!val.includes('(') || !val.includes(')')) {
                 return false
               }
@@ -270,6 +272,12 @@ export default function SurveiPage() {
       Object.entries(demographics).forEach(([field_id, value]) => {
         if (validFieldIds.has(field_id) && value) {
           demoObj[field_id] = String(value).trim()
+        }
+      })
+      // Ensure toggle fields (e.g. disabilitas) record 'Tidak' if unselected
+      demographicFields.forEach((f) => {
+        if (f.field_type === 'toggle' && !demoObj[f.id]) {
+          demoObj[f.id] = 'Tidak'
         }
       })
 
