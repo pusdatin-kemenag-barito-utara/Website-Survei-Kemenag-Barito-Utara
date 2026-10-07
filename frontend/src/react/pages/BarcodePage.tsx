@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useI18n } from '@/components/shared/I18nProvider'
 import { PublicNavbar } from '@/components/shared/PublicNavbar'
 import { Footer } from '@/components/shared/Footer'
-import { createClient } from '@/lib/supabase/client'
+import { pb } from '@/lib/pocketbase'
 import type { Service } from '@/types'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -21,14 +21,17 @@ export default function BarcodePage() {
 
   useEffect(() => {
     async function fetchServices() {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('services')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order')
-      if (data) setServices(data as Service[])
-      setLoading(false)
+      try {
+        const records = await pb.collection('services').getFullList({
+          filter: 'is_active = true',
+          sort: 'sort_order',
+        })
+        setServices(records as unknown as Service[])
+      } catch (err) {
+        console.error('Failed to fetch services for barcode:', err)
+      } finally {
+        setLoading(false)
+      }
     }
     fetchServices()
   }, [])

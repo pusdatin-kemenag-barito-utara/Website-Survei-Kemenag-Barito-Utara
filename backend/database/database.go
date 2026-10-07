@@ -16,6 +16,11 @@ import (
 var DB *gorm.DB
 
 func ConnectDB(cfg *config.Config) {
+	if cfg.DatabaseURL == "" {
+		log.Printf("ℹ️ PocketBase mode aktif (POCKETBASE_URL: %s). Melewati koneksi PostgreSQL GORM.", cfg.PocketbaseURL)
+		return
+	}
+
 	var err error
 	dbSchema := cfg.DatabaseSchema
 	if dbSchema == "" {

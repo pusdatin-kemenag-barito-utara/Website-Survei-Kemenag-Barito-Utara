@@ -103,7 +103,9 @@ func main() {
 		}
 
 		status := fiber.StatusOK
-		if dbStatus != "connected" {
+		if cfg.PocketbaseURL != "" {
+			dbStatus = "pocketbase (" + cfg.PocketbaseURL + ")"
+		} else if dbStatus != "connected" {
 			status = fiber.StatusServiceUnavailable
 		}
 

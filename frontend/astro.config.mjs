@@ -21,6 +21,7 @@ export default defineConfig({
     },
     optimizeDeps: {
       include: [
+        "pocketbase",
         "@tanstack/react-query",
         "framer-motion",
         "lucide-react",

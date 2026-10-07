@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { PublicNavbar } from '@/components/shared/PublicNavbar'
 import { Footer } from '@/components/shared/Footer'
 import PageBanner from '@/components/shared/PageBanner'
-import { createClient } from '@/lib/supabase/client'
+import { pb } from '@/lib/pocketbase'
 import { Analytics } from '@/lib/analytics'
 import type { Service } from '@/types'
 import { toast } from 'sonner'
@@ -30,9 +30,15 @@ export default function BarcodePage() {
 
   useEffect(() => {
     async function fetchServices() {
-      const supabase = createClient()
-      const { data } = await supabase.from('services').select('*').eq('is_active', true).order('name')
-      if (data) setServices(data as Service[])
+      try {
+        const records = await pb.collection('services').getFullList({
+          filter: 'is_active = true',
+          sort: 'name',
+        })
+        setServices(records as unknown as Service[])
+      } catch (err) {
+        console.error('Failed to fetch services:', err)
+      }
     }
     fetchServices()
   }, [])

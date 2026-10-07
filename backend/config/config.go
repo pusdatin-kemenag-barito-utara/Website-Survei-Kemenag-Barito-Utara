@@ -17,6 +17,7 @@ type Config struct {
 	AdminEmail         string
 	AdminPassword      string
 	TurnstileSecretKey string
+	PocketbaseURL      string
 }
 
 func (c *Config) GetCorsOrigins() []string {
@@ -35,19 +36,17 @@ func (c *Config) GetCorsOrigins() []string {
 }
 
 func LoadConfig() *Config {
-	// Try loading from local .env or parent root ../.env
-	err := godotenv.Load()
-	if err != nil {
-		err = godotenv.Load("../.env")
-		if err != nil {
-			log.Println("⚠️ .env file not found in local or root directory, using OS env")
-		}
+	// Try loading from .env if present, otherwise proceed with system/Infisical env
+	if err := godotenv.Load(); err != nil {
+		_ = godotenv.Load("../.env")
+	}
+
+	pocketbaseURL := os.Getenv("POCKETBASE_URL")
+	if pocketbaseURL == "" {
+		pocketbaseURL = os.Getenv("PUBLIC_POCKETBASE_URL")
 	}
 
 	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable"
-	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -114,6 +113,7 @@ func LoadConfig() *Config {
 		AdminEmail:         adminEmail,
 		AdminPassword:      adminPassword,
 		TurnstileSecretKey: turnstileSecretKey,
+		PocketbaseURL:      pocketbaseURL,
 	}
 }
 

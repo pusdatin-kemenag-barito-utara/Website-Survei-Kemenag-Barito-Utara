@@ -7,11 +7,12 @@
     "install:all": "npm install && npm run install:backend",
     "install:frontend": "npm install --prefix frontend",
     "install:backend": "cd backend && go mod download",
-    "dev": "concurrently -n \"BE,FE\" -c \"cyan.bold,magenta.bold\" \"cd backend && %USERPROFILE%\\go\\bin\\air.exe\" \"cd frontend && npm run dev\"",
-    "dev:no-air": "concurrently -n \"BE,FE\" -c \"cyan.bold,magenta.bold\" \"cd backend && go run main.go\" \"cd frontend && npm run dev\"",
-    "dev:backend": "cd backend && go run main.go",
-    "dev:frontend": "cd frontend && npm run dev",
-    "build:frontend": "cd frontend && npm run build",
+    "dev": "node scripts/run-infisical.cjs",
+    "dev:infisical": "infisical run --env=dev --path=/survei-kemenag -- concurrently -k -n \"BE,FE\" -c \"cyan.bold,magenta.bold\" \"cd backend && %USERPROFILE%\\go\\bin\\air.exe\" \"cd frontend && npm run dev\"",
+    "dev:no-air": "node scripts/run-infisical.cjs concurrently -n \"BE,FE\" -c \"cyan.bold,magenta.bold\" \"cd backend && go run main.go\" \"cd frontend && npm run dev\"",
+    "dev:backend": "node scripts/run-infisical.cjs cd backend && go run main.go",
+    "dev:frontend": "node scripts/run-infisical.cjs cd frontend && npm run dev",
+    "build:frontend": "node scripts/run-infisical.cjs cd frontend && npm run build",
     "build:backend": "cd backend && go build -o bin/server main.go"
   },
   "devDependencies": {
