@@ -53,7 +53,7 @@ self.addEventListener('fetch', (event) => {
 
   // Bypass API, dynamic dev modules, and external auth
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_image') || url.pathname.startsWith('/@') || url.pathname.includes('/node_modules/')) return;
-  if (url.origin.includes('pocketbase') || url.origin.includes('pusdatin') || url.origin.includes('cloudflare') || url.origin.includes('kemenag-baritoutara.com')) return;
+  if (url.origin.includes('pocketbase') || url.origin.includes('db-survei') || url.origin.includes('pusdatin') || url.origin.includes('cloudflare') || url.origin.includes('kemenag-baritoutara.com')) return;
 
   // ONLY cache static media (images and fonts) - NEVER cache JS scripts to avoid stale React chunk conflicts
   const isStaticMedia =

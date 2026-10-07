@@ -9,16 +9,13 @@ export default defineConfig({
     port: 3000,
     host: true,
   },
-  site: process.env.PUBLIC_APP_URL || "http://localhost:3000",
+  site: process.env.PUBLIC_APP_URL,
   output: "server",
   adapter: node({ mode: "standalone" }),
   viewTransitions: true,
   integrations: [react()],
   vite: {
     envPrefix: ["PUBLIC_"],
-    define: {
-      "process.env": {},
-    },
     optimizeDeps: {
       include: [
         "pocketbase",

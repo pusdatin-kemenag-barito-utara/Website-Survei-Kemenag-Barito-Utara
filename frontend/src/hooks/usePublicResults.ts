@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchCachedPublicResults, getCachedPublicResultsSync } from '@/lib/data-cache'
-import { pb } from '@/lib/pocketbase'
+import { getPocketBase } from '@/lib/pocketbase/client'
 import type { IndexSummary, UnsurSummary, IndexByService } from '@/types'
 
 export interface PublicResultsData {
@@ -45,29 +45,31 @@ export function usePublicResults() {
     }
   }, [])
 
-  // PocketBase Realtime refresh on new survey responses
+  // Realtime refresh via PocketBase SSE
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null
-
-    async function subscribeRealtime() {
-      try {
-        unsubscribe = await pb.collection('responses').subscribe('*', async () => {
+    let unsubscribe: (() => void) | undefined
+    try {
+      const pb = getPocketBase()
+      pb.collection('responses').subscribe('*', async (e) => {
+        if (e.action === 'create' || e.action === 'delete') {
           try {
             const res = await fetchCachedPublicResults(true)
             setData(res as PublicResultsData)
             setError(null)
           } catch {}
-        })
-      } catch {}
-    }
-
-    subscribeRealtime()
+        }
+      }).then((unsub) => {
+        unsubscribe = unsub
+      }).catch((err) => {
+        console.warn('[PocketBase] Realtime subscribe error:', err)
+      })
+    } catch {}
 
     return () => {
       if (unsubscribe) {
-        unsubscribe()
+        try { unsubscribe() } catch {}
       } else {
-        pb.collection('responses').unsubscribe('*').catch(() => {})
+        try { getPocketBase().collection('responses').unsubscribe('*') } catch {}
       }
     }
   }, [])

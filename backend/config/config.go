@@ -4,62 +4,74 @@ import (
 	"log"
 	"os"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	DatabaseURL        string
-	DatabaseSchema     string
-	JWTSecret          string
-	CorsOrigins        string
-	Port               string
-	AdminEmail         string
-	AdminPassword      string
-	TurnstileSecretKey string
-	PocketbaseURL      string
+	DatabaseURL             string
+	DatabaseSchema          string
+	PocketBaseURL           string
+	PocketBaseAdminEmail    string
+	PocketBaseAdminPassword string
+	JWTSecret               string
+	CorsOrigins             string
+	Port                    string
+	AdminEmail              string
+	AdminPassword           string
+	TurnstileSecretKey      string
 }
 
 func (c *Config) GetCorsOrigins() []string {
-	if c.CorsOrigins == "" {
-		return []string{"http://localhost:3000", "http://127.0.0.1:3000"}
+	origins := []string{
+		"http://localhost:3000",
+		"http://127.0.0.1:3000",
+		"https://survei.kemenag-baritoutara.com",
 	}
-	parts := strings.Split(c.CorsOrigins, ",")
-	var origins []string
-	for _, p := range parts {
-		trimmed := strings.TrimSpace(p)
-		if trimmed != "" {
-			origins = append(origins, trimmed)
+	if c.CorsOrigins != "" {
+		parts := strings.Split(c.CorsOrigins, ",")
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" && trimmed != "*" {
+				found := false
+				for _, o := range origins {
+					if o == trimmed {
+						found = true
+						break
+					}
+				}
+				if !found {
+					origins = append(origins, trimmed)
+				}
+			}
 		}
 	}
 	return origins
 }
 
 func LoadConfig() *Config {
-	// Try loading from .env if present, otherwise proceed with system/Infisical env
-	if err := godotenv.Load(); err != nil {
-		_ = godotenv.Load("../.env")
+	pbURL := os.Getenv("POCKETBASE_URL")
+	if pbURL == "" {
+		pbURL = os.Getenv("PUBLIC_POCKETBASE_URL")
 	}
 
-	pocketbaseURL := os.Getenv("POCKETBASE_URL")
-	if pocketbaseURL == "" {
-		pocketbaseURL = os.Getenv("PUBLIC_POCKETBASE_URL")
-	}
+	pbEmail := os.Getenv("POCKETBASE_ADMIN_EMAIL")
+	pbPassword := os.Getenv("POCKETBASE_ADMIN_PASSWORD")
 
 	dbURL := os.Getenv("DATABASE_URL")
+	if pbURL == "" && dbURL == "" {
+		log.Println("⚠️ Warning: Neither POCKETBASE_URL nor DATABASE_URL environment variable is provided from Infisical")
+	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "sikap-kemenag-secret-jwt-key-2026"
-		log.Println("⚠️ JWT_SECRET not set in environment, using default key")
+		jwtSecret = os.Getenv("APP_JWT_SECRET")
+	}
+	if jwtSecret == "" {
+		log.Println("⚠️ Warning: JWT_SECRET environment variable is not set from Infisical")
 	}
 
 	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
 	if corsOrigins == "" {
 		corsOrigins = os.Getenv("CORS_ORIGINS")
-	}
-	if corsOrigins == "" {
-		corsOrigins = "http://localhost:3000, http://127.0.0.1:3000, https://survei.kemenag-baritoutara.com"
 	}
 
 	adminEmail := os.Getenv("ADMIN_EMAIL")
@@ -69,10 +81,16 @@ func LoadConfig() *Config {
 	if adminEmail == "" {
 		adminEmail = os.Getenv("PUBLIC_SUPER_ADMIN_EMAIL")
 	}
+	if adminEmail == "" {
+		adminEmail = pbEmail
+	}
 
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	if adminPassword == "" {
 		adminPassword = os.Getenv("SUPER_ADMIN_PASSWORD")
+	}
+	if adminPassword == "" {
+		adminPassword = pbPassword
 	}
 
 	port := os.Getenv("GO_PORT")
@@ -105,15 +123,16 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		DatabaseURL:        dbURL,
-		DatabaseSchema:     dbSchema,
-		JWTSecret:          jwtSecret,
-		CorsOrigins:        corsOrigins,
-		Port:               port,
-		AdminEmail:         adminEmail,
-		AdminPassword:      adminPassword,
-		TurnstileSecretKey: turnstileSecretKey,
-		PocketbaseURL:      pocketbaseURL,
+		DatabaseURL:             dbURL,
+		DatabaseSchema:          dbSchema,
+		PocketBaseURL:           pbURL,
+		PocketBaseAdminEmail:    pbEmail,
+		PocketBaseAdminPassword: pbPassword,
+		JWTSecret:               jwtSecret,
+		CorsOrigins:             corsOrigins,
+		Port:                    port,
+		AdminEmail:              adminEmail,
+		AdminPassword:           adminPassword,
+		TurnstileSecretKey:      turnstileSecretKey,
 	}
 }
-

@@ -25,7 +25,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { apiFetch } from '@/lib/api'
 import { toast } from 'sonner'
-import { fetchCachedAdminUnsur, getCachedAdminUnsurSync } from '@/lib/data-cache'
+import { fetchCachedAdminUnsur, getCachedAdminUnsurSync, invalidateClientCache } from '@/lib/data-cache'
 import type { Unsur } from '@/types'
 
 const unsurSchema = z.object({
@@ -120,13 +120,19 @@ export default function AdminUnsurPage() {
 
   async function confirmDelete() {
     if (!deleteDialog) return
+    const target = deleteDialog
     setDeleting(true)
+    // Optimistic instant UI update
+    setUnsurList((prev) => prev.filter((u) => u.id !== target.id))
+    setDeleteDialog(null)
     try {
-      await apiFetch(`/admin/unsur/${deleteDialog.id}`, { method: 'DELETE' })
+      await apiFetch(`/admin/unsur/${target.id}`, { method: 'DELETE' })
       toast.success('Unsur berhasil dihapus')
-      setDeleteDialog(null)
+      invalidateClientCache()
       loadData(true)
     } catch {
+      // Revert if error
+      setUnsurList((prev) => [...prev, target])
       toast.error('Gagal menghapus unsur')
     } finally {
       setDeleting(false)

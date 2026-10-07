@@ -30,7 +30,7 @@ func ConnectDB(cfg *config.Config) {
 
 	DB, err = gorm.Open(postgres.New(postgres.Config{
 		DSN:                  cfg.DatabaseURL,
-		PreferSimpleProtocol: true, // Disables prepared statement caching for Supabase/pgBouncer
+		PreferSimpleProtocol: true, // Disables prepared statement caching for connection poolers
 	}), &gorm.Config{
 		Logger:      logger.Default.LogMode(logger.Error), // Only log critical SQL errors, hide slow query warnings
 		PrepareStmt: false,                                // Prevent prepared statement caching completely

@@ -101,7 +101,8 @@ type DemographicField struct {
 	IsActive   bool                `gorm:"type:boolean;not null;default:true" json:"is_active"`
 	CreatedAt  time.Time           `gorm:"type:timestamptz;not null;default:now()" json:"created_at"`
 	UpdatedAt  time.Time           `gorm:"type:timestamptz;not null;default:now()" json:"updated_at"`
-	Options    []DemographicOption `gorm:"foreignKey:FieldID" json:"options,omitempty"`
+	Options            []DemographicOption `gorm:"foreignKey:FieldID" json:"options"`
+	DemographicOptions []DemographicOption `gorm:"-" json:"demographic_options"`
 }
 
 func (DemographicField) TableName() string {

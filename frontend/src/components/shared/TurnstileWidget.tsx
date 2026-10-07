@@ -98,6 +98,8 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
       }
     };
 
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
     if (window.turnstile) {
       renderWidget();
     } else {
@@ -113,8 +115,17 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
       }
       script.addEventListener("load", renderWidget);
 
+      // Fallback polling for SPA ClientRouter transitions where script already exists in head
+      pollInterval = setInterval(() => {
+        if (window.turnstile) {
+          if (pollInterval) clearInterval(pollInterval);
+          renderWidget();
+        }
+      }, 100);
+
       return () => {
         isMounted = false;
+        if (pollInterval) clearInterval(pollInterval);
         script?.removeEventListener("load", renderWidget);
         if (widgetIdRef.current && window.turnstile) {
           try {
@@ -129,6 +140,7 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
 
     return () => {
       isMounted = false;
+      if (pollInterval) clearInterval(pollInterval);
       if (widgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.remove(widgetIdRef.current);

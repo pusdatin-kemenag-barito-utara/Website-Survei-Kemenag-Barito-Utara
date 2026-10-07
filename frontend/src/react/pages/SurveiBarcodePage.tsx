@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { PublicNavbar } from '@/components/shared/PublicNavbar'
 import { Footer } from '@/components/shared/Footer'
 import PageBanner from '@/components/shared/PageBanner'
-import { pb } from '@/lib/pocketbase'
+import { fetchCachedServices } from '@/lib/data-cache'
 import { Analytics } from '@/lib/analytics'
 import type { Service } from '@/types'
 import { toast } from 'sonner'
@@ -23,7 +23,7 @@ export default function BarcodePage() {
   const [copied, setCopied] = useState(false)
 
   const origin = typeof window !== 'undefined'
-    ? ((window as any).__ENV__?.PUBLIC_APP_URL || window.location.origin)
+    ? ((window as any).__ENV__?.PUBLIC_APP_URL || (window as any).__PUBLIC_ENV__?.PUBLIC_APP_URL || window.location.origin)
     : (import.meta.env.PUBLIC_APP_URL || '')
   const selectedSlug = selectedServiceId !== 'all' ? services.find(s => s.id === selectedServiceId)?.slug : null
   const targetUrl = selectedSlug ? `${origin}/survei?service=${selectedSlug}` : `${origin}/survei`
@@ -31,13 +31,12 @@ export default function BarcodePage() {
   useEffect(() => {
     async function fetchServices() {
       try {
-        const records = await pb.collection('services').getFullList({
-          filter: 'is_active = true',
-          sort: 'name',
-        })
-        setServices(records as unknown as Service[])
+        const cached = await fetchCachedServices()
+        if (cached && cached.length > 0) {
+          setServices(cached)
+        }
       } catch (err) {
-        console.error('Failed to fetch services:', err)
+        console.warn('Failed to load services for barcode:', err)
       }
     }
     fetchServices()

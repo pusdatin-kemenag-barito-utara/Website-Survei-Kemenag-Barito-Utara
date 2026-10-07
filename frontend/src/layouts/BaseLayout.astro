@@ -9,15 +9,15 @@ interface Props {
   type?: string;
 }
 
-const appUrl = import.meta.env.PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || "";
-const gaMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID || process.env.PUBLIC_GA_MEASUREMENT_ID || "";
-const gtagId = import.meta.env.PUBLIC_GTAG_ID || process.env.PUBLIC_GTAG_ID || "";
-const cfBeaconToken = import.meta.env.PUBLIC_CF_BEACON_TOKEN || process.env.PUBLIC_CF_BEACON_TOKEN || "";
-const enableCfRum = (import.meta.env.PUBLIC_CLOUDFLARE_RUM_ENABLED || process.env.PUBLIC_CLOUDFLARE_RUM_ENABLED) !== "false";
+const appUrl = process.env.PUBLIC_APP_URL || import.meta.env.PUBLIC_APP_URL || "";
+const gaMeasurementId = process.env.PUBLIC_GA_MEASUREMENT_ID || import.meta.env.PUBLIC_GA_MEASUREMENT_ID || "";
+const gtagId = process.env.PUBLIC_GTAG_ID || import.meta.env.PUBLIC_GTAG_ID || "";
+const cfBeaconToken = process.env.PUBLIC_CF_BEACON_TOKEN || import.meta.env.PUBLIC_CF_BEACON_TOKEN || "";
+const enableCfRum = (process.env.PUBLIC_CLOUDFLARE_RUM_ENABLED || import.meta.env.PUBLIC_CLOUDFLARE_RUM_ENABLED) !== "false";
 const turnstileSiteKey = process.env.PUBLIC_TURNSTILE_SITE_KEY || import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || "";
 const pusdatinUrl = process.env.PUBLIC_PUSDATIN_URL || import.meta.env.PUBLIC_PUSDATIN_URL || "";
 const pocketbaseUrl = process.env.PUBLIC_POCKETBASE_URL || import.meta.env.PUBLIC_POCKETBASE_URL || process.env.POCKETBASE_URL || "";
-const superAdminEmail = process.env.PUBLIC_SUPER_ADMIN_EMAIL || import.meta.env.PUBLIC_SUPER_ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || "";
+const superAdminEmail = process.env.PUBLIC_SUPER_ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || import.meta.env.PUBLIC_SUPER_ADMIN_EMAIL || "";
 
 const {
   title = "SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara",
@@ -47,10 +47,11 @@ const siteTitle = title.includes("SI-ARUS")
 
 const ogImageUrl = image.startsWith("http") ? image : `${appUrl}${image}`;
 
+const canonicalBase = appUrl || (Astro.site ? Astro.site.toString() : Astro.url.origin);
 const canonicalUrl = new URL(
   Astro.url.pathname,
-  appUrl || "https://survei.kemenag-baritoutara.com"
-).href.replace(/\/+$/, "") || appUrl;
+  canonicalBase
+).href.replace(/\/+$/, "") || canonicalBase;
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -401,6 +402,7 @@ const jsonLd = {
       }
     }}>
       window.__ENV__ = Object.assign(window.__ENV__ || {}, envData);
+      window.__PUBLIC_ENV__ = window.__ENV__;
     </script>
 
     <!-- Client Router for Instant SPA Page Transitions -->

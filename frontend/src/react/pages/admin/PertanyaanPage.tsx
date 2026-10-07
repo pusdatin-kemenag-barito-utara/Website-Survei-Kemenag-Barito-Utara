@@ -31,6 +31,7 @@ import {
   getCachedAdminQuestionsSync,
   getCachedAdminUnsurSync,
   getCachedAdminServicesSync,
+  invalidateClientCache,
 } from '@/lib/data-cache'
 import type { Question, Unsur, Service } from '@/types'
 
@@ -254,13 +255,19 @@ export default function AdminPertanyaanPage() {
 
   async function confirmDelete() {
     if (!deleteDialog) return
+    const target = deleteDialog
     setDeleting(true)
+    // Optimistic instant UI update
+    setQuestions((prev) => prev.filter((q) => q.id !== target.id))
+    setDeleteDialog(null)
     try {
-      await apiFetch(`/admin/questions/${deleteDialog.id}`, { method: 'DELETE' })
+      await apiFetch(`/admin/questions/${target.id}`, { method: 'DELETE' })
       toast.success('Pertanyaan berhasil dihapus')
-      setDeleteDialog(null)
+      invalidateClientCache()
       fetchQuestions(filterUnsur, true)
     } catch {
+      // Revert if error
+      setQuestions((prev) => [...prev, target])
       toast.error('Gagal menghapus pertanyaan')
     } finally {
       setDeleting(false)

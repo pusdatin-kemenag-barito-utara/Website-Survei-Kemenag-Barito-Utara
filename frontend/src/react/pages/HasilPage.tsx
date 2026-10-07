@@ -20,7 +20,7 @@ import {
   getCachedPublicResultsSync,
   getCachedServicesSync,
 } from '@/lib/data-cache'
-import { pb } from '@/lib/pocketbase'
+import { getPocketBase } from '@/lib/pocketbase/client'
 import { exportToExcel, exportToPdf } from '@/lib/export'
 import { Analytics } from '@/lib/analytics'
 import type { IndexSummary, IndexByService, IndexTrend, UnsurSummary, DemographicSummary } from '@/types'
@@ -78,11 +78,11 @@ export default function HasilPage() {
   }, [])
 
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null
-
-    async function subscribeRealtime() {
-      try {
-        unsubscribe = await pb.collection('responses').subscribe('*', async () => {
+    let unsubscribe: (() => void) | undefined
+    try {
+      const pb = getPocketBase()
+      pb.collection('responses').subscribe('*', async (e) => {
+        if (e.action === 'create' || e.action === 'delete') {
           try {
             const publicData = await fetchCachedPublicResults(true)
             if (publicData) {
@@ -93,17 +93,19 @@ export default function HasilPage() {
               if (publicData.demographics) setDemoSummary(publicData.demographics)
             }
           } catch {}
-        })
-      } catch {}
-    }
-
-    subscribeRealtime()
+        }
+      }).then((unsub) => {
+        unsubscribe = unsub
+      }).catch((err) => {
+        console.warn('[PocketBase] Realtime subscribe error:', err)
+      })
+    } catch {}
 
     return () => {
       if (unsubscribe) {
-        unsubscribe()
+        try { unsubscribe() } catch {}
       } else {
-        pb.collection('responses').unsubscribe('*').catch(() => {})
+        try { getPocketBase().collection('responses').unsubscribe('*') } catch {}
       }
     }
   }, [])

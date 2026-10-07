@@ -106,6 +106,8 @@ func (h *DemographicHandler) CreateOption(c fiber.Ctx) error {
 	if err := h.repo.CreateDemographicOption(&opt); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	service.DeleteCache("survey_form_questions")
+	service.DeleteCache("admin_demographics")
 	return c.Status(fiber.StatusCreated).JSON(opt)
 }
 
@@ -125,6 +127,8 @@ func (h *DemographicHandler) UpdateOption(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	service.DeleteCache("survey_form_questions")
+	service.DeleteCache("admin_demographics")
 	return c.JSON(updated)
 }
 
@@ -138,5 +142,7 @@ func (h *DemographicHandler) DeleteOption(c fiber.Ctx) error {
 	if err := h.repo.DeleteDemographicOption(id); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	service.DeleteCache("survey_form_questions")
+	service.DeleteCache("admin_demographics")
 	return c.JSON(fiber.Map{"message": "Opsi demografi berhasil dihapus"})
 }

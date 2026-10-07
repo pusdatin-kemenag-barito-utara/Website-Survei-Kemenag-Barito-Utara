@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useI18n } from '@/components/shared/I18nProvider'
 import { PublicNavbar } from '@/components/shared/PublicNavbar'
 import { Footer } from '@/components/shared/Footer'
-import { pb } from '@/lib/pocketbase'
+import { fetchCachedServices } from '@/lib/data-cache'
 import type { Service } from '@/types'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -22,13 +22,12 @@ export default function BarcodePage() {
   useEffect(() => {
     async function fetchServices() {
       try {
-        const records = await pb.collection('services').getFullList({
-          filter: 'is_active = true',
-          sort: 'sort_order',
-        })
-        setServices(records as unknown as Service[])
+        const cached = await fetchCachedServices()
+        if (cached && cached.length > 0) {
+          setServices(cached)
+        }
       } catch (err) {
-        console.error('Failed to fetch services for barcode:', err)
+        console.warn('Failed to fetch services in barcode page:', err)
       } finally {
         setLoading(false)
       }

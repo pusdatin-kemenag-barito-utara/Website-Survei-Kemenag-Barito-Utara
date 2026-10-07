@@ -19,4 +19,6 @@ export function getPocketBaseClient() {
   return new PocketBase(getPocketBaseUrl());
 }
 
+export const getPocketBase = getPocketBaseClient;
+
 export default pb;
