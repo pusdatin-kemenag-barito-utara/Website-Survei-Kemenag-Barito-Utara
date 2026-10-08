@@ -8,7 +8,6 @@ import (
 	"survey-kemenag-backend/service"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 type PeriodHandler struct {
@@ -62,14 +61,14 @@ func (h *PeriodHandler) CreatePeriod(c fiber.Ctx) error {
 	service.DeleteCache("public_results")
 	service.DeleteCache("admin_periods")
 	service.DeleteCache("admin_stats")
+	service.DeleteCachePrefix("archive_results_")
 	return c.Status(fiber.StatusCreated).JSON(period)
 }
 
 func (h *PeriodHandler) SetPeriodActive(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID periode tidak valid"})
+		return err
 	}
 
 	if err := h.repo.SetPeriodActive(id); err != nil {
@@ -79,14 +78,14 @@ func (h *PeriodHandler) SetPeriodActive(c fiber.Ctx) error {
 	service.DeleteCache("public_results")
 	service.DeleteCache("admin_periods")
 	service.DeleteCache("admin_stats")
+	service.DeleteCachePrefix("archive_results_")
 	return c.JSON(fiber.Map{"message": "Periode survei berhasil diaktifkan"})
 }
 
 func (h *PeriodHandler) UpdatePeriod(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID periode tidak valid"})
+		return err
 	}
 
 	var period models.SurveyPeriod
@@ -102,14 +101,14 @@ func (h *PeriodHandler) UpdatePeriod(c fiber.Ctx) error {
 	service.DeleteCache("public_results")
 	service.DeleteCache("admin_periods")
 	service.DeleteCache("admin_stats")
+	service.DeleteCachePrefix("archive_results_")
 	return c.JSON(updated)
 }
 
 func (h *PeriodHandler) DeletePeriod(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID periode tidak valid"})
+		return err
 	}
 
 	if err := h.repo.DeletePeriod(id); err != nil {
@@ -119,5 +118,6 @@ func (h *PeriodHandler) DeletePeriod(c fiber.Ctx) error {
 	service.DeleteCache("public_results")
 	service.DeleteCache("admin_periods")
 	service.DeleteCache("admin_stats")
+	service.DeleteCachePrefix("archive_results_")
 	return c.JSON(fiber.Map{"message": "Periode survei berhasil dihapus"})
 }

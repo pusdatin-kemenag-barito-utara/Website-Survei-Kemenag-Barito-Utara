@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ChevronDown, FolderArchive, Activity, ShieldCheck } from 'lucide-react'
 import { useI18n } from '@/components/shared/I18nProvider'
 import { cn } from '@/lib/utils'
-import { fetchCachedPeriods, getCachedPeriodsSync } from '@/lib/data-cache'
+import { fetchCachedPeriods, getCachedPeriodsSync, fetchCachedArchiveResults, getArchivePeriodDates } from '@/lib/data-cache'
 import type { SurveyPeriod } from '@/types'
 import {
   DropdownMenu,
@@ -74,6 +74,11 @@ export function NavArchiveDropdown({ isActive, label }: NavArchiveDropdownProps)
     })
   }, [periods])
 
+  const handlePrefetch = (year: number | string, p: string) => {
+    const d = getArchivePeriodDates(String(year), p)
+    fetchCachedArchiveResults(d.rawStart, d.rawEnd).catch(() => {})
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -104,28 +109,41 @@ export function NavArchiveDropdown({ isActive, label }: NavArchiveDropdownProps)
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent sideOffset={8} className="w-52 rounded-2xl p-1.5 shadow-2xl shadow-emerald-950/15 border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl space-y-0.5">
                   {item.quarters.map((q) => (
-                    <Link key={q} href={`/arsip/ipkp/${item.year}/q${q}`}>
+                    <Link
+                      key={q}
+                      href={`/arsip/ipkp/${item.year}/q${q}`}
+                      onMouseEnter={() => handlePrefetch(item.year, `q${q}`)}
+                    >
                       <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                         {locale === 'en' ? `Quarter ${q}` : `Triwulan ${q}`} ({item.year})
                       </DropdownMenuItem>
                     </Link>
                   ))}
                   {item.hasSemester1 && (
-                    <Link href={`/arsip/ipkp/${item.year}/s1`}>
+                    <Link
+                      href={`/arsip/ipkp/${item.year}/s1`}
+                      onMouseEnter={() => handlePrefetch(item.year, 's1')}
+                    >
                       <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                         {locale === 'en' ? 'Semester 1' : 'Semester I'} ({item.year})
                       </DropdownMenuItem>
                     </Link>
                   )}
                   {item.hasSemester2 && (
-                    <Link href={`/arsip/ipkp/${item.year}/s2`}>
+                    <Link
+                      href={`/arsip/ipkp/${item.year}/s2`}
+                      onMouseEnter={() => handlePrefetch(item.year, 's2')}
+                    >
                       <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                         {locale === 'en' ? 'Semester 2' : 'Semester II'} ({item.year})
                       </DropdownMenuItem>
                     </Link>
                   )}
                   {item.hasTahunan && (
-                    <Link href={`/arsip/ipkp/${item.year}/tahunan`}>
+                    <Link
+                      href={`/arsip/ipkp/${item.year}/tahunan`}
+                      onMouseEnter={() => handlePrefetch(item.year, 'tahunan')}
+                    >
                       <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-extrabold text-emerald-800 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/80 hover:bg-emerald-100 transition-all">
                         {locale === 'en' ? 'Annual' : 'Tahunan'} ({item.year})
                       </DropdownMenuItem>
@@ -143,28 +161,41 @@ export function NavArchiveDropdown({ isActive, label }: NavArchiveDropdownProps)
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent sideOffset={8} className="w-52 rounded-2xl p-1.5 shadow-2xl shadow-emerald-950/15 border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl space-y-0.5">
                   {item.quarters.map((q) => (
-                    <Link key={q} href={`/arsip/ipak/${item.year}/q${q}`}>
+                    <Link
+                      key={q}
+                      href={`/arsip/ipak/${item.year}/q${q}`}
+                      onMouseEnter={() => handlePrefetch(item.year, `q${q}`)}
+                    >
                       <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                         {locale === 'en' ? `Quarter ${q}` : `Triwulan ${q}`} ({item.year})
                       </DropdownMenuItem>
                     </Link>
                   ))}
                   {item.hasSemester1 && (
-                    <Link href={`/arsip/ipak/${item.year}/s1`}>
+                    <Link
+                      href={`/arsip/ipak/${item.year}/s1`}
+                      onMouseEnter={() => handlePrefetch(item.year, 's1')}
+                    >
                       <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                         {locale === 'en' ? 'Semester 1' : 'Semester I'} ({item.year})
                       </DropdownMenuItem>
                     </Link>
                   )}
                   {item.hasSemester2 && (
-                    <Link href={`/arsip/ipak/${item.year}/s2`}>
+                    <Link
+                      href={`/arsip/ipak/${item.year}/s2`}
+                      onMouseEnter={() => handlePrefetch(item.year, 's2')}
+                    >
                       <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 hover:text-emerald-800 hover:font-extrabold transition-all">
                         {locale === 'en' ? 'Semester 2' : 'Semester II'} ({item.year})
                       </DropdownMenuItem>
                     </Link>
                   )}
                   {item.hasTahunan && (
-                    <Link href={`/arsip/ipak/${item.year}/tahunan`}>
+                    <Link
+                      href={`/arsip/ipak/${item.year}/tahunan`}
+                      onMouseEnter={() => handlePrefetch(item.year, 'tahunan')}
+                    >
                       <DropdownMenuItem className="cursor-pointer text-xs py-2 px-3 rounded-xl font-extrabold text-emerald-800 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/80 hover:bg-emerald-100 transition-all">
                         {locale === 'en' ? 'Annual' : 'Tahunan'} ({item.year})
                       </DropdownMenuItem>

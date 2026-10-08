@@ -164,8 +164,8 @@ func (s *SurveyService) GetAdminStats() (fiber.Map, error) {
 			activeServices int64
 			totalUnsur     int64
 			activePeriod   *models.SurveyPeriod
-			results        []domain.AnswerUnsurRaw
-			errResp, errServ, errUnsur, errRes error
+			viewIndex      []domain.ViewIndexSummaryRow
+			errResp, errServ, errUnsur, errIdx error
 		)
 
 		var wg sync.WaitGroup
@@ -193,7 +193,7 @@ func (s *SurveyService) GetAdminStats() (fiber.Map, error) {
 
 		go func() {
 			defer wg.Done()
-			results, errRes = s.repo.GetAnswerUnsurRawList()
+			viewIndex, errIdx = s.repo.GetViewIndexSummary()
 		}()
 
 		wg.Wait()
@@ -207,30 +207,17 @@ func (s *SurveyService) GetAdminStats() (fiber.Map, error) {
 		if errUnsur != nil {
 			return nil, errUnsur
 		}
-		if errRes != nil {
-			results = nil
-		}
 
 		ipkpScore := 0.0
 		ipakScore := 0.0
 
-		if len(results) > 0 {
-			var ipkpSum, ipakSum float64
-			var ipkpCount, ipakCount int64
-			for _, r := range results {
-				if r.IndexType == "IPAK" {
-					ipakSum += float64(r.RatingValue)
-					ipakCount++
+		if errIdx == nil && len(viewIndex) > 0 {
+			for _, vi := range viewIndex {
+				if vi.IndexType == "IPAK" {
+					ipakScore = vi.NilaiKonversi
 				} else {
-					ipkpSum += float64(r.RatingValue)
-					ipkpCount++
+					ipkpScore = vi.NilaiKonversi
 				}
-			}
-			if ipkpCount > 0 {
-				ipkpScore = domain.RoundTwoDecimals(((ipkpSum / float64(ipkpCount)) / 4.0) * 100.0)
-			}
-			if ipakCount > 0 {
-				ipakScore = domain.RoundTwoDecimals(((ipakSum / float64(ipakCount)) / 4.0) * 100.0)
 			}
 		}
 
@@ -279,7 +266,7 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 	}
 
 	if totalResponses == 0 {
-		globalCache.Set(cacheKey, emptyResult, 10*time.Minute)
+		globalCache.Set(cacheKey, emptyResult, 5*time.Minute)
 		return emptyResult, nil
 	}
 
@@ -449,7 +436,7 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 	}
 
 	// 3. Demographics Summary
-	demoList, _ := s.repo.GetDemographicSummary()
+	demoList, _ := s.repo.GetArchiveDemographicSummary(startDate, endDate)
 	if demoList == nil {
 		demoList = []domain.DemographicSummaryRow{}
 	}
@@ -481,7 +468,7 @@ func (s *SurveyService) GetArchiveResults(startDate, endDate string) (fiber.Map,
 		"index_summary":   indexSummary,
 		"trend":           trendList,
 	}
-	globalCache.Set(cacheKey, result, 10*time.Minute)
+	globalCache.Set(cacheKey, result, 5*time.Minute)
 
 	return result, nil
 }
@@ -598,9 +585,10 @@ func (s *SurveyService) SubmitSurvey(req *domain.SubmitSurveyRequest, clientIP s
 
 	// Feature 1 & 3: Async Non-Blocking Cache Invalidation, Pre-warming & Audit Logging
 	go func(rID uuid.UUID) {
-		// Invalidate public and admin stats cache
+		// Invalidate public, admin stats, and archive cache
 		globalCache.Delete("public_results")
 		globalCache.Delete("admin_stats")
+		globalCache.DeletePrefix("archive_results_")
 
 		// Pre-warm public results in background so next viewer gets instant 0ms response
 		_, _ = s.GetPublicResults()
@@ -623,6 +611,7 @@ func (s *SurveyService) PrewarmCache() {
 		log.Println("🔥 [Cache] Background pre-warming public results, services, and form questions...")
 		start := time.Now()
 		_, _ = s.GetPublicResults()
+		_, _ = s.GetAdminStats()
 		_, _ = s.repo.ListActiveServices()
 		_, _ = s.repo.ListActiveQuestions()
 		_, _ = s.repo.ListActiveDemographicFields()

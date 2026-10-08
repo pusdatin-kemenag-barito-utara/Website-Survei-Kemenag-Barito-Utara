@@ -81,6 +81,7 @@ type Repository interface {
 	DeleteResponseFull(id uuid.UUID) error
 	SaveResponseFull(resp *models.Response, demoList []models.ResponseDemographic, answerList []models.ResponseAnswer) error
 	GetArchiveRawAnswers(startDate, endDate string) (int64, []domain.CombinedRawAnswer, error)
+	GetArchiveDemographicSummary(startDate, endDate string) ([]domain.DemographicSummaryRow, error)
 
 	GetResponseAnswersDetail(id uuid.UUID) ([]domain.AnswerDetailResult, error)
 	GetResponseDemographicsDetail(id uuid.UUID) ([]domain.DemoDetailResult, error)

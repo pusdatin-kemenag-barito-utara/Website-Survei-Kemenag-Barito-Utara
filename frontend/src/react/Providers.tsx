@@ -9,6 +9,7 @@ import { MaintenanceListener } from "@/components/providers/maintenance-listener
 
 interface ErrorBoundaryState {
   hasError: boolean;
+  isNotFound: boolean;
   error: Error | null;
 }
 
@@ -16,23 +17,29 @@ class GlobalErrorBoundary extends Component<
   { children: ReactNode },
   ErrorBoundaryState
 > {
-  state: ErrorBoundaryState = { hasError: false, error: null };
+  state: ErrorBoundaryState = { hasError: false, isNotFound: false, error: null };
 
   static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
     if (error instanceof NotFoundError) {
-      return { hasError: false, error: null };
+      return { hasError: false, isNotFound: true, error: null };
     }
     return {
       hasError: true,
+      isNotFound: false,
       error: error instanceof Error ? error : new Error(String(error)),
     };
   }
 
   componentDidCatch(error: Error, errorInfo: unknown) {
-    console.error("[SI-ARUS Error Boundary Caught]:", error, errorInfo);
+    if (!(error instanceof NotFoundError)) {
+      console.error("[SI-ARUS Error Boundary Caught]:", error, errorInfo);
+    }
   }
 
   render() {
+    if (this.state.isNotFound) {
+      return <NotFoundPage />;
+    }
     if (this.state.hasError) {
       return (
         <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
@@ -71,23 +78,6 @@ class GlobalErrorBoundary extends Component<
   }
 }
 
-class NotFoundBoundary extends Component<
-  { children: ReactNode },
-  { notFound: boolean }
-> {
-  state = { notFound: false };
-
-  static getDerivedStateFromError(error: unknown) {
-    if (error instanceof NotFoundError) return { notFound: true };
-    return null;
-  }
-
-  render() {
-    if (this.state.notFound) return <NotFoundPage />;
-    return this.props.children;
-  }
-}
-
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
 
@@ -97,7 +87,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <TooltipProvider>
           <MaintenanceListener />
           <GlobalErrorBoundary>
-            <NotFoundBoundary>{children}</NotFoundBoundary>
+            {children}
           </GlobalErrorBoundary>
           <Toaster />
         </TooltipProvider>

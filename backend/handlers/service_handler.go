@@ -8,7 +8,6 @@ import (
 	"survey-kemenag-backend/service"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 type ServiceHandler struct {
@@ -73,10 +72,9 @@ func (h *ServiceHandler) CreateService(c fiber.Ctx) error {
 }
 
 func (h *ServiceHandler) UpdateService(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
+		return err
 	}
 
 	var s models.Service
@@ -95,10 +93,9 @@ func (h *ServiceHandler) UpdateService(c fiber.Ctx) error {
 }
 
 func (h *ServiceHandler) DeleteService(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
+		return err
 	}
 
 	if err := h.repo.DeleteService(id); err != nil {

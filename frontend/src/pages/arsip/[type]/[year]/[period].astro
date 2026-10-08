@@ -10,5 +10,5 @@ const description = `Laporan arsip dan rekapitulasi data survei ${indexType} per
 ---
 
 <BaseLayout title={title} description={description}>
-  <ArsipEntry client:load />
+  <ArsipEntry client:only="react" type={type} year={year} period={period} />
 </BaseLayout>

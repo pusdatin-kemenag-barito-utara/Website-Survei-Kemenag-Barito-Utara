@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import NotFoundPage from "@/react/pages/NotFoundPage";
 import {
@@ -53,6 +53,7 @@ import {
   getCachedArchiveResultsSync,
   getCachedServicesSync,
 } from "@/lib/data-cache";
+import { getPocketBase } from "@/lib/pocketbase";
 import { exportToExcel, exportToPdf } from "@/lib/export";
 
 import type {
@@ -96,15 +97,25 @@ function getDates(y: string, p: string) {
   };
 }
 
-export default function ArsipPage() {
+export interface ArsipPageProps {
+  type?: string;
+  year?: string;
+  period?: string;
+}
+
+export default function ArsipPage({
+  type: propType,
+  year: propYear,
+  period: propPeriod,
+}: ArsipPageProps = {}) {
   const { t, locale } = useI18n();
   const isEn = locale === "en";
 
   const params = useParams();
-  const type = (params?.type as string) || "ipkp";
+  const type = propType || (params?.type as string) || "ipkp";
   const yearStr =
-    (params?.year as string) || new Date().getFullYear().toString();
-  const period = (params?.period as string) || "tahunan";
+    propYear || (params?.year as string) || new Date().getFullYear().toString();
+  const period = propPeriod || (params?.period as string) || "tahunan";
 
   const validTypes = ["ipkp", "ipak"];
   const validPeriods = [
@@ -124,7 +135,8 @@ export default function ArsipPage() {
     !validTypes.includes(type.toLowerCase()) ||
     !validPeriods.includes(period.toLowerCase()) ||
     isNaN(yearNum) ||
-    yearNum < 2026;
+    yearNum < 2020 ||
+    yearNum > 2100;
 
   const indexType = type.toUpperCase() === "IPAK" ? "IPAK" : "IPKP";
 
@@ -219,104 +231,214 @@ export default function ArsipPage() {
   const [serviceFilter, setServiceFilter] = useState("all");
 
   useEffect(() => {
+    let isMounted = true;
     async function fetchData() {
+      setLoading(true);
       const dates = getDates(yearStr, period);
       try {
         const [archiveData, servicesRes] = await Promise.all([
-          fetchCachedArchiveResults(dates.rawStart, dates.rawEnd),
+          fetchCachedArchiveResults(dates.rawStart, dates.rawEnd, false),
           fetchCachedServices(),
         ]);
+
+        if (!isMounted) return;
 
         setTotalResponses(archiveData.total_responses || 0);
         if (archiveData.by_service && Array.isArray(archiveData.by_service)) {
           setByService(archiveData.by_service);
+        } else {
+          setByService([]);
         }
         if (archiveData.unsur_summary && Array.isArray(archiveData.unsur_summary)) {
           setUnsurSummary(archiveData.unsur_summary);
+        } else {
+          setUnsurSummary([]);
         }
         if (archiveData.demographics && Array.isArray(archiveData.demographics)) {
           setDemoSummary(archiveData.demographics);
+        } else {
+          setDemoSummary([]);
         }
         if (archiveData.trend && Array.isArray(archiveData.trend)) {
           setTrend(archiveData.trend);
+        } else {
+          setTrend([]);
         }
 
         if (servicesRes && Array.isArray(servicesRes)) {
           setAllServices(servicesRes);
         }
 
-        setSummary([
-          {
-            index_type: "IPKP",
-            nilai_index: archiveData.ipkp_score / 25,
-            nilai_konversi: archiveData.ipkp_score,
-            mutu:
-              archiveData.ipkp_score >= 88.31
-                ? "A"
-                : archiveData.ipkp_score >= 76.61
-                  ? "B"
-                  : archiveData.ipkp_score >= 65.0
-                    ? "C"
-                    : "D",
-            mutu_pelayanan:
-              archiveData.ipkp_score >= 88.31
-                ? "Sangat Baik"
-                : archiveData.ipkp_score >= 76.61
-                  ? "Baik"
-                  : archiveData.ipkp_score >= 65.0
-                    ? "Kurang Baik"
-                    : "Tidak Baik",
-            total_responden: archiveData.total_responses,
-          },
-          {
-            index_type: "IPAK",
-            nilai_index: archiveData.ipak_score / 25,
-            nilai_konversi: archiveData.ipak_score,
-            mutu:
-              archiveData.ipak_score >= 88.31
-                ? "A"
-                : archiveData.ipak_score >= 76.61
-                  ? "B"
-                  : archiveData.ipak_score >= 65.0
-                    ? "C"
-                    : "D",
-            total_responden: archiveData.total_responses || 0,
-            kinerja: "Sangat Baik",
-            calculated_at: new Date().toISOString(),
-          },
-        ]);
-
+        if (archiveData.index_summary && Array.isArray(archiveData.index_summary) && archiveData.index_summary.length > 0) {
+          setSummary(
+            archiveData.index_summary.map((idx) => ({
+              index_type: idx.index_type,
+              nilai_index: idx.nilai_index,
+              nilai_konversi: idx.nilai_konversi,
+              mutu: idx.mutu,
+              mutu_pelayanan:
+                idx.kinerja ||
+                (idx.mutu === "A"
+                  ? "Sangat Baik"
+                  : idx.mutu === "B"
+                    ? "Baik"
+                    : idx.mutu === "C"
+                      ? "Kurang Baik"
+                      : "Tidak Baik"),
+              kinerja: idx.kinerja || "Sangat Baik",
+              total_responden: archiveData.total_responses || 0,
+              calculated_at: new Date().toISOString(),
+            }))
+          );
+        } else {
+          setSummary([
+            {
+              index_type: "IPKP",
+              nilai_index: archiveData.ipkp_score / 25,
+              nilai_konversi: archiveData.ipkp_score,
+              mutu:
+                archiveData.ipkp_score >= 88.31
+                  ? "A"
+                  : archiveData.ipkp_score >= 76.61
+                    ? "B"
+                    : archiveData.ipkp_score >= 65.0
+                      ? "C"
+                      : "D",
+              mutu_pelayanan:
+                archiveData.ipkp_score >= 88.31
+                  ? "Sangat Baik"
+                  : archiveData.ipkp_score >= 76.61
+                    ? "Baik"
+                    : archiveData.ipkp_score >= 65.0
+                      ? "Kurang Baik"
+                      : "Tidak Baik",
+              total_responden: archiveData.total_responses || 0,
+            },
+            {
+              index_type: "IPAK",
+              nilai_index: archiveData.ipak_score / 25,
+              nilai_konversi: archiveData.ipak_score,
+              mutu:
+                archiveData.ipak_score >= 88.31
+                  ? "A"
+                  : archiveData.ipak_score >= 76.61
+                    ? "B"
+                    : archiveData.ipak_score >= 65.0
+                      ? "C"
+                      : "D",
+              total_responden: archiveData.total_responses || 0,
+              kinerja: "Sangat Baik",
+              calculated_at: new Date().toISOString(),
+            },
+          ]);
+        }
       } catch (err) {
         console.error("Fetch archive error:", err);
       } finally {
-        setLoading(false);
-
-        // Background prefetch other periods for instant switching
-        const otherPeriods = ["q1", "q2", "q3", "q4", "s1", "s2", "tahunan"].filter(
-          (p) => p !== period.toLowerCase()
-        );
-        for (const p of otherPeriods) {
-          const d = getDates(yearStr, p);
-          fetchCachedArchiveResults(d.rawStart, d.rawEnd).catch(() => {});
+        if (isMounted) {
+          setLoading(false);
         }
       }
     }
     fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [yearStr, period]);
 
-  const serviceOptions = Array.from(
-    new Set([
-      ...allServices.map((s) => s.name),
-      ...byService.map((s) => s.service_name),
-    ]),
-  ).sort();
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    try {
+      const pb = getPocketBase();
+      pb.collection("responses").subscribe("*", async (e) => {
+        if (e.action === "create" || e.action === "delete") {
+          const dates = getDates(yearStr, period);
+          try {
+            const [archiveData, servicesRes] = await Promise.all([
+              fetchCachedArchiveResults(dates.rawStart, dates.rawEnd, true),
+              fetchCachedServices(),
+            ]);
+            if (archiveData) {
+              setTotalResponses(archiveData.total_responses || 0);
+              if (archiveData.by_service && Array.isArray(archiveData.by_service)) {
+                setByService(archiveData.by_service);
+              }
+              if (archiveData.unsur_summary && Array.isArray(archiveData.unsur_summary)) {
+                setUnsurSummary(archiveData.unsur_summary);
+              }
+              if (archiveData.demographics && Array.isArray(archiveData.demographics)) {
+                setDemoSummary(archiveData.demographics);
+              }
+              if (archiveData.trend && Array.isArray(archiveData.trend)) {
+                setTrend(archiveData.trend);
+              }
+              if (servicesRes && Array.isArray(servicesRes)) {
+                setAllServices(servicesRes);
+              }
+              if (archiveData.index_summary && Array.isArray(archiveData.index_summary) && archiveData.index_summary.length > 0) {
+                setSummary(
+                  archiveData.index_summary.map((idx) => ({
+                    index_type: idx.index_type,
+                    nilai_index: idx.nilai_index,
+                    nilai_konversi: idx.nilai_konversi,
+                    mutu: idx.mutu,
+                    mutu_pelayanan:
+                      idx.kinerja ||
+                      (idx.mutu === "A"
+                        ? idx.index_type === "IPAK"
+                          ? "Sangat Bersih"
+                          : "Sangat Baik"
+                        : idx.mutu === "B"
+                          ? idx.index_type === "IPAK"
+                            ? "Bersih"
+                            : "Baik"
+                          : idx.mutu === "C"
+                            ? idx.index_type === "IPAK"
+                              ? "Kurang Bersih"
+                              : "Kurang Baik"
+                            : idx.index_type === "IPAK"
+                              ? "Tidak Bersih"
+                              : "Tidak Baik"),
+                    total_responden: idx.total_responden || archiveData.total_responses || 0,
+                  }))
+                );
+              }
+            }
+          } catch (err) {
+            console.error("Archive realtime re-fetch error:", err);
+          }
+        }
+      }).then((unsub) => {
+        unsubscribe = unsub;
+      }).catch((err) => {
+        console.warn("[PocketBase] Archive realtime subscribe error:", err);
+      });
+    } catch {}
 
-  const displayedServices =
-    serviceFilter === "all"
+    return () => {
+      if (unsubscribe) {
+        try { unsubscribe(); } catch {}
+      }
+    };
+  }, [yearStr, period]);
+
+  const serviceOptions = useMemo(() => {
+    return Array.from(
+      new Set([
+        ...allServices.map((s) => s.name),
+        ...byService.map((s) => s.service_name),
+      ]),
+    ).sort();
+  }, [allServices, byService]);
+
+  const displayedServices = useMemo(() => {
+    return serviceFilter === "all"
       ? allServices
       : allServices.filter((s) => s.name === serviceFilter);
+  }, [allServices, serviceFilter]);
 
-  const parseBarData = () => {
+  const barData = useMemo(() => {
     const ipkpByService = byService.filter((b) => b.index_type === "IPKP");
     const ipakByService = byService.filter((b) => b.index_type === "IPAK");
 
@@ -340,7 +462,7 @@ export default function ArsipPage() {
         IPAK: ipakEntry?.nilai_konversi || 0,
       };
     });
-  };
+  }, [byService, serviceFilter]);
 
   const getPendidikanRank = (val: string): number => {
     const v = val.toUpperCase().trim();
@@ -373,49 +495,57 @@ export default function ArsipPage() {
     return 99;
   };
 
-  const parseDemoFieldData = (fieldKey: string) => {
-    let filtered = demoSummary.filter(
-      (d) => d.field_key.toLowerCase() === fieldKey.toLowerCase(),
-    );
-    if (serviceFilter !== "all") {
-      filtered = filtered.filter((d) => d.service_name === serviceFilter);
-    }
-
-    const map = new Map<string, number>();
-    for (const item of filtered) {
-      const val = item.demographic_value || "Lainnya";
-      map.set(val, (map.get(val) || 0) + Number(item.count || 0));
-    }
-
-    const paletteMap: Record<string, string[]> = {
-      jenis_kelamin: ["#06b6d4", "#ec4899", "#f59e0b", "#10b981"],
-      pendidikan: ["#f59e0b", "#3b82f6", "#10b981", "#ec4899", "#8b5cf6", "#06b6d4", "#ef4444", "#64748b"],
-      usia: ["#f43f5e", "#ec4899", "#f59e0b", "#eab308", "#84cc16"],
-      pekerjaan: ["#10b981", "#14b8a6", "#06b6d4", "#3b82f6", "#6366f1", "#8b5cf6"],
-    };
-    const colors = paletteMap[fieldKey.toLowerCase()] || ["#06b6d4", "#10b981", "#3b82f6", "#f59e0b"];
-
-    if (map.size === 0) {
-      if (fieldKey === "jenis_kelamin") {
-        return [
-          { name: "Laki-laki", value: totalResponses > 0 ? totalResponses : 0, fill: colors[0] },
-          { name: "Perempuan", value: 0, fill: colors[1] },
-        ];
-      }
-      return [];
-    }
-
-    const rawList = Array.from(map.entries()).map(([name, value]) => ({
-      name,
-      value,
-    }));
-    if (fieldKey.toLowerCase() === "pendidikan") {
-      rawList.sort(
-        (a, b) => getPendidikanRank(a.name) - getPendidikanRank(b.name),
+  const parseDemoFieldData = useCallback(
+    (fieldKey: string) => {
+      let filtered = demoSummary.filter(
+        (d) => d.field_key.toLowerCase() === fieldKey.toLowerCase(),
       );
-    }
-    return rawList.map((item, idx) => ({ ...item, fill: colors[idx % colors.length] }));
-  };
+      if (serviceFilter !== "all") {
+        filtered = filtered.filter((d) => d.service_name === serviceFilter);
+      }
+
+      const map = new Map<string, number>();
+      for (const item of filtered) {
+        const val = item.demographic_value || "Lainnya";
+        map.set(val, (map.get(val) || 0) + Number(item.count || 0));
+      }
+
+      const paletteMap: Record<string, string[]> = {
+        jenis_kelamin: ["#06b6d4", "#ec4899", "#f59e0b", "#10b981"],
+        pendidikan: ["#f59e0b", "#3b82f6", "#10b981", "#ec4899", "#8b5cf6", "#06b6d4", "#ef4444", "#64748b"],
+        usia: ["#f43f5e", "#ec4899", "#f59e0b", "#eab308", "#84cc16"],
+        pekerjaan: ["#10b981", "#14b8a6", "#06b6d4", "#3b82f6", "#6366f1", "#8b5cf6"],
+      };
+      const colors = paletteMap[fieldKey.toLowerCase()] || ["#06b6d4", "#10b981", "#3b82f6", "#f59e0b"];
+
+      if (map.size === 0) {
+        return [];
+      }
+
+      const rawList = Array.from(map.entries()).map(([name, value]) => ({
+        name,
+        value,
+      }));
+      if (fieldKey.toLowerCase() === "pendidikan") {
+        rawList.sort(
+          (a, b) => getPendidikanRank(a.name) - getPendidikanRank(b.name),
+        );
+      }
+      return rawList.map((item, idx) => ({ ...item, fill: colors[idx % colors.length] }));
+    },
+    [demoSummary, serviceFilter],
+  );
+
+  const genderData = useMemo(() => parseDemoFieldData("jenis_kelamin"), [parseDemoFieldData]);
+  const educationData = useMemo(() => parseDemoFieldData("pendidikan"), [parseDemoFieldData]);
+  const ageData = useMemo(() => parseDemoFieldData("usia"), [parseDemoFieldData]);
+  const jobData = useMemo(() => parseDemoFieldData("pekerjaan"), [parseDemoFieldData]);
+
+  const filteredTrend = useMemo(() => {
+    return trend.filter(
+      (t) => !t.index_type || t.index_type.toUpperCase() === indexType.toUpperCase()
+    );
+  }, [trend, indexType]);
 
   const getMutuDescription = (mutu: string) => {
     if (!mutu || mutu === "-") return "Belum Terisi Survey";
@@ -717,7 +847,7 @@ export default function ArsipPage() {
                   <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
                       <Pie
-                        data={parseDemoFieldData("jenis_kelamin")}
+                        data={genderData}
                         cx="50%"
                         cy="45%"
                         innerRadius={40}
@@ -759,7 +889,7 @@ export default function ArsipPage() {
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart
-                      data={parseDemoFieldData("pendidikan")}
+                      data={educationData}
                       margin={{ top: 20, right: 4, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid
@@ -822,7 +952,7 @@ export default function ArsipPage() {
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart
-                      data={parseDemoFieldData("usia")}
+                      data={ageData}
                       margin={{ top: 20, right: 4, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid
@@ -885,7 +1015,7 @@ export default function ArsipPage() {
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart
-                      data={parseDemoFieldData("pekerjaan")}
+                      data={jobData}
                       margin={{ top: 20, right: 4, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid
@@ -947,7 +1077,7 @@ export default function ArsipPage() {
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart
-                      data={parseBarData()}
+                      data={barData}
                       margin={{ top: 12, right: 10, left: -10, bottom: 10 }}
                     >
                       <CartesianGrid
@@ -1041,7 +1171,7 @@ export default function ArsipPage() {
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
                     <AreaChart
-                      data={trend}
+                      data={filteredTrend}
                       margin={{ top: 12, right: 10, left: -10, bottom: 0 }}
                     >
                       <defs>

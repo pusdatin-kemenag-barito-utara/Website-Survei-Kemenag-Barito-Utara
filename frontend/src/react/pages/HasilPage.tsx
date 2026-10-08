@@ -20,7 +20,7 @@ import {
   getCachedPublicResultsSync,
   getCachedServicesSync,
 } from '@/lib/data-cache'
-import { getPocketBase } from '@/lib/pocketbase/client'
+import { getPocketBase } from '@/lib/pocketbase'
 import { exportToExcel, exportToPdf } from '@/lib/export'
 import { Analytics } from '@/lib/analytics'
 import type { IndexSummary, IndexByService, IndexTrend, UnsurSummary, DemographicSummary } from '@/types'
@@ -123,9 +123,9 @@ export default function HasilPage() {
     ? byService.filter(item => item.index_type === indexType)
     : byService.filter(item => item.index_type === indexType && item.service_name === serviceFilter)
 
-  const activeTotalResponses = currentByService.length > 0 
-    ? currentByService.reduce((acc, item) => acc + (item.jumlah_responden || 0), 0)
-    : (summary.find(s => s.index_type === indexType)?.total_responden ?? 0)
+  const activeTotalResponses = serviceFilter === 'all'
+    ? (summary.find(s => s.index_type === indexType)?.total_responden ?? (currentByService.length > 0 ? currentByService.reduce((acc, item) => acc + (item.jumlah_responden || 0), 0) : 0))
+    : (currentByService.find(item => item.service_name === serviceFilter)?.jumlah_responden ?? 0)
 
   const parseUnsurBarData = () => {
     let filtered = unsurSummary.filter((u) => u.index_type === indexType)
@@ -155,15 +155,18 @@ export default function HasilPage() {
   }
 
   const parseTrendData = () => {
-    return trend.map((t) => {
+    const filtered = trend.filter((t) => !t.index_type || t.index_type === indexType)
+    return filtered.map((t) => {
       let dateLabel = t.bulan
       try {
-        const d = new Date(t.bulan)
-        if (!isNaN(d.getTime())) {
-          const dateNum = d.getDate()
-          const weekNum = Math.ceil(dateNum / 7)
-          const monthName = d.toLocaleDateString(locale === 'en' ? 'en-US' : 'id-ID', { month: 'short', year: 'numeric' })
-          dateLabel = locale === 'en' ? `Week ${weekNum} ${monthName}` : `Minggu ke-${weekNum} ${monthName}`
+        if (t.bulan && t.bulan.includes('-')) {
+          const parts = t.bulan.split('-')
+          const y = parseInt(parts[0], 10)
+          const m = parseInt(parts[1], 10)
+          if (!isNaN(y) && !isNaN(m)) {
+            const d = new Date(y, m - 1, 1)
+            dateLabel = d.toLocaleDateString(locale === 'en' ? 'en-US' : 'id-ID', { month: 'short', year: 'numeric' })
+          }
         }
       } catch {
         dateLabel = t.bulan
@@ -175,8 +178,6 @@ export default function HasilPage() {
       }
     })
   }
-
-
 
 const getPendidikanRank = (val: string): number => {
   const v = val.toUpperCase().trim()
@@ -211,12 +212,6 @@ const getPendidikanRank = (val: string): number => {
     const colors = paletteMap[fieldKey.toLowerCase()] || ['#06b6d4', '#10b981', '#3b82f6', '#f59e0b']
 
     if (map.size === 0) {
-      if (fieldKey === 'jenis_kelamin') {
-        return [
-          { name: 'Laki-laki', value: activeTotalResponses > 0 ? activeTotalResponses : 0, fill: colors[0] },
-          { name: 'Perempuan', value: 0, fill: colors[1] },
-        ]
-      }
       return []
     }
 
@@ -345,7 +340,8 @@ const getPendidikanRank = (val: string): number => {
                     </TableRow>
                   ) : (
                     displayedServices.map((service, i) => {
-                      const item = byService.find(b => b.service_id === service.id && b.index_type === indexType)
+                      const item = byService.find(b => (b.service_id === service.id || b.service_name === service.name) && b.index_type === indexType)
+                      const hasData = Boolean(item && item.jumlah_responden > 0)
                       const mutuText = getMutuDescription(item?.mutu || '')
                       const count = item?.jumlah_responden || 0
 
@@ -356,19 +352,19 @@ const getPendidikanRank = (val: string): number => {
                             {service.name}
                           </TableCell>
                           <TableCell className="text-center font-bold text-xs sm:text-sm">
-                            {item ? item.nilai_index.toFixed(2) : '0.00'}
+                            {hasData && item ? item.nilai_index.toFixed(2) : '0.00'}
                           </TableCell>
                           <TableCell className="text-center font-extrabold text-xs sm:text-sm text-emerald-700 dark:text-emerald-400">
-                            {item ? item.nilai_konversi.toFixed(2) : '0.00'}
+                            {hasData && item ? item.nilai_konversi.toFixed(2) : '0.00'}
                           </TableCell>
                           <TableCell className="text-center">
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold ${
-                              item?.mutu === 'A' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                              item?.mutu === 'B' ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' :
-                              item?.mutu === 'C' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                              hasData && item?.mutu === 'A' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                              hasData && item?.mutu === 'B' ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' :
+                              hasData && item?.mutu === 'C' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                               'bg-slate-100 text-slate-600 border border-slate-200'
                             }`}>
-                              {item ? `${item.mutu} (${mutuText})` : 'Belum Terisi'}
+                              {hasData && item ? `${item.mutu} (${mutuText})` : 'Belum Terisi'}
                             </span>
                           </TableCell>
                           <TableCell className="text-center font-bold text-xs">

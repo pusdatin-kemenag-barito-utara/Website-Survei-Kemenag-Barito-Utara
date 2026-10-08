@@ -7,6 +7,7 @@ interface Props {
   description?: string;
   image?: string;
   type?: string;
+  preloadImage?: string;
 }
 
 const appUrl = process.env.PUBLIC_APP_URL || import.meta.env.PUBLIC_APP_URL || "";
@@ -16,7 +17,7 @@ const cfBeaconToken = process.env.PUBLIC_CF_BEACON_TOKEN || import.meta.env.PUBL
 const enableCfRum = (process.env.PUBLIC_CLOUDFLARE_RUM_ENABLED || import.meta.env.PUBLIC_CLOUDFLARE_RUM_ENABLED) !== "false";
 const turnstileSiteKey = process.env.PUBLIC_TURNSTILE_SITE_KEY || import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || "";
 const pusdatinUrl = process.env.PUBLIC_PUSDATIN_URL || import.meta.env.PUBLIC_PUSDATIN_URL || "";
-const pocketbaseUrl = process.env.PUBLIC_POCKETBASE_URL || import.meta.env.PUBLIC_POCKETBASE_URL || process.env.POCKETBASE_URL || "";
+const pocketbaseUrl = process.env.PUBLIC_POCKETBASE_URL || import.meta.env.PUBLIC_POCKETBASE_URL || process.env.POCKETBASE_URL || "https://db-survei.kemenag-baritoutara.com";
 const superAdminEmail = process.env.PUBLIC_SUPER_ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || import.meta.env.PUBLIC_SUPER_ADMIN_EMAIL || "";
 
 const {
@@ -24,6 +25,7 @@ const {
   description = "SI-ARUS - Sistem Informasi Analisis Rekapitulasi Ulasan Survei Kepuasan Masyarakat Kantor Kementerian Agama Kabupaten Barito Utara.",
   image = `${appUrl}/arus.webp`,
   type = "website",
+  preloadImage,
 } = Astro.props;
 
 const keywords = [
@@ -197,6 +199,33 @@ const jsonLd = {
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta http-equiv="Accept-CH" content="DPR, Width, Viewport-Width, Downlink, ECT" />
     
+    <!-- Clean DevTools Console Filter for Third-Party Iframe & Benign Development Logs -->
+    <script is:inline>
+      (function () {
+        if (typeof window === 'undefined') return;
+        const noisyKeywords = [
+          'No available adapters',
+          'OTS parsing error',
+          'Size of decompressed WOFF',
+          'React DevTools',
+          'challenges.cloudflare.com',
+          'dev-toolbar',
+          'was preloaded using link preload but not used',
+        ];
+        const wrapLogger = (orig) => {
+          if (!orig) return orig;
+          return function (...args) {
+            const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a || ''))).join(' ');
+            if (noisyKeywords.some((k) => text.includes(k))) return;
+            orig.apply(console, args);
+          };
+        };
+        console.warn = wrapLogger(console.warn);
+        console.error = wrapLogger(console.error);
+        console.info = wrapLogger(console.info);
+      })();
+    </script>
+    
     <!-- Primary Metadata & SEO -->
     <title>{siteTitle}</title>
     <meta name="title" content={siteTitle} />
@@ -256,8 +285,6 @@ const jsonLd = {
     )}
     <link rel="dns-prefetch" href="https://challenges.cloudflare.com" />
 
-    <!-- Preload Maklumat Pelayanan Banner for Instant LCP -->
-    <link rel="preload" as="image" href="/maklumat-pelayanan.webp" type="image/webp" fetchpriority="high" />
 
     <!-- Cloudflare Browser Insights & Real User Monitoring (RUM) with Core Web Vitals & SPA Support -->
     {enableCfRum && import.meta.env.PROD && (
@@ -307,21 +334,16 @@ const jsonLd = {
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap"
     />
 
-    <!-- Priority Hints for Critical LCP Resources -->
-    <link
-      rel="preload"
-      as="image"
-      href="/hero_survey_bg.webp"
-      type="image/webp"
-      fetchpriority="high"
-    />
-    <link
-      rel="preload"
-      as="image"
-      href="/arus.webp"
-      type="image/webp"
-      fetchpriority="high"
-    />
+    <!-- Optional Dynamic Page LCP Preload -->
+    {preloadImage && (
+      <link
+        rel="preload"
+        as="image"
+        href={preloadImage}
+        type="image/webp"
+        fetchpriority="high"
+      />
+    )}
 
     <!-- PWA & Mobile Web Capabilities -->
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -372,20 +394,57 @@ const jsonLd = {
     <!-- Schema.org Structured Data -->
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-    <!-- Service Worker Registration for PWA -->
+    <!-- Service Worker Registration for PWA (Production Only) -->
     <script is:inline>
-      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker
-            .register('/sw.js')
-            .then((reg) => {
-              console.log('[PWA] Service Worker registered with scope:', reg.scope);
-            })
-            .catch((err) => {
-              console.warn('[PWA] Service Worker registration failed:', err);
-            });
-        });
+      if ('serviceWorker' in navigator) {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          navigator.serviceWorker.getRegistrations().then((regs) => {
+            for (const reg of regs) {
+              reg.unregister();
+            }
+          });
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker
+              .register('/sw.js')
+              .then((reg) => {
+                console.log('[PWA] Service Worker registered with scope:', reg.scope);
+              })
+              .catch((err) => {
+                console.warn('[PWA] Service Worker registration failed:', err);
+              });
+          });
+        }
       }
+    </script>
+
+    <!-- Auto-recovery for Vite Outdated Optimize Dep (504) and Dynamic Import Failures -->
+    <script is:inline>
+      const triggerReload = () => {
+        const retryKey = 'astro_retry_' + window.location.pathname;
+        const now = Date.now();
+        const lastRetry = parseInt(sessionStorage.getItem(retryKey) || '0', 10);
+        if (now - lastRetry > 4000) {
+          sessionStorage.setItem(retryKey, now.toString());
+          window.location.reload();
+        }
+      };
+
+      window.addEventListener('astro:hydration-error', triggerReload);
+
+      window.addEventListener('error', (e) => {
+        const msg = String(e?.message || e?.error?.message || '');
+        if (msg.includes('Failed to fetch dynamically imported module') || msg.includes('Outdated Optimize Dep')) {
+          triggerReload();
+        }
+      });
+
+      window.addEventListener('unhandledrejection', (e) => {
+        const msg = String(e?.reason?.message || e?.reason || '');
+        if (msg.includes('Failed to fetch dynamically imported module') || msg.includes('Outdated Optimize Dep')) {
+          triggerReload();
+        }
+      });
     </script>
 
     <!-- Runtime Environment Injection for Client Components -->

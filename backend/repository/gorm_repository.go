@@ -2,7 +2,6 @@ package repository
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"survey-kemenag-backend/domain"
@@ -29,19 +28,16 @@ func (r *gormRepository) GetActivePeriod() (*models.SurveyPeriod, error) {
 	now := time.Now().Format("2006-01-02")
 	var period models.SurveyPeriod
 
-	// 1. Check if there is a designated active period
-	err := r.db.Where("is_active = ?", true).First(&period).Error
+	// 1. Check if there is a designated active period.
+	// Admin manual selection ALWAYS takes precedence, regardless of calendar dates!
+	err := r.db.Where("is_active = ?", true).
+		Order("case when period_type = 'triwulan' then 1 else 2 end, start_date desc").
+		First(&period).Error
 	if err == nil {
-		pStart := strings.Split(period.StartDate, "T")[0]
-		pEnd := strings.Split(period.EndDate, "T")[0]
-
-		if now >= pStart && now <= pEnd {
-			return &period, nil
-		}
-		r.db.Model(&models.SurveyPeriod{}).Where("id = ?", period.ID).Update("is_active", false)
+		return &period, nil
 	}
 
-	// 2. Automatically find and activate the period matching TODAY's date (prioritize triwulan)
+	// 2. Fallback ONLY if NO period is marked active in the database: find period matching TODAY's date
 	var currentPeriod models.SurveyPeriod
 	err = r.db.Where("start_date <= ? AND end_date >= ? AND period_type = ?", now, now, "triwulan").
 		Order("start_date desc").First(&currentPeriod).Error
@@ -52,9 +48,6 @@ func (r *gormRepository) GetActivePeriod() (*models.SurveyPeriod, error) {
 	}
 
 	if err == nil {
-		r.db.Model(&models.SurveyPeriod{}).Where("1 = 1").Update("is_active", false)
-		r.db.Model(&models.SurveyPeriod{}).Where("id = ?", currentPeriod.ID).Update("is_active", true)
-		currentPeriod.IsActive = true
 		return &currentPeriod, nil
 	}
 
@@ -686,4 +679,26 @@ func (r *gormRepository) GetArchiveRawAnswers(startDate, endDate string) (int64,
 		return totalResponses, nil, err
 	}
 	return totalResponses, rawAnswers, nil
+}
+
+func (r *gormRepository) GetArchiveDemographicSummary(startDate, endDate string) ([]domain.DemographicSummaryRow, error) {
+	var results []domain.DemographicSummaryRow
+	query := fmt.Sprintf(`
+		SELECT
+			s.id::text as service_id,
+			s.name as service_name,
+			df.field_key,
+			rd.demographic_value,
+			count(*)::bigint as count
+		FROM %s.response_demographics rd
+		JOIN %s.responses r ON rd.response_id = r.id
+		JOIN %s.services s ON r.service_id = s.id
+		JOIN %s.demographic_fields df ON rd.field_id = df.id
+		WHERE (NULLIF(?, '') IS NULL OR r.submitted_at::date >= ?::date)
+		  AND (NULLIF(?, '') IS NULL OR r.submitted_at::date <= ?::date)
+		GROUP BY s.id, s.name, df.field_key, rd.demographic_value
+		ORDER BY s.name, df.field_key, count DESC
+	`, models.SchemaName, models.SchemaName, models.SchemaName, models.SchemaName)
+	err := r.db.Raw(query, startDate, startDate, endDate, endDate).Scan(&results).Error
+	return results, err
 }

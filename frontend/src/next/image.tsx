@@ -35,7 +35,7 @@ export default function Image({
         {...rest}
         loading={computedLoading}
         decoding={decoding}
-        {...(computedFetchPriority ? { fetchpriority: computedFetchPriority } : {})}
+        {...(computedFetchPriority ? { fetchPriority: computedFetchPriority } : {})}
         sizes={sizes}
         style={
           {
@@ -69,7 +69,7 @@ export default function Image({
       sizes={sizes}
       loading={computedLoading}
       decoding={decoding}
-      {...(computedFetchPriority ? { fetchpriority: computedFetchPriority } : {})}
+      {...(computedFetchPriority ? { fetchPriority: computedFetchPriority } : {})}
       style={computedStyle}
       {...rest}
     />

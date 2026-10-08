@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchCachedPublicResults, getCachedPublicResultsSync } from '@/lib/data-cache'
-import { getPocketBase } from '@/lib/pocketbase/client'
+import { getPocketBase } from '@/lib/pocketbase'
 import type { IndexSummary, UnsurSummary, IndexByService } from '@/types'
 
 export interface PublicResultsData {

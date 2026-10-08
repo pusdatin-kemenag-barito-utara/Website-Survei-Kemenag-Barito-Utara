@@ -406,13 +406,13 @@ export default function AdminLayout({
           </div>
         </header>
 
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={pathname}
-            initial={{ opacity: 0, y: 15 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
             className="p-4 md:p-6 lg:p-8 w-full max-w-full flex-1"
           >
             {children}

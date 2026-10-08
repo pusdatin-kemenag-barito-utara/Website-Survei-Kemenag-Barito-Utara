@@ -1,36 +1,8 @@
-
 import { useEffect, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Loader2,
-  GripVertical,
-  FileText,
-  Search,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Hash,
-  Link2,
-  AlignLeft,
-  ChevronDown,
-} from "lucide-react";
+import { Plus, Loader2, FileText, Search, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import {
   Table,
   TableHeader,
@@ -39,27 +11,14 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
-import { fetchCachedAdminServices, getCachedAdminServicesSync, invalidateClientCache } from "@/lib/data-cache";
+import {
+  fetchCachedAdminServices,
+  getCachedAdminServicesSync,
+  invalidateClientCache,
+} from "@/lib/data-cache";
 import type { Service, ServiceCategory } from "@/types";
 
 import {
@@ -76,145 +35,16 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
-const serviceSchema = z.object({
-  name: z.string().min(1, "Nama layanan wajib diisi"),
-  slug: z.string().min(1, "Slug wajib diisi"),
-  description: z.string().nullable().optional(),
-  is_active: z.boolean(),
-});
+import { SortableServiceRow } from "@/components/admin/layanan/SortableServiceRow";
+import { ServiceDeleteDialog } from "@/components/admin/layanan/ServiceDeleteDialog";
+import {
+  ServiceFormModal,
+  sluggify,
+  type ServiceFormData,
+} from "@/components/admin/layanan/ServiceFormModal";
 
-type ServiceForm = z.infer<typeof serviceSchema>;
-
-function sluggify(text: string) {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-// ---------------------------
-// Sortable Table Row Component
-// ---------------------------
-function SortableRow({
-  service,
-  onEdit,
-  onDeleteDialog,
-}: {
-  service: Service;
-  onEdit: (s: Service) => void;
-  onDeleteDialog: (s: Service) => void;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: service.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 1 : 0,
-    position: "relative" as const,
-  };
-
-  return (
-    <TableRow
-      ref={setNodeRef}
-      style={style}
-      className={`group transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50 ${
-        isDragging
-          ? "bg-emerald-50/80 dark:bg-emerald-900/30 shadow-xl ring-2 ring-emerald-500/30 rounded-xl"
-          : ""
-      }`}
-    >
-      <TableCell className="w-12 text-center">
-        <button
-          type="button"
-          className="cursor-grab active:cursor-grabbing p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors touch-none"
-          {...attributes}
-          {...listeners}
-          title="Geser untuk mengatur urutan"
-        >
-          <GripVertical className="size-4" />
-        </button>
-      </TableCell>
-
-      <TableCell className="font-semibold text-slate-900 dark:text-white">
-        <div className="flex items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100/80 dark:bg-emerald-950/40 dark:border-emerald-900/40">
-            <FileText className="size-4" />
-          </div>
-          <span className="text-sm font-bold tracking-tight">
-            {service.name}
-          </span>
-        </div>
-      </TableCell>
-
-      <TableCell>
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700">
-          <Hash className="size-3 text-slate-400" />
-          {service.slug}
-        </span>
-      </TableCell>
-
-      <TableCell className="max-w-xs text-xs text-slate-500 dark:text-slate-400 truncate">
-        {service.description ? (
-          <span className="font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-900 px-2 py-0.5 rounded-md">
-            {service.description}
-          </span>
-        ) : (
-          <span className="italic text-slate-400">Tidak ada bidang</span>
-        )}
-      </TableCell>
-
-      <TableCell>
-        {service.is_active ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-900/50">
-            <CheckCircle2 className="size-3.5 text-emerald-600" />
-            Aktif
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/50">
-            <XCircle className="size-3.5 text-rose-600" />
-            Nonaktif
-          </span>
-        )}
-      </TableCell>
-
-      <TableCell className="text-right">
-        <div className="flex justify-end items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => onEdit(service)}
-            className="flex size-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-100 transition-all cursor-pointer"
-            title="Edit Layanan"
-          >
-            <Pencil className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onDeleteDialog(service)}
-            className="flex size-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 border border-rose-100 transition-all cursor-pointer"
-            title="Hapus Layanan"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </div>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-// ---------------------------
-// Main Page Component
-// ---------------------------
 export default function AdminLayananPage() {
   const cachedInitial = getCachedAdminServicesSync();
   const [services, setServices] = useState<Service[]>(() => cachedInitial || []);
@@ -228,33 +58,7 @@ export default function AdminLayananPage() {
   const [deleteDialog, setDeleteDialog] = useState<Service | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    control,
-    formState: { errors },
-  } = useForm<ServiceForm>({
-    resolver: zodResolver(serviceSchema),
-    defaultValues: { name: "", slug: "", description: "", is_active: true },
-  });
-
-  const nameValue = useWatch({ control, name: "name" }) || "";
-  const descriptionValue = useWatch({ control, name: "description" }) || "";
-  const isActiveValue = useWatch({ control, name: "is_active" });
-
-  useEffect(() => {
-    if (!editing) {
-      setValue("slug", sluggify(nameValue));
-    }
-  }, [nameValue, setValue, editing]);
-
-  // Dynamic new category state
-  const [newCategoryDialogOpen, setNewCategoryDialogOpen] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [savingCategory, setSavingCategory] = useState(false);
-
+  // Fetch Services
   async function fetchServices(force = false) {
     try {
       const data = await fetchCachedAdminServices(force);
@@ -266,12 +70,46 @@ export default function AdminLayananPage() {
     }
   }
 
+  // Fetch Service Categories from API with fallback
   async function fetchCategories() {
-    setCategories([]);
+    try {
+      const data = await apiFetch<ServiceCategory[]>("/admin/service-categories");
+      if (Array.isArray(data) && data.length > 0) {
+        setCategories(data);
+        return;
+      }
+    } catch {
+      try {
+        const res = await apiFetch<{ categories?: ServiceCategory[] }>("/survey/services");
+        if (res?.categories && Array.isArray(res.categories)) {
+          setCategories(res.categories);
+        }
+      } catch (err) {
+        console.warn("Fetch categories fallback error:", err);
+      }
+    }
+  }
+
+  // Save category to backend
+  async function saveCategoryToBackend(catName: string) {
+    const trimmed = catName.trim();
+    if (!trimmed) return;
+    try {
+      const created = await apiFetch<ServiceCategory>("/admin/service-categories", {
+        method: "POST",
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (created?.id) {
+        setCategories((prev) => [...prev, created]);
+      }
+    } catch {
+      // Handled silently
+    }
   }
 
   useEffect(() => {
     fetchServices();
+    fetchCategories();
   }, []);
 
   // Drag and drop sensors
@@ -284,11 +122,9 @@ export default function AdminLayananPage() {
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-
     if (over && active.id !== over.id) {
       const oldIndex = services.findIndex((s) => s.id === active.id);
       const newIndex = services.findIndex((s) => s.id === over.id);
-
       const reordered = arrayMove(services, oldIndex, newIndex);
       setServices(reordered);
       toast.success("Urutan layanan diperbarui");
@@ -298,64 +134,70 @@ export default function AdminLayananPage() {
   function openCreate() {
     setEditing(null);
     fetchCategories();
-    reset({ name: "", slug: "", description: "", is_active: true });
     setDialogOpen(true);
   }
 
   function openEdit(s: Service) {
     setEditing(s);
     fetchCategories();
-    reset({
-      name: s.name,
-      slug: s.slug,
-      description: s.description || "",
-      is_active: s.is_active,
-    });
     setDialogOpen(true);
   }
 
-  async function handleCreateCategory() {
-    const trimmed = newCategoryName.trim();
-    if (!trimmed) {
-      toast.error("Nama bidang tidak boleh kosong");
+  async function onSubmit(data: ServiceFormData) {
+    const cleanSlug = sluggify(data.slug);
+    if (!cleanSlug) {
+      toast.error("URL Slug wajib diisi");
       return;
     }
-    setSavingCategory(true);
-    toast.success(`Bidang "${trimmed}" berhasil ditambahkan`);
-    setValue("description", trimmed);
-    setNewCategoryName("");
-    setNewCategoryDialogOpen(false);
-    setSavingCategory(false);
-  }
 
-  async function onSubmit(data: ServiceForm) {
+    const dup = services.find(
+      (s) =>
+        s.id !== editing?.id &&
+        s.slug.trim().toLowerCase() === cleanSlug.toLowerCase()
+    );
+    if (dup) {
+      toast.error(
+        `Slug "${cleanSlug}" sudah dipakai oleh layanan "${dup.name}". Mohon gunakan slug yang unik.`
+      );
+      return;
+    }
+
     setSaving(true);
     try {
+      const desc = data.description?.trim() || null;
+      const payload = {
+        name: data.name.trim(),
+        slug: cleanSlug,
+        description: desc,
+        is_active: data.is_active,
+      };
+
       if (editing) {
         await apiFetch(`/admin/services/${editing.id}`, {
           method: "PUT",
-          body: JSON.stringify({
-            name: data.name,
-            slug: data.slug,
-            description: data.description || null,
-            is_active: data.is_active,
-          }),
+          body: JSON.stringify(payload),
         });
         toast.success("Layanan berhasil diperbarui");
       } else {
         await apiFetch("/admin/services", {
           method: "POST",
-          body: JSON.stringify({
-            name: data.name,
-            slug: data.slug,
-            description: data.description || null,
-            is_active: data.is_active,
-          }),
+          body: JSON.stringify(payload),
         });
         toast.success("Layanan baru berhasil ditambahkan");
       }
+
+      if (desc) {
+        const exists = categories.some(
+          (c) => c.name.toLowerCase() === desc.toLowerCase()
+        );
+        if (!exists) {
+          saveCategoryToBackend(desc);
+        }
+      }
+
+      invalidateClientCache();
       setDialogOpen(false);
-      fetchServices(true);
+      await fetchServices(true);
     } catch (err: unknown) {
       const errorMsg =
         err instanceof Error ? err.message : "Gagal menyimpan layanan";
@@ -369,7 +211,6 @@ export default function AdminLayananPage() {
     if (!deleteDialog) return;
     const target = deleteDialog;
     setDeleting(true);
-    // Optimistic instant UI update
     setServices((prev) => prev.filter((s) => s.id !== target.id));
     setDeleteDialog(null);
     try {
@@ -380,7 +221,6 @@ export default function AdminLayananPage() {
       invalidateClientCache();
       fetchServices(true);
     } catch (err: unknown) {
-      // Revert if error
       setServices((prev) => [...prev, target]);
       const errorMsg = err instanceof Error ? err.message : "Error server";
       toast.error("Gagal menghapus layanan: " + errorMsg);
@@ -420,8 +260,7 @@ export default function AdminLayananPage() {
               Kelola Layanan PTSP
             </h1>
             <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium mt-0.5">
-              Kelola daftar layanan publik yang dapat dinilai oleh responden
-              pada survei.
+              Kelola daftar layanan publik yang dapat dinilai oleh responden pada survei.
             </p>
           </div>
         </div>
@@ -437,7 +276,6 @@ export default function AdminLayananPage() {
 
       {/* Main Table Card */}
       <Card className="border border-slate-200/80 dark:border-gray-800 shadow-xl shadow-slate-200/40 dark:shadow-black/20 bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
-        {/* Table Header & Search */}
         <CardHeader className="bg-slate-50/50 dark:bg-gray-800/40 border-b border-slate-100 dark:border-gray-800 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
@@ -494,7 +332,7 @@ export default function AdminLayananPage() {
                   strategy={verticalListSortingStrategy}
                 >
                   {visibleServices.map((service) => (
-                    <SortableRow
+                    <SortableServiceRow
                       key={service.id}
                       service={service}
                       onEdit={openEdit}
@@ -520,7 +358,7 @@ export default function AdminLayananPage() {
             </Table>
           </DndContext>
 
-          {/* Muat Lebih Banyak (Load More) Button */}
+          {/* Load More Button */}
           {visibleServices.length < filteredServices.length && (
             <div className="flex flex-col items-center justify-center p-5 border-t border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/30 gap-2">
               <Button
@@ -531,9 +369,7 @@ export default function AdminLayananPage() {
               >
                 <ChevronDown className="size-4 text-emerald-600 animate-bounce" />
                 <span>
-                  Muat Lebih Banyak (
-                  {filteredServices.length - visibleServices.length} Layanan
-                  Tersisa)
+                  Muat Lebih Banyak ({filteredServices.length - visibleServices.length} Layanan Tersisa)
                 </span>
               </Button>
               <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
@@ -552,276 +388,26 @@ export default function AdminLayananPage() {
         </CardContent>
       </Card>
 
-      {/* Modal Add/Edit Layanan */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="rounded-3xl max-w-lg p-6 border border-slate-200 shadow-2xl">
-          <DialogTitle className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-            <FileText className="size-5 text-emerald-600" />
-            <span>
-              {editing ? "Ubah Informasi Layanan" : "Tambah Layanan Baru"}
-            </span>
-          </DialogTitle>
+      {/* Modular Form Modal */}
+      <ServiceFormModal
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        editing={editing}
+        services={services}
+        categories={categories}
+        saving={saving}
+        onSubmit={onSubmit}
+      />
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
-            {/* Nama Layanan */}
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="name"
-                className="text-xs font-bold text-slate-700 dark:text-slate-200"
-              >
-                Nama Layanan
-              </Label>
-              <Input
-                id="name"
-                placeholder="Contoh: Permohonan Data dan Informasi"
-                {...register("name")}
-                className="rounded-xl border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs sm:text-sm font-medium"
-              />
-              {errors.name && (
-                <p className="text-xs font-medium text-rose-500 mt-1">
-                  {errors.name.message}
-                </p>
-              )}
-            </div>
-
-            {/* Slug */}
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="slug"
-                className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5"
-              >
-                <Link2 className="size-3.5 text-emerald-600" />
-                URL Slug
-              </Label>
-              <Input
-                id="slug"
-                placeholder="permohonan-data-dan-informasi"
-                {...register("slug")}
-                className="rounded-xl text-xs border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-              />
-              <p className="text-[11px] text-slate-400">
-                Otomatis dihasilkan berdasarkan nama layanan.
-              </p>
-              {errors.slug && (
-                <p className="text-xs font-medium text-rose-500 mt-1">
-                  {errors.slug.message}
-                </p>
-              )}
-            </div>
-
-            {/* Deskripsi / Bidang Layanan Dropdown */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="description"
-                  className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5"
-                >
-                  <AlignLeft className="size-3.5 text-emerald-600" />
-                  <span>Bidang / Deskripsi Layanan</span>
-                </Label>
-                <button
-                  type="button"
-                  onClick={() => setNewCategoryDialogOpen(true)}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 px-2.5 py-1 rounded-lg border border-emerald-200/80 transition-all cursor-pointer shadow-2xs"
-                >
-                  <Plus className="size-3 text-emerald-600" />
-                  <span>+ Bidang Baru</span>
-                </button>
-              </div>
-
-              <Select
-                value={descriptionValue}
-                onValueChange={(val) => {
-                  if (val === "__ADD_NEW__") {
-                    setNewCategoryDialogOpen(true);
-                  } else {
-                    setValue("description", val);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs sm:text-sm font-semibold">
-                  <SelectValue placeholder="-- Pilih Bidang / Deskripsi Layanan --" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl max-h-60">
-                  {Array.from(
-                    new Set(
-                      [
-                        "Layanan Tata Usaha",
-                        "Layanan Bimbingan Masyarakat Islam",
-                        "Layanan Pendidikan Madrasah",
-                        "Layanan Pendidikan Diniyah dan Pondok Pesantren",
-                        "Layanan Pendidikan Agama Islam",
-                        "Layanan Bimbingan Masyarakat Kristen",
-                        "Layanan Penyelenggara Zakat dan Wakaf",
-                        "Layanan Penyelenggara Hindu",
-                        ...categories.map((c) => c.name),
-                        ...services
-                          .map((s) => s.description)
-                          .filter((d): d is string => Boolean(d && d.trim())),
-                      ].map((str) => str.replace(/\s+/g, " ").trim()),
-                    ),
-                  ).map((catName) => (
-                    <SelectItem
-                      key={catName}
-                      value={catName}
-                      className="text-xs font-medium cursor-pointer"
-                    >
-                      {catName}
-                    </SelectItem>
-                  ))}
-                  <SelectItem
-                    value="__ADD_NEW__"
-                    className="text-xs font-bold text-emerald-600 cursor-pointer border-t border-slate-100 mt-1"
-                  >
-                    + Tambah Nama Bidang Baru...
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Status Switch Box */}
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/40">
-              <div className="space-y-0.5">
-                <Label
-                  htmlFor="is_active"
-                  className="text-xs font-bold text-emerald-900 dark:text-emerald-300 cursor-pointer"
-                >
-                  Status Layanan
-                </Label>
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
-                  {isActiveValue
-                    ? "Layanan aktif & akan tampil di form survei publik"
-                    : "Layanan nonaktif (tersembunyi dari publik)"}
-                </p>
-              </div>
-              <Switch
-                id="is_active"
-                checked={Boolean(isActiveValue)}
-                onCheckedChange={(v) => setValue("is_active", v)}
-              />
-            </div>
-
-            <DialogFooter className="pt-4 border-t border-slate-100 dark:border-gray-800 flex justify-end gap-2">
-              <DialogClose
-                render={
-                  <Button
-                    variant="outline"
-                    className="rounded-xl font-bold text-xs"
-                  >
-                    Batal
-                  </Button>
-                }
-              />
-              <Button
-                type="submit"
-                disabled={saving}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs px-5 shadow-md shadow-emerald-600/20 cursor-pointer"
-              >
-                {saving ? (
-                  <Loader2 className="size-4 animate-spin mr-1.5" />
-                ) : null}
-                {editing ? "Simpan Perubahan" : "Tambah Layanan"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal Tambah Bidang Baru */}
-      <Dialog
-        open={newCategoryDialogOpen}
-        onOpenChange={setNewCategoryDialogOpen}
-      >
-        <DialogContent className="rounded-3xl max-w-md p-6 border border-slate-200 shadow-2xl">
-          <DialogTitle className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-            <Plus className="size-5 text-emerald-600" />
-            <span>Tambah Bidang / Deskripsi Baru</span>
-          </DialogTitle>
-          <div className="space-y-4 pt-2">
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Masukkan nama bidang/seksi layanan baru (contoh:{" "}
-              <strong>Layanan Penyelenggara Zakat dan Wakaf</strong>). Nama ini
-              akan otomatis tersimpan dan dapat dipilih untuk layanan lainnya.
-            </p>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700">
-                Nama Bidang / Kategori
-              </Label>
-              <Input
-                placeholder="Contoh: Layanan Penyelenggara Zakat dan Wakaf"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleCreateCategory();
-                  }
-                }}
-                className="rounded-xl border-slate-200 text-xs sm:text-sm font-semibold"
-              />
-            </div>
-          </div>
-          <DialogFooter className="pt-4 border-t border-slate-100 flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setNewCategoryDialogOpen(false)}
-              className="rounded-xl font-bold text-xs"
-            >
-              Batal
-            </Button>
-            <Button
-              onClick={handleCreateCategory}
-              disabled={savingCategory}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs px-5 shadow-md shadow-emerald-600/20 cursor-pointer"
-            >
-              {savingCategory ? (
-                <Loader2 className="size-4 animate-spin mr-1.5" />
-              ) : null}
-              Simpan Bidang
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Alert Delete Modal */}
-      <AlertDialog
-        open={!!deleteDialog}
+      {/* Modular Delete Dialog */}
+      <ServiceDeleteDialog
+        service={deleteDialog}
+        deleting={deleting}
         onOpenChange={(open) => {
           if (!open) setDeleteDialog(null);
         }}
-      >
-        <AlertDialogContent className="rounded-3xl p-6 border border-slate-200 shadow-2xl">
-          <AlertDialogHeader className="space-y-3">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 mx-auto sm:mx-0">
-              <AlertTriangle className="size-6" />
-            </div>
-            <AlertDialogTitle className="text-lg font-extrabold text-slate-900">
-              Hapus Layanan PTSP?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
-              Apakah Anda yakin ingin menghapus layanan &ldquo;
-              <strong className="text-slate-800">{deleteDialog?.name}</strong>
-              &rdquo;? Layanan ini tidak akan muncul lagi pada formulir survei
-              publik.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-4 flex gap-2">
-            <AlertDialogCancel className="rounded-xl text-xs font-bold">
-              Batal
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs px-5 cursor-pointer shadow-md shadow-rose-600/20"
-              onClick={confirmDelete}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <Loader2 className="size-4 animate-spin mr-1.5" />
-              ) : null}
-              Ya, Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

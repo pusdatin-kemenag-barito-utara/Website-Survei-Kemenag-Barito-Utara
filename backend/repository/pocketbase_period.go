@@ -37,21 +37,27 @@ func mapPeriod(m map[string]interface{}) models.SurveyPeriod {
 func (r *pocketbaseRepository) GetActivePeriod() (*models.SurveyPeriod, error) {
 	now := time.Now().Format("2006-01-02")
 
-	// 1. Check if there is an active period in PB
+	// 1. Check if there is an active period in PB.
+	// Admin manual selection ALWAYS takes precedence, regardless of calendar dates!
 	var list pbRecordList
 	q := url.Values{}
 	q.Set("filter", "is_active=true")
-	q.Set("perPage", "1")
+	q.Set("sort", "-start_date")
+	q.Set("perPage", "10")
 	if err := r.pb.Get("/api/collections/survey_periods/records", q, &list); err == nil && len(list.Items) > 0 {
-		period := mapPeriod(list.Items[0])
-		pStart := strings.Split(period.StartDate, "T")[0]
-		pEnd := strings.Split(period.EndDate, "T")[0]
-		if now >= pStart && now <= pEnd {
-			return &period, nil
+		// Prioritize triwulan period if multiple are active
+		for _, item := range list.Items {
+			p := mapPeriod(item)
+			if p.PeriodType == "triwulan" {
+				return &p, nil
+			}
 		}
+		// Otherwise return the first active period
+		period := mapPeriod(list.Items[0])
+		return &period, nil
 	}
 
-	// 2. Fallback: find period covering today
+	// 2. Fallback ONLY if NO period is marked active in the database: find period covering today
 	q = url.Values{}
 	q.Set("sort", "-start_date")
 	q.Set("perPage", "100")
@@ -61,9 +67,6 @@ func (r *pocketbaseRepository) GetActivePeriod() (*models.SurveyPeriod, error) {
 			pStart := strings.Split(p.StartDate, "T")[0]
 			pEnd := strings.Split(p.EndDate, "T")[0]
 			if now >= pStart && now <= pEnd {
-				pbID := getString(item, "id")
-				_ = r.pb.Patch(fmt.Sprintf("/api/collections/survey_periods/records/%s", pbID), map[string]interface{}{"is_active": true}, nil)
-				p.IsActive = true
 				return &p, nil
 			}
 		}
@@ -76,6 +79,9 @@ func (r *pocketbaseRepository) GetActivePeriod() (*models.SurveyPeriod, error) {
 }
 
 func (r *pocketbaseRepository) ListPeriods() ([]models.SurveyPeriod, error) {
+	if cached, ok := r.getMemCache("all_periods"); ok {
+		return cached.([]models.SurveyPeriod), nil
+	}
 	var list pbRecordList
 	q := url.Values{}
 	q.Set("sort", "start_date")
@@ -87,6 +93,7 @@ func (r *pocketbaseRepository) ListPeriods() ([]models.SurveyPeriod, error) {
 	for _, item := range list.Items {
 		res = append(res, mapPeriod(item))
 	}
+	r.setMemCache("all_periods", res, 2*time.Minute)
 	return res, nil
 }
 
@@ -149,7 +156,18 @@ func (r *pocketbaseRepository) SetPeriodActive(id uuid.UUID) error {
 		}
 	}
 	targetPbID := domain.UUIDToPbID(id.String())
-	return r.pb.Patch(fmt.Sprintf("/api/collections/survey_periods/records/%s", targetPbID), map[string]interface{}{"is_active": true}, nil)
+	if err := r.pb.Patch(fmt.Sprintf("/api/collections/survey_periods/records/%s", targetPbID), map[string]interface{}{"is_active": true}, nil); err != nil {
+		var list pbRecordList
+		q := url.Values{}
+		q.Set("filter", fmt.Sprintf("original_id='%s'||id='%s'", id.String(), targetPbID))
+		q.Set("perPage", "1")
+		if findErr := r.pb.Get("/api/collections/survey_periods/records", q, &list); findErr == nil && len(list.Items) > 0 {
+			foundID := getString(list.Items[0], "id")
+			return r.pb.Patch(fmt.Sprintf("/api/collections/survey_periods/records/%s", foundID), map[string]interface{}{"is_active": true}, nil)
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *pocketbaseRepository) DeletePeriod(id uuid.UUID) error {

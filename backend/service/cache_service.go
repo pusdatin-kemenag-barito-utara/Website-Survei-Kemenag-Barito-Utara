@@ -3,6 +3,7 @@ package service
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,6 +52,16 @@ func (c *MemoryCache) Delete(key string) {
 	delete(c.items, key)
 }
 
+func (c *MemoryCache) DeletePrefix(prefix string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for k := range c.items {
+		if strings.HasPrefix(k, prefix) {
+			delete(c.items, k)
+		}
+	}
+}
+
 func init() {
 	// Background garbage collector for expired cache entries (every 5 minutes)
 	go func() {
@@ -89,6 +100,10 @@ func GetCache(key string) (interface{}, bool) {
 
 func DeleteCache(key string) {
 	globalCache.Delete(key)
+}
+
+func DeleteCachePrefix(prefix string) {
+	globalCache.DeletePrefix(prefix)
 }
 
 func ClearCache() {

@@ -113,6 +113,20 @@ func (r *pocketbaseRepository) UpdateUnsur(id uuid.UUID, item *models.Unsur) (*m
 
 func (r *pocketbaseRepository) DeleteUnsur(id uuid.UUID) error {
 	pbID := domain.UUIDToPbID(id.String())
+
+	// 1. Delete all questions referencing this unsur first so foreign key constraints won't block deletion
+	var qList pbRecordList
+	qParams := url.Values{}
+	qParams.Set("filter", fmt.Sprintf("unsur='%s'||unsur='%s'", pbID, id.String()))
+	qParams.Set("perPage", "500")
+	if err := r.pb.Get("/api/collections/questions/records", qParams, &qList); err == nil {
+		for _, qItem := range qList.Items {
+			if qID := getString(qItem, "id"); qID != "" {
+				_ = r.pb.Delete(fmt.Sprintf("/api/collections/questions/records/%s", qID))
+			}
+		}
+	}
+
 	err := r.pb.Delete(fmt.Sprintf("/api/collections/unsur/records/%s", pbID))
 	if err != nil {
 		var list pbRecordList
@@ -128,6 +142,8 @@ func (r *pocketbaseRepository) DeleteUnsur(id uuid.UUID) error {
 		return err
 	}
 	r.invalidateMemCache("list_unsur")
+	r.invalidateMemCache("active_questions")
+	r.invalidateMemCache("public_results")
 	return nil
 }
 
@@ -190,7 +206,9 @@ func mapQuestion(m map[string]interface{}) models.Question {
 
 func (r *pocketbaseRepository) ListActiveQuestions() ([]models.Question, error) {
 	if cached, ok := r.getMemCache("active_questions"); ok {
-		return cached.([]models.Question), nil
+		if items, ok := cached.([]models.Question); ok && len(items) > 0 {
+			return items, nil
+		}
 	}
 	var list pbRecordList
 	q := url.Values{}
@@ -205,7 +223,9 @@ func (r *pocketbaseRepository) ListActiveQuestions() ([]models.Question, error) 
 	for _, item := range list.Items {
 		res = append(res, mapQuestion(item))
 	}
-	r.setMemCache("active_questions", res, 2*time.Minute)
+	if len(res) > 0 {
+		r.setMemCache("active_questions", res, 2*time.Minute)
+	}
 	return res, nil
 }
 
@@ -546,6 +566,20 @@ func (r *pocketbaseRepository) UpdateDemographicField(id uuid.UUID, field *model
 
 func (r *pocketbaseRepository) DeleteDemographicField(id uuid.UUID) error {
 	pbID := domain.UUIDToPbID(id.String())
+
+	// 1. Delete associated options first
+	var optList pbRecordList
+	qOpts := url.Values{}
+	qOpts.Set("filter", fmt.Sprintf("field='%s'", pbID))
+	qOpts.Set("perPage", "500")
+	if err := r.pb.Get("/api/collections/demographic_options/records", qOpts, &optList); err == nil {
+		for _, o := range optList.Items {
+			if oID := getString(o, "id"); oID != "" {
+				_ = r.pb.Delete(fmt.Sprintf("/api/collections/demographic_options/records/%s", oID))
+			}
+		}
+	}
+
 	err := r.pb.Delete(fmt.Sprintf("/api/collections/demographic_fields/records/%s", pbID))
 	if err != nil {
 		var list pbRecordList

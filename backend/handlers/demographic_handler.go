@@ -8,7 +8,6 @@ import (
 	"survey-kemenag-backend/service"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 type DemographicHandler struct {
@@ -48,10 +47,9 @@ func (h *DemographicHandler) CreateField(c fiber.Ctx) error {
 }
 
 func (h *DemographicHandler) UpdateField(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
+		return err
 	}
 
 	var field models.DemographicField
@@ -69,10 +67,9 @@ func (h *DemographicHandler) UpdateField(c fiber.Ctx) error {
 }
 
 func (h *DemographicHandler) DeleteField(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
+		return err
 	}
 
 	if err := h.repo.DeleteDemographicField(id); err != nil {
@@ -84,10 +81,9 @@ func (h *DemographicHandler) DeleteField(c fiber.Ctx) error {
 }
 
 func (h *DemographicHandler) ListOptions(c fiber.Ctx) error {
-	fieldIDStr := c.Params("fieldId")
-	fieldID, err := uuid.Parse(fieldIDStr)
+	fieldID, err := parseParamID(c, "fieldId")
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Field ID tidak valid"})
+		return err
 	}
 
 	options, err := h.repo.ListDemographicOptionsByField(fieldID)
@@ -112,10 +108,9 @@ func (h *DemographicHandler) CreateOption(c fiber.Ctx) error {
 }
 
 func (h *DemographicHandler) UpdateOption(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
+		return err
 	}
 
 	var opt models.DemographicOption
@@ -133,10 +128,9 @@ func (h *DemographicHandler) UpdateOption(c fiber.Ctx) error {
 }
 
 func (h *DemographicHandler) DeleteOption(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
+		return err
 	}
 
 	if err := h.repo.DeleteDemographicOption(id); err != nil {

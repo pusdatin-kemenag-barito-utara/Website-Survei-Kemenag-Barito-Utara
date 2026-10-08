@@ -1,4 +1,4 @@
-import { getPocketBase } from "@/lib/pocketbase/client";
+import { getPocketBase } from "@/lib/pocketbase";
 
 export async function GET() {
   const baseUrl = (

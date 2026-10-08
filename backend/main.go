@@ -21,7 +21,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/recover"
 )
 
-// Server start time for uptime tracking
+// Server start time for uptime tracking and reload trigger
 var serverStartTime = time.Now()
 
 func main() {

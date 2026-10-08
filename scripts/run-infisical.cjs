@@ -79,7 +79,7 @@ const args = process.argv.slice(2);
 const commandToRun =
   args.length > 0
     ? args.join(' ')
-    : 'concurrently -k -n "BE,FE" -c "cyan.bold,magenta.bold" "cd backend && %USERPROFILE%\\go\\bin\\air.exe" "cd frontend && npm run dev"';
+    : 'npx concurrently -n "BE,FE" -c "cyan.bold,magenta.bold" "cd backend && %USERPROFILE%\\go\\bin\\air.exe" "cd frontend && npm run dev"';
 
 const isWindows = process.platform === 'win32';
 const shellCmd = isWindows ? 'cmd.exe' : '/bin/sh';

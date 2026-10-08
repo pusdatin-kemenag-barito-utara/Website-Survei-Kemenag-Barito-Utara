@@ -5,6 +5,9 @@ import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 
 export default defineConfig({
+  devToolbar: {
+    enabled: false,
+  },
   server: {
     port: 3000,
     host: true,
@@ -18,6 +21,11 @@ export default defineConfig({
     envPrefix: ["PUBLIC_"],
     optimizeDeps: {
       include: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "@radix-ui/react-dialog",
         "pocketbase",
         "@tanstack/react-query",
         "framer-motion",
@@ -35,22 +43,21 @@ export default defineConfig({
         "@dnd-kit/core",
         "@dnd-kit/sortable",
         "@dnd-kit/utilities",
-        "@base-ui/react/alert-dialog",
         "@base-ui/react/button",
-        "@base-ui/react/checkbox",
-        "@base-ui/react/dialog",
         "@base-ui/react/input",
-        "@base-ui/react/menu",
-        "@base-ui/react/merge-props",
+        "@base-ui/react/select",
+        "@base-ui/react/tabs",
+        "@base-ui/react/switch",
         "@base-ui/react/popover",
+        "@base-ui/react/dialog",
+        "@base-ui/react/use-render",
+        "@base-ui/react/merge-props",
+        "@base-ui/react/menu",
+        "@base-ui/react/checkbox",
         "@base-ui/react/radio",
         "@base-ui/react/radio-group",
-        "@base-ui/react/select",
         "@base-ui/react/separator",
-        "@base-ui/react/switch",
-        "@base-ui/react/tabs",
         "@base-ui/react/tooltip",
-        "@base-ui/react/use-render",
       ],
       exclude: ["@react-pdf/renderer", "exceljs"],
     },

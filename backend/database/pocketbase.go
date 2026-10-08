@@ -63,6 +63,7 @@ func ConnectPocketBase(cfg *config.Config) error {
 			log.Printf("⚠️ Warning: Failed initial PocketBase admin auth: %v (will retry on demand)", err)
 		} else {
 			log.Println("✅ Successfully connected and authenticated to PocketBase Database at", pbURL)
+			go AutoSeedPocketBase(PB)
 		}
 	} else {
 		log.Println("ℹ️ PocketBase client initialized without admin credentials (public mode) at", pbURL)

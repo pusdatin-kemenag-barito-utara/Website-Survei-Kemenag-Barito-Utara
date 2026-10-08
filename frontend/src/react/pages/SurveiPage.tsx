@@ -334,12 +334,19 @@ export default function SurveiPage() {
         onReset={() => {
           setSubmitted(false)
           setStep(0)
-          reset()
+          reset({
+            service_id: '',
+            is_anonymous: false,
+            respondent_name: '',
+            respondent_contact: '',
+            respondent_address: '',
+          })
           setAnswers({})
           setDemographics({})
           setIpkpFeedback('')
           setIpakFeedback('')
-          window.scrollTo({ top: 0, behavior: 'smooth' })
+          setDisclaimerOpen(false)
+          window.scrollTo({ top: 0, behavior: 'instant' })
         }}
       />
     )

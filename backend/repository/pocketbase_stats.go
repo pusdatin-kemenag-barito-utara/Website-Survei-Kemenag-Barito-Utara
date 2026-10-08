@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"survey-kemenag-backend/domain"
@@ -144,18 +145,26 @@ func (r *pocketbaseRepository) GetServiceAvgRating(serviceID uuid.UUID, indexTyp
 	return 0, nil
 }
 
+func cleanDateOnly(d string) string {
+	d = strings.TrimSpace(d)
+	if len(d) >= 10 {
+		return d[:10]
+	}
+	return d
+}
+
 func (r *pocketbaseRepository) getAllAnswers() ([]map[string]interface{}, error) {
 	if cached, ok := r.getMemCache("all_answers"); ok {
 		return cached.([]map[string]interface{}), nil
 	}
 	var list pbRecordList
 	q := url.Values{}
-	q.Set("expand", "unsur,question")
+	q.Set("fields", "id,response,unsur,rating_value")
 	q.Set("perPage", "5000")
 	if err := r.pb.Get("/api/collections/response_answers/records", q, &list); err != nil {
 		return nil, err
 	}
-	r.setMemCache("all_answers", list.Items, 30*time.Second)
+	r.setMemCache("all_answers", list.Items, 2*time.Minute)
 	return list.Items, nil
 }
 
@@ -166,11 +175,12 @@ func (r *pocketbaseRepository) getAllResponses() ([]map[string]interface{}, erro
 	var respList pbRecordList
 	q := url.Values{}
 	q.Set("perPage", "5000")
-	q.Set("sort", "submitted_at")
+	q.Set("sort", "-submitted_at")
+	q.Set("fields", "id,service,period,submitted_at,created")
 	if err := r.pb.Get("/api/collections/responses/records", q, &respList); err != nil {
 		return nil, err
 	}
-	r.setMemCache("all_responses", respList.Items, 30*time.Second)
+	r.setMemCache("all_responses", respList.Items, 2*time.Minute)
 	return respList.Items, nil
 }
 
@@ -541,11 +551,32 @@ func (r *pocketbaseRepository) GetDemographicSummary() ([]domain.DemographicSumm
 }
 
 func (r *pocketbaseRepository) GetArchiveRawAnswers(startDate, endDate string) (int64, []domain.CombinedRawAnswer, error) {
-	var respList pbRecordList
-	q := url.Values{}
-	q.Set("perPage", "5000")
-	if err := r.pb.Get("/api/collections/responses/records", q, &respList); err != nil {
+	// 1. Identify target periods matching the date range [startDate, endDate]
+	periods, _ := r.ListPeriods()
+	targetPeriodPbIDs := make(map[string]bool)
+	startClean := cleanDateOnly(startDate)
+	endClean := cleanDateOnly(endDate)
+
+	for _, p := range periods {
+		pStart := cleanDateOnly(p.StartDate)
+		pEnd := cleanDateOnly(p.EndDate)
+		if (startClean == "" || pStart >= startClean) && (endClean == "" || pEnd <= endClean) {
+			pbID := domain.UUIDToPbID(p.ID.String())
+			if pbID != "" {
+				targetPeriodPbIDs[pbID] = true
+			}
+			targetPeriodPbIDs[p.ID.String()] = true
+		}
+	}
+
+	// 2. Fetch responses from PocketBase (shared lightweight cache)
+	respItems, err := r.getAllResponses()
+	if err != nil {
 		return 0, nil, err
+	}
+
+	if len(respItems) == 0 {
+		return 0, []domain.CombinedRawAnswer{}, nil
 	}
 
 	services, _ := r.ListAllServicesAdmin()
@@ -565,25 +596,43 @@ func (r *pocketbaseRepository) GetArchiveRawAnswers(startDate, endDate string) (
 		ServiceName string
 		Bulan       string
 	}
-	respMeta := make(map[string]rMeta)
+	respMeta := make(map[string]rMeta, len(respItems))
 	var filteredRespCount int64
 
-	for _, rItem := range respList.Items {
-		subAt := parseTime(rItem["submitted_at"])
-		dateStr := subAt.Format("2006-01-02")
-		if startDate != "" && dateStr < startDate {
-			continue
+	for _, rItem := range respItems {
+		periodID := getString(rItem, "period")
+		rawSub := getString(rItem, "submitted_at")
+		if rawSub == "" {
+			rawSub = getString(rItem, "created")
 		}
-		if endDate != "" && dateStr > endDate {
-			continue
+		dateStr := cleanDateOnly(rawSub)
+
+		// Period-aware matching: if response has a period, check against target periods for this archive
+		if periodID != "" {
+			pbMatch := targetPeriodPbIDs[periodID] || targetPeriodPbIDs[domain.UUIDToPbID(periodID)]
+			if !pbMatch {
+				continue
+			}
+		} else {
+			if startClean != "" && dateStr != "" && dateStr < startClean {
+				continue
+			}
+			if endClean != "" && dateStr != "" && dateStr > endClean {
+				continue
+			}
 		}
+
 		filteredRespCount++
 		rID := getString(rItem, "id")
 		sPbID := getString(rItem, "service")
+		bulan := "2026-01"
+		if len(dateStr) >= 7 {
+			bulan = dateStr[:7]
+		}
 		respMeta[rID] = rMeta{
 			ServiceID:   domain.PbIDToUUID(sPbID),
 			ServiceName: servNameMap[sPbID],
-			Bulan:       subAt.Format("2006-01"),
+			Bulan:       bulan,
 		}
 	}
 
@@ -619,4 +668,121 @@ func (r *pocketbaseRepository) GetArchiveRawAnswers(startDate, endDate string) (
 	}
 
 	return filteredRespCount, rawAnswers, nil
+}
+
+func (r *pocketbaseRepository) GetArchiveDemographicSummary(startDate, endDate string) ([]domain.DemographicSummaryRow, error) {
+	// 1. Identify target periods matching the date range [startDate, endDate]
+	periods, _ := r.ListPeriods()
+	targetPeriodPbIDs := make(map[string]bool)
+	startClean := cleanDateOnly(startDate)
+	endClean := cleanDateOnly(endDate)
+
+	for _, p := range periods {
+		pStart := cleanDateOnly(p.StartDate)
+		pEnd := cleanDateOnly(p.EndDate)
+		if (startClean == "" || pStart >= startClean) && (endClean == "" || pEnd <= endClean) {
+			pbID := domain.UUIDToPbID(p.ID.String())
+			if pbID != "" {
+				targetPeriodPbIDs[pbID] = true
+			}
+			targetPeriodPbIDs[p.ID.String()] = true
+		}
+	}
+
+	respItems, err := r.getAllResponses()
+	if err != nil || len(respItems) == 0 {
+		return []domain.DemographicSummaryRow{}, nil
+	}
+
+	validRespIDs := make(map[string]bool, len(respItems))
+	respServiceMap := make(map[string]string, len(respItems))
+	for _, rItem := range respItems {
+		periodID := getString(rItem, "period")
+		rawSub := getString(rItem, "submitted_at")
+		if rawSub == "" {
+			rawSub = getString(rItem, "created")
+		}
+		dateStr := cleanDateOnly(rawSub)
+
+		if periodID != "" {
+			pbMatch := targetPeriodPbIDs[periodID] || targetPeriodPbIDs[domain.UUIDToPbID(periodID)]
+			if !pbMatch {
+				continue
+			}
+		} else {
+			if startClean != "" && dateStr != "" && dateStr < startClean {
+				continue
+			}
+			if endClean != "" && dateStr != "" && dateStr > endClean {
+				continue
+			}
+		}
+
+		rID := getString(rItem, "id")
+		validRespIDs[rID] = true
+		respServiceMap[rID] = getString(rItem, "service")
+	}
+
+	if len(validRespIDs) == 0 {
+		return []domain.DemographicSummaryRow{}, nil
+	}
+
+	services, _ := r.ListActiveServices()
+	servNameMap := make(map[string]string)
+	for _, s := range services {
+		servNameMap[domain.UUIDToPbID(s.ID.String())] = s.Name
+	}
+
+	fields, _ := r.ListAllDemographicFieldsAdmin()
+	fieldKeyMap := make(map[string]string)
+	for _, f := range fields {
+		fieldKeyMap[domain.UUIDToPbID(f.ID.String())] = f.FieldKey
+	}
+
+	var demoList pbRecordList
+	if cached, ok := r.getMemCache("all_response_demographics"); ok {
+		demoList = cached.(pbRecordList)
+	} else {
+		qDemo := url.Values{}
+		qDemo.Set("perPage", "5000")
+		qDemo.Set("fields", "id,response,field,value")
+		if err := r.pb.Get("/api/collections/response_demographics/records", qDemo, &demoList); err != nil {
+			return nil, err
+		}
+		r.setMemCache("all_response_demographics", demoList, 2*time.Minute)
+	}
+
+	type dKey struct {
+		ServiceName string
+		FieldKey    string
+		Value       string
+	}
+	counts := make(map[dKey]int64)
+
+	for _, d := range demoList.Items {
+		rID := getString(d, "response")
+		if !validRespIDs[rID] {
+			continue
+		}
+		sPbID := respServiceMap[rID]
+		sName := servNameMap[sPbID]
+		fID := getString(d, "field")
+		val := getString(d, "value")
+		fKey := fieldKeyMap[fID]
+		if fKey != "" && val != "" {
+			k := dKey{ServiceName: sName, FieldKey: fKey, Value: val}
+			counts[k]++
+		}
+	}
+
+	res := make([]domain.DemographicSummaryRow, 0, len(counts))
+	for k, cnt := range counts {
+		res = append(res, domain.DemographicSummaryRow{
+			ServiceName:      k.ServiceName,
+			FieldKey:         k.FieldKey,
+			DemographicValue: k.Value,
+			Count:            cnt,
+		})
+	}
+	return res, nil
 }

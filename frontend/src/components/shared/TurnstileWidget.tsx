@@ -31,11 +31,12 @@ interface TurnstileWidgetProps {
   onSuccess: (token: string) => void;
   onError?: () => void;
   className?: string;
+  size?: "normal" | "compact" | "flexible";
 }
 
 export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetProps>(
   function TurnstileWidget(
-    { siteKey, onSuccess, onError, className },
+    { siteKey, onSuccess, onError, className, size = "flexible" },
     ref
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -90,7 +91,7 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
             }
           },
           theme: "light",
-          size: "flexible",
+          size: size || "flexible",
           "response-field": false,
         });
       } catch (err) {

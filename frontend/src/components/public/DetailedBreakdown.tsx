@@ -76,10 +76,21 @@ const getPendidikanRank = (val: string): number => {
 export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summary, byService, unsurSummary, demoSummary }: DetailedBreakdownProps) {
   const { locale } = useI18n()
 
+  // Helper to ensure valid Permenpan grade
+  const getMutuGrade = (konversi: number, rawMutu?: string): 'A' | 'B' | 'C' | 'D' => {
+    if (rawMutu && ['A', 'B', 'C', 'D'].includes(rawMutu.toUpperCase())) {
+      return rawMutu.toUpperCase() as 'A' | 'B' | 'C' | 'D'
+    }
+    if (konversi >= 88.31) return 'A'
+    if (konversi >= 76.61) return 'B'
+    if (konversi >= 65.00) return 'C'
+    return 'D'
+  }
+
   // 1. Calculate Score Data
   const scoreData = useMemo(() => {
     let konversi = 0
-    let mutu = 'A'
+    let mutu: 'A' | 'B' | 'C' | 'D' = 'A'
     let nilaiIndex = 0
 
     if (serviceFilter === 'all') {
@@ -87,7 +98,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
       if (s) {
         konversi = Number(s.nilai_konversi) || Number(s.score) || 0
         nilaiIndex = s.nilai_index !== undefined ? Number(s.nilai_index) : (konversi / 25)
-        mutu = s.kategori_mutu || s.mutu || (konversi >= 88.31 ? 'A' : konversi >= 76.61 ? 'B' : konversi >= 65.00 ? 'C' : 'D')
+        mutu = getMutuGrade(konversi, s.mutu)
         return { konversi, mutu, nilai_index: nilaiIndex }
       }
     } else {
@@ -95,7 +106,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
       if (s) {
         konversi = Number(s.nilai_konversi) || Number(s.score) || 0
         nilaiIndex = s.nilai_index !== undefined ? Number(s.nilai_index) : (konversi / 25)
-        mutu = s.kategori_mutu || s.mutu || (konversi >= 88.31 ? 'A' : konversi >= 76.61 ? 'B' : konversi >= 65.00 ? 'C' : 'D')
+        mutu = getMutuGrade(konversi, s.mutu)
         return { konversi, mutu, nilai_index: nilaiIndex }
       }
     }
@@ -106,12 +117,15 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
       const totalScore = filteredUnsur.reduce((acc, curr) => acc + (Number(curr.nilai_konversi) || Number(curr.nrr_unsur ? curr.nrr_unsur * 25 : 0) || 0), 0)
       konversi = Math.round((totalScore / filteredUnsur.length) * 100) / 100
       nilaiIndex = Math.round((konversi / 25) * 100) / 100
-      mutu = konversi >= 88.31 ? 'A' : konversi >= 76.61 ? 'B' : konversi >= 65.00 ? 'C' : 'D'
+      mutu = getMutuGrade(konversi)
       return { konversi, mutu, nilai_index: nilaiIndex }
     }
 
     return null
   }, [indexType, serviceFilter, summary, byService, unsurSummary])
+
+  const mutuItem = scoreData ? (NILAI_MUTU[scoreData.mutu] || { grade: scoreData.mutu, label_id: 'Sangat Baik', label_en: 'Excellent' }) : null
+  const mutuLabel = mutuItem ? (locale === 'id' ? mutuItem.label_id : mutuItem.label_en) : ''
 
   // 2. Aggregate Unsur Data
   const unsurData = useMemo(() => {
@@ -240,7 +254,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
                   Indeks Survei ({indexType})
                 </TableCell>
                 <TableCell className="text-center text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3 whitespace-nowrap">
-                  {scoreData.nilai_index.toFixed(2)} ({locale === 'id' ? NILAI_MUTU[scoreData.mutu]?.label_id : NILAI_MUTU[scoreData.mutu]?.label_en})
+                  {scoreData.nilai_index.toFixed(2)} {mutuLabel ? `(${mutuLabel})` : ''}
                 </TableCell>
               </TableRow>
               <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs">
@@ -256,7 +270,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
                   Mutu Pelayanan
                 </TableCell>
                 <TableCell className="text-center text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3 whitespace-nowrap">
-                  {scoreData.mutu} ({locale === 'id' ? NILAI_MUTU[scoreData.mutu]?.label_id : NILAI_MUTU[scoreData.mutu]?.label_en})
+                  {scoreData.mutu} {mutuLabel ? `(${mutuLabel})` : ''}
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -292,7 +306,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
           <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-100 dark:border-gray-800">
             <h3 className="text-6xl md:text-7xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter leading-none">{scoreData.konversi.toFixed(2)}</h3>
             <span className="inline-flex items-center px-4 py-1.5 rounded-full text-sm sm:text-base font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-              {scoreData.mutu} ({locale === 'id' ? NILAI_MUTU[scoreData.mutu]?.label_id : NILAI_MUTU[scoreData.mutu]?.label_en})
+              {mutuLabel} ({scoreData.mutu})
             </span>
           </div>
           <div className="w-full md:w-1/2 bg-slate-50/50 dark:bg-gray-800/20">

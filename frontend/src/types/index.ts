@@ -1,5 +1,6 @@
 export interface Service {
   id: string
+  original_id?: string
   name: string
   slug: string
   description: string | null
@@ -18,6 +19,7 @@ export interface ServiceCategory {
 
 export interface SurveyPeriod {
   id: string
+  original_id?: string
   period_type: 'triwulan' | 'semester' | 'tahunan'
   label: string
   start_date: string
@@ -46,6 +48,10 @@ export interface Question {
   question_text_en: string
   input_type: 'star_rating'
   rating_labels?: Record<string, string> | null
+  label_1?: string
+  label_2?: string
+  label_3?: string
+  label_4?: string
   is_active: boolean
   sort_order: number
   created_at: string

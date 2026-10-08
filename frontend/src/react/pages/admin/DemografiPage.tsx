@@ -1,31 +1,25 @@
-
-import React, { useEffect, useState } from 'react'
-import { useForm, Controller, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Plus, Pencil, Trash2, Loader2, GripVertical, Users, Search, CheckCircle2, XCircle, AlertTriangle, Key, Type, Hash, ListFilter, CheckSquare, ToggleLeft, Sparkles } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { useEffect, useState } from "react";
+import { Plus, Loader2, Users, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from '@/components/ui/table'
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
 import {
-  Dialog, DialogContent, DialogTitle, DialogFooter, DialogClose,
-} from '@/components/ui/dialog'
-import {
-  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
-} from '@/components/ui/alert-dialog'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { apiFetch } from '@/lib/api'
-import { toast } from 'sonner'
-import { fetchCachedAdminDemographics, getCachedAdminDemographicsSync, invalidateClientCache } from '@/lib/data-cache'
-import type { DemographicField, DemographicOption } from '@/types'
-
+  fetchCachedAdminDemographics,
+  getCachedAdminDemographicsSync,
+  invalidateClientCache,
+} from "@/lib/data-cache";
+import type { DemographicField } from "@/types";
 
 import {
   DndContext,
@@ -35,582 +29,142 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-} from '@dnd-kit/core'
+} from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+} from "@dnd-kit/sortable";
 
-const fieldSchema = z.object({
-  field_key: z.string().min(1, 'Field key wajib diisi'),
-  label_id: z.string().min(1, 'Label (ID) wajib diisi'),
-  label_en: z.string().min(1, 'Label (EN) wajib diisi'),
-  field_type: z.enum(['select', 'checkbox', 'toggle', 'text', 'number']),
-  is_required: z.boolean(),
-  sort_order: z.number().int().min(0),
-  is_active: z.boolean(),
-})
-
-type FieldForm = z.infer<typeof fieldSchema>
-
-const getTypeBadge = (type: string) => {
-  switch (type) {
-    case 'select':
-      return (
-        <span className="inline-flex items-center gap-1 font-bold text-[11px] bg-blue-50 text-blue-700 border border-blue-200/80 px-2.5 py-1 rounded-lg">
-          <ListFilter className="size-3 text-blue-600" />
-          Dropdown (Pilihan)
-        </span>
-      )
-    case 'checkbox':
-      return (
-        <span className="inline-flex items-center gap-1 font-bold text-[11px] bg-purple-50 text-purple-700 border border-purple-200/80 px-2.5 py-1 rounded-lg">
-          <CheckSquare className="size-3 text-purple-600" />
-          Checkbox (Multi Pilihan)
-        </span>
-      )
-    case 'toggle':
-      return (
-        <span className="inline-flex items-center gap-1 font-bold text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
-          <ToggleLeft className="size-3 text-emerald-600" />
-          Toggle (Ya/Tidak)
-        </span>
-      )
-    case 'text':
-      return (
-        <span className="inline-flex items-center gap-1 font-bold text-[11px] bg-amber-50 text-amber-700 border border-amber-200/80 px-2.5 py-1 rounded-lg">
-          <Type className="size-3 text-amber-600" />
-          Teks Bebas
-        </span>
-      )
-    case 'number':
-      return (
-        <span className="inline-flex items-center gap-1 font-bold text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200/80 px-2.5 py-1 rounded-lg">
-          <Hash className="size-3 text-indigo-600" />
-          Angka
-        </span>
-      )
-    default:
-      return type
-  }
-}
-
-function SortableFieldRow({
-  f,
-  onEdit,
-  onDeleteDialog,
-  onOpenOptionsModal,
-}: {
-  f: DemographicField
-  onEdit: (field: DemographicField) => void
-  onDeleteDialog: (field: DemographicField) => void
-  onOpenOptionsModal: (field: DemographicField) => void
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: f.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 10 : 0,
-    position: 'relative' as const,
-  }
-
-  return (
-    <TableRow
-      ref={setNodeRef}
-      style={style}
-      className={`group transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50 ${
-        isDragging ? 'bg-blue-50/80 dark:bg-blue-900/30 shadow-xl ring-2 ring-blue-500/30 rounded-xl' : ''
-      }`}
-    >
-      <TableCell className="w-12 text-center pl-6">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors touch-none inline-flex items-center justify-center"
-          title="Geser untuk mengatur urutan"
-        >
-          <GripVertical className="size-4" />
-        </button>
-      </TableCell>
-
-      <TableCell className="text-center text-xs font-bold text-slate-400">
-        {f.sort_order}
-      </TableCell>
-
-      <TableCell>
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg border border-slate-200/80">
-          <Key className="size-3 text-slate-400" />
-          {f.field_key}
-        </span>
-      </TableCell>
-
-      <TableCell className="font-semibold text-slate-900 dark:text-white">
-        <div className="flex flex-col">
-          <span className="text-sm font-bold text-slate-900 dark:text-white">{f.label_id}</span>
-          <span className="text-[11px] text-slate-400 italic">{f.label_en}</span>
-        </div>
-      </TableCell>
-
-      <TableCell>
-        {getTypeBadge(f.field_type)}
-      </TableCell>
-
-      <TableCell>
-        {f.is_required ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
-            WAJIB
-          </span>
-        ) : (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-            OPSIONAL
-          </span>
-        )}
-      </TableCell>
-
-      <TableCell>
-        {f.is_active ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-            <CheckCircle2 className="size-3.5 text-emerald-600" />
-            Aktif
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
-            <XCircle className="size-3.5 text-rose-600" />
-            Nonaktif
-          </span>
-        )}
-      </TableCell>
-
-      <TableCell className="text-right pr-6">
-        <div className="flex justify-end items-center gap-1.5">
-          {(f.field_type === 'select' || f.field_type === 'checkbox' || f.field_type === 'toggle') && (
-            <button
-              type="button"
-              onClick={() => onOpenOptionsModal(f)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold text-xs transition-all cursor-pointer shadow-xs"
-              title="Kelola Pilihan Opsi"
-            >
-              <ListFilter className="size-3.5" />
-              <span>Opsi</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => onEdit(f)}
-            className="flex size-8 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-all cursor-pointer"
-            title="Edit Field"
-          >
-            <Pencil className="size-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onDeleteDialog(f)}
-            className="flex size-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 transition-all cursor-pointer"
-            title="Hapus Field"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </div>
-      </TableCell>
-    </TableRow>
-  )
-}
-
-function SortableOptionItem({
-  opt,
-  onEditOption,
-  onDeleteOption,
-}: {
-  opt: DemographicOption
-  onEditOption: (opt: DemographicOption) => void
-  onDeleteOption: (optionId: string) => void
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: opt.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 10 : 0,
-    position: 'relative' as const,
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/60 p-3 text-xs hover:bg-slate-100/80 transition-colors ${
-        isDragging ? 'bg-blue-100 border-blue-300 shadow-lg ring-2 ring-blue-500/30' : ''
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing transition-colors inline-flex items-center justify-center"
-          title="Geser untuk mengatur urutan"
-        >
-          <GripVertical className="size-4" />
-        </button>
-        <span className="font-mono text-[10px] text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">
-          #{opt.sort_order}
-        </span>
-        <div>
-          <p className="font-bold text-slate-900">{opt.label_id}</p>
-          <p className="text-[11px] text-slate-400 italic">{opt.label_en || opt.value}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onEditOption(opt)}
-          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-          title="Edit Opsi"
-        >
-          <Pencil className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDeleteOption(opt.id)}
-          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-          title="Hapus Opsi"
-        >
-          <Trash2 className="size-3.5" />
-        </button>
-      </div>
-    </div>
-  )
-}
+import { SortableFieldRow } from "@/components/admin/demografi/SortableFieldRow";
+import { DemografiDeleteDialog } from "@/components/admin/demografi/DemografiDeleteDialog";
+import {
+  DemografiFieldModal,
+  type FieldFormData,
+} from "@/components/admin/demografi/DemografiFieldModal";
+import { DemografiOptionsModal } from "@/components/admin/demografi/DemografiOptionsModal";
 
 export default function AdminDemografiPage() {
-  const cachedInitial = getCachedAdminDemographicsSync()
-  const [fields, setFields] = useState<DemographicField[]>(() => cachedInitial || [])
-  const [loading, setLoading] = useState(() => !cachedInitial)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<DemographicField | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [deleteDialog, setDeleteDialog] = useState<DemographicField | null>(null)
-  const [deleting, setDeleting] = useState(false)
+  const cachedInitial = getCachedAdminDemographicsSync();
+  const [fields, setFields] = useState<DemographicField[]>(() => cachedInitial || []);
+  const [loading, setLoading] = useState(() => !cachedInitial || cachedInitial.length === 0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<DemographicField | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<DemographicField | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [optionsModalField, setOptionsModalField] = useState<DemographicField | null>(null);
 
-  const [optionsModalField, setOptionsModalField] = useState<DemographicField | null>(null)
-  const [options, setOptions] = useState<DemographicOption[]>([])
-  const [editingOption, setEditingOption] = useState<DemographicOption | null>(null)
-  
-  const [newOptValue, setNewOptValue] = useState('')
-  const [newOptLabelId, setNewOptLabelId] = useState('')
-  const [newOptLabelEn, setNewOptLabelEn] = useState('')
-  const [addingOpt, setAddingOpt] = useState(false)
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
-  )
-
-  const { register, handleSubmit, reset, control, setValue, formState: { errors } } = useForm<FieldForm>({
-    resolver: zodResolver(fieldSchema),
-    defaultValues: {
-      field_key: '', label_id: '', label_en: '', field_type: 'select',
-      is_required: false, sort_order: 0, is_active: true,
-    },
-  })
-
-  const labelIdVal = useWatch({ control, name: 'label_id' })
-  useEffect(() => {
-    if (!editing && labelIdVal) {
-      setValue('field_key', labelIdVal.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''))
-      setValue('label_en', labelIdVal)
-    }
-  }, [labelIdVal, setValue, editing])
+  );
 
   async function fetchFields(force = false) {
+    if (!force && fields.length === 0) setLoading(true);
     try {
-      const res = await fetchCachedAdminDemographics(force)
-      setFields(Array.isArray(res) ? res : [])
-    } catch (err) {
-      console.error("Fetch fields error:", err)
+      const data = await fetchCachedAdminDemographics(force);
+      if (Array.isArray(data)) {
+        setFields(data);
+      }
+    } catch {
+      toast.error("Gagal memuat field demografi");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchFields()
-  }, [])
-
-  async function handleFieldDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (over && active.id !== over.id) {
-      const oldIndex = fields.findIndex((f) => f.id === active.id)
-      const newIndex = fields.findIndex((f) => f.id === over.id)
-      const newFields = arrayMove(fields, oldIndex, newIndex)
-      setFields(newFields)
-
-      try {
-        await Promise.all(
-          newFields.map((field, index) =>
-            apiFetch(`/admin/demographics/${field.id}`, {
-              method: 'PUT',
-              body: JSON.stringify({
-                field_key: field.field_key,
-                label_id: field.label_id,
-                label_en: field.label_en,
-                field_type: field.field_type,
-                is_required: field.is_required,
-                is_active: field.is_active,
-                sort_order: index,
-              }),
-            })
-          )
-        )
-        toast.success('Urutan field demografi diperbarui', { duration: 2000 })
-      } catch {
-        toast.error('Gagal menyimpan urutan field')
-        fetchFields()
-      }
-    }
-  }
-
-  async function handleOptionDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (over && active.id !== over.id && optionsModalField) {
-      const oldIndex = options.findIndex((o) => o.id === active.id)
-      const newIndex = options.findIndex((o) => o.id === over.id)
-      const newOptions = arrayMove(options, oldIndex, newIndex)
-      setOptions(newOptions)
-
-      try {
-        await Promise.all(
-          newOptions.map((opt, index) =>
-            apiFetch(`/admin/demographics/options/${opt.id}`, {
-              method: 'PUT',
-              body: JSON.stringify({
-                value: opt.value,
-                label_id: opt.label_id,
-                label_en: opt.label_en,
-                sort_order: index,
-              }),
-            })
-          )
-        )
-        toast.success('Urutan opsi diperbarui', { duration: 2000 })
-        fetchFields(true)
-      } catch {
-        toast.error('Gagal menyimpan urutan opsi')
-      }
-    }
-  }
+    fetchFields();
+  }, []);
 
   function openCreate() {
-    setEditing(null)
-    const nextSort = fields.length > 0 ? Math.max(...fields.map(f => f.sort_order)) + 1 : 1
-    reset({
-      field_key: '', label_id: '', label_en: '', field_type: 'select',
-      is_required: true, sort_order: nextSort, is_active: true,
-    })
-    setDialogOpen(true)
+    setEditing(null);
+    setDialogOpen(true);
   }
 
-  function openEdit(field: DemographicField) {
-    setEditing(field)
-    reset({
-      field_key: field.field_key,
-      label_id: field.label_id,
-      label_en: field.label_en,
-      field_type: field.field_type,
-      is_required: field.is_required,
-      sort_order: field.sort_order,
-      is_active: field.is_active,
-    })
-    setDialogOpen(true)
+  function openEdit(f: DemographicField) {
+    setEditing(f);
+    setDialogOpen(true);
   }
 
-  async function onSubmit(data: FieldForm) {
-    setSaving(true)
+  async function onSubmit(data: FieldFormData) {
+    setSaving(true);
     try {
       if (editing) {
         await apiFetch(`/admin/demographics/${editing.id}`, {
-          method: 'PUT',
+          method: "PUT",
           body: JSON.stringify(data),
-        })
-        toast.success('Field demografi berhasil diperbarui')
+        });
+        toast.success("Field demografi berhasil diperbarui");
       } else {
-        await apiFetch('/admin/demographics', {
-          method: 'POST',
+        await apiFetch("/admin/demographics", {
+          method: "POST",
           body: JSON.stringify(data),
-        })
-        toast.success('Field demografi berhasil ditambah')
+        });
+        toast.success("Field demografi baru berhasil ditambahkan");
       }
-      setDialogOpen(false)
-      fetchFields(true)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menyimpan field'
-      toast.error(msg)
+      setDialogOpen(false);
+      invalidateClientCache();
+      fetchFields(true);
+    } catch {
+      toast.error("Gagal menyimpan field demografi");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   async function confirmDelete() {
-    if (!deleteDialog) return
-    const target = deleteDialog
-    setDeleting(true)
-    // Optimistic instant UI update
-    setFields((prev) => prev.filter((f) => f.id !== target.id))
-    setDeleteDialog(null)
+    if (!deleteDialog) return;
+    const target = deleteDialog;
+    setDeleting(true);
+    setFields((prev) => prev.filter((f) => f.id !== target.id));
+    setDeleteDialog(null);
     try {
-      await apiFetch(`/admin/demographics/${target.id}`, { method: 'DELETE' })
-      toast.success('Field demografi berhasil dihapus')
-      invalidateClientCache()
-      fetchFields(true)
+      await apiFetch(`/admin/demographics/${target.id}`, { method: "DELETE" });
+      toast.success("Field demografi berhasil dihapus");
+      invalidateClientCache();
+      fetchFields(true);
     } catch {
-      // Revert if error
-      setFields((prev) => [...prev, target])
-      toast.error('Gagal menghapus field')
+      setFields((prev) => [...prev, target]);
+      toast.error("Gagal menghapus field demografi");
     } finally {
-      setDeleting(false)
+      setDeleting(false);
     }
   }
 
-  async function openOptionsModal(field: DemographicField) {
-    setOptionsModalField(field)
-    setEditingOption(null)
-    try {
-      const data = await apiFetch<DemographicOption[]>(`/admin/demographics/${field.id}/options`)
-      setOptions(Array.isArray(data) ? data : [])
-    } catch {
-      setOptions([])
-    }
-    setNewOptValue('')
-    setNewOptLabelId('')
-    setNewOptLabelEn('')
-  }
-
-  function openEditOption(opt: DemographicOption) {
-    setEditingOption(opt)
-    setNewOptValue(opt.value)
-    setNewOptLabelId(opt.label_id)
-    setNewOptLabelEn(opt.label_en)
-  }
-
-  function cancelEditOption() {
-    setEditingOption(null)
-    setNewOptValue('')
-    setNewOptLabelId('')
-    setNewOptLabelEn('')
-  }
-
-  async function handleAddOptionSubmit(fieldId: string, e: React.SyntheticEvent) {
-    e.preventDefault()
-    if (!newOptValue || !newOptLabelId) {
-      toast.error('Nilai & Label Indonesia wajib diisi')
-      return
-    }
-    setAddingOpt(true)
-
-    try {
-      if (editingOption) {
-        await apiFetch(`/admin/demographics/options/${editingOption.id}`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            value: newOptValue,
-            label_id: newOptLabelId,
-            label_en: newOptLabelEn || newOptLabelId,
-            sort_order: editingOption.sort_order,
-          }),
-        })
-        toast.success('Opsi berhasil diperbarui')
-        setEditingOption(null)
-      } else {
-        await apiFetch('/admin/demographics/options', {
-          method: 'POST',
-          body: JSON.stringify({
-            field_id: fieldId,
-            value: newOptValue,
-            label_id: newOptLabelId,
-            label_en: newOptLabelEn || newOptLabelId,
-            sort_order: options.length,
-          }),
-        })
-        toast.success('Opsi berhasil ditambahkan')
-      }
-
-      setNewOptValue('')
-      setNewOptLabelId('')
-      setNewOptLabelEn('')
-      
-      const data = await apiFetch<DemographicOption[]>(`/admin/demographics/${fieldId}/options`)
-      setOptions(Array.isArray(data) ? data : [])
-      fetchFields()
-    } catch {
-      toast.error('Gagal menyimpan opsi')
-    } finally {
-      setAddingOpt(false)
+  async function handleFieldDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = fields.findIndex((f) => f.id === active.id);
+      const newIndex = fields.findIndex((f) => f.id === over.id);
+      const reordered = arrayMove(fields, oldIndex, newIndex);
+      setFields(reordered);
+      toast.success("Urutan field demografi diperbarui");
     }
   }
 
-  async function deleteOption(optionId: string, fieldId: string) {
-    const prevOptions = [...options]
-    // Optimistic instant UI update
-    setOptions((prev) => prev.filter((o) => o.id !== optionId))
-    try {
-      await apiFetch(`/admin/demographics/options/${optionId}`, { method: 'DELETE' })
-      toast.success('Opsi berhasil dihapus')
-      if (editingOption?.id === optionId) {
-        cancelEditOption()
-      }
-      invalidateClientCache()
-      const data = await apiFetch<DemographicOption[]>(`/admin/demographics/${fieldId}/options`)
-      setOptions(Array.isArray(data) ? data : [])
-      fetchFields(true)
-    } catch {
-      // Revert if error
-      setOptions(prevOptions)
-      toast.error('Gagal menghapus opsi')
-    }
-  }
-
-
-  const filteredFields = (Array.isArray(fields) ? fields : []).filter(f => 
-    (f.label_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (f.field_key || '').toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
+  const filteredFields = (Array.isArray(fields) ? fields : []).filter(
+    (f) =>
+      (f.label_id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (f.field_key || "").toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <Loader2 className="size-8 animate-spin text-emerald-600" />
       </div>
-    )
+    );
   }
 
   return (
     <div className="w-full space-y-6">
-      
+      {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-slate-200/80 dark:border-gray-800">
         <div className="flex items-center gap-4">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-md shadow-emerald-500/20">
@@ -626,8 +180,8 @@ export default function AdminDemografiPage() {
           </div>
         </div>
 
-        <Button 
-          onClick={openCreate} 
+        <Button
+          onClick={openCreate}
           className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl px-5 py-6 shadow-md shadow-emerald-600/20 transition-all cursor-pointer w-full md:w-auto"
         >
           <Plus className="size-5" />
@@ -635,12 +189,14 @@ export default function AdminDemografiPage() {
         </Button>
       </div>
 
+      {/* Main Table Card */}
       <Card className="border border-slate-200/80 dark:border-gray-800 shadow-xl shadow-slate-200/40 dark:shadow-black/20 bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
-        
         <CardHeader className="bg-slate-50/50 dark:bg-gray-800/40 border-b border-slate-100 dark:border-gray-800 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <CardTitle className="text-base font-bold text-slate-900 dark:text-white">Daftar Pertanyaan Demografi</CardTitle>
+              <CardTitle className="text-base font-bold text-slate-900 dark:text-white">
+                Daftar Pertanyaan Demografi
+              </CardTitle>
               <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold px-2.5 py-0.5 rounded-full text-xs">
                 {fields.length} Field
               </Badge>
@@ -667,14 +223,30 @@ export default function AdminDemografiPage() {
             <Table>
               <TableHeader className="bg-slate-50/80 dark:bg-gray-800/60">
                 <TableRow className="border-b border-slate-100 dark:border-gray-800">
-                  <TableHead className="w-12 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">Geser</TableHead>
-                  <TableHead className="w-12 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">Urutan</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">Field Key</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">Label Pertanyaan</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tipe Field</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">Wajib</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">Status</TableHead>
-                  <TableHead className="w-48 text-right text-xs font-bold text-slate-700 uppercase tracking-wider pr-6">Aksi</TableHead>
+                  <TableHead className="w-12 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Geser
+                  </TableHead>
+                  <TableHead className="w-12 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Urutan
+                  </TableHead>
+                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Field Key
+                  </TableHead>
+                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Label Pertanyaan
+                  </TableHead>
+                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Tipe Field
+                  </TableHead>
+                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Wajib
+                  </TableHead>
+                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Status
+                  </TableHead>
+                  <TableHead className="w-48 text-right text-xs font-bold text-slate-700 uppercase tracking-wider pr-6">
+                    Aksi
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -686,7 +258,7 @@ export default function AdminDemografiPage() {
                     <SortableFieldRow
                       key={f.id}
                       f={f}
-                      onOpenOptionsModal={openOptionsModal}
+                      onOpenOptionsModal={setOptionsModalField}
                       onEdit={openEdit}
                       onDeleteDialog={setDeleteDialog}
                     />
@@ -697,7 +269,9 @@ export default function AdminDemografiPage() {
                   <TableRow>
                     <TableCell colSpan={8} className="py-12 text-center text-slate-400">
                       <Users className="size-10 mx-auto mb-2 text-slate-300" />
-                      <p className="text-sm font-medium">Tidak ada field demografi ditemukan</p>
+                      <p className="text-sm font-medium">
+                        Tidak ada field demografi ditemukan
+                      </p>
                     </TableCell>
                   </TableRow>
                 )}
@@ -707,308 +281,31 @@ export default function AdminDemografiPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!optionsModalField} onOpenChange={(open) => { if (!open) setOptionsModalField(null) }}>
-        <DialogContent className="sm:max-w-xl rounded-3xl p-0 overflow-hidden border border-slate-200 shadow-2xl">
-          <div className="bg-gradient-to-r from-blue-800 to-indigo-700 p-6 text-white space-y-1">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md text-white">
-                <Sparkles className="size-5" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-extrabold text-white">
-                  Kelola Opsi Pilihan
-                </DialogTitle>
-                <p className="text-xs text-blue-100 font-medium">
-                  Field: &ldquo;<strong className="text-white">{optionsModalField?.label_id}</strong>&rdquo; ({optionsModalField?.field_type})
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* Modular Field Modal */}
+      <DemografiFieldModal
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        editing={editing}
+        saving={saving}
+        onSubmit={onSubmit}
+      />
 
-          <div className="p-6 space-y-5 bg-white dark:bg-gray-900">
-            <form onSubmit={(e) => optionsModalField && handleAddOptionSubmit(optionsModalField.id, e)} className="space-y-3 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200/80">
-              <div className="flex items-center justify-between">
-                <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  {editingOption ? 'Edit Opsi Pilihan' : 'Tambah Opsi Baru'}
-                </h5>
-                {editingOption && (
-                  <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold">
-                    Mode Edit: {editingOption.value}
-                  </span>
-                )}
-              </div>
+      {/* Modular Options Modal */}
+      <DemografiOptionsModal
+        field={optionsModalField}
+        onClose={() => setOptionsModalField(null)}
+        onRefreshFields={() => fetchFields(true)}
+      />
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-bold text-slate-600">Value (Data)</Label>
-                  <Input 
-                    placeholder="Contoh: L / Ya / S1" 
-                    value={newOptValue} 
-                    onChange={(e) => setNewOptValue(e.target.value)} 
-                    className="rounded-xl text-xs bg-white"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-bold text-slate-600">Label (Indonesia)</Label>
-                  <Input 
-                    placeholder="Contoh: Laki-laki / S1" 
-                    value={newOptLabelId} 
-                    onChange={(e) => setNewOptLabelId(e.target.value)} 
-                    className="rounded-xl text-xs bg-white"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-bold text-slate-600">Label (English)</Label>
-                  <Input 
-                    placeholder="Contoh: Male / Bachelor" 
-                    value={newOptLabelEn} 
-                    onChange={(e) => setNewOptLabelEn(e.target.value)} 
-                    className="rounded-xl text-xs bg-white"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-end gap-2">
-                {editingOption && (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={cancelEditOption} 
-                    className="rounded-xl text-xs font-bold h-9 px-3"
-                  >
-                    Batal Edit
-                  </Button>
-                )}
-                <Button 
-                  type="submit" 
-                  disabled={addingOpt} 
-                  className={`${editingOption ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-bold rounded-xl text-xs h-9 px-4 cursor-pointer shadow-xs`}
-                >
-                  {addingOpt ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : editingOption ? <Pencil className="size-3.5 mr-1.5" /> : <Plus className="size-3.5 mr-1.5" />}
-                  {editingOption ? 'Simpan Edit Opsi' : 'Tambah Opsi'}
-                </Button>
-              </div>
-            </form>
-
-            <div className="space-y-2">
-              <h5 className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                <span>Daftar Opsi Tersedia ({options.length})</span>
-                <span className="text-[10px] text-slate-400 font-normal">Geser ikon titik-titik untuk mengubah urutan</span>
-              </h5>
-
-              {options.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-6 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                  Belum ada opsi pilihan ditambahkan.
-                </p>
-              ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleOptionDragEnd}
-                >
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    <SortableContext
-                      items={options.map((o) => o.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {options.map((opt) => (
-                        <SortableOptionItem
-                          key={opt.id}
-                          opt={opt}
-                          onEditOption={openEditOption}
-                          onDeleteOption={(optId) => optionsModalField && deleteOption(optId, optionsModalField.id)}
-                        />
-                      ))}
-                    </SortableContext>
-                  </div>
-                </DndContext>
-              )}
-            </div>
-
-            <DialogFooter className="pt-3 border-t border-slate-100">
-              <DialogClose render={<Button variant="outline" className="rounded-xl font-bold text-xs">Selesai</Button>} />
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg rounded-3xl p-0 overflow-hidden border border-slate-200 shadow-2xl">
-          <div className="bg-gradient-to-r from-emerald-800 to-teal-700 p-6 text-white space-y-1">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md text-white">
-                <Users className="size-5" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-extrabold text-white">
-                  {editing ? 'Ubah Field Demografi' : 'Tambah Field Demografi Baru'}
-                </DialogTitle>
-              </div>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 bg-white dark:bg-gray-900">
-            <div className="space-y-1.5">
-              <Label htmlFor="field_key" className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                <Key className="size-3.5 text-emerald-600" />
-                Field Key (Kode unik database)
-              </Label>
-              <Input 
-                id="field_key" 
-                placeholder="contoh: jenis_kelamin, usia, disabilitas" 
-                {...register('field_key')} 
-                className="rounded-xl text-xs border-slate-200 focus:ring-2 focus:ring-emerald-500/20"
-              />
-              {errors.field_key && <p className="text-xs font-medium text-rose-500 mt-1">{errors.field_key.message}</p>}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="label_id" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Type className="size-3.5 text-emerald-600" />
-                  Label (Indonesia)
-                </Label>
-                <Input id="label_id" placeholder="Jenis Kelamin" {...register('label_id')} className="rounded-xl text-xs sm:text-sm border-slate-200" />
-                {errors.label_id && <p className="text-xs font-medium text-rose-500 mt-1">{errors.label_id.message}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="label_en" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Type className="size-3.5 text-emerald-600" />
-                  Label (English)
-                </Label>
-                <Input id="label_en" placeholder="Gender" {...register('label_en')} className="rounded-xl text-xs sm:text-sm border-slate-200" />
-                {errors.label_en && <p className="text-xs font-medium text-rose-500 mt-1">{errors.label_en.message}</p>}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <ListFilter className="size-3.5 text-emerald-600" />
-                Tipe Isian Field
-              </Label>
-              <Controller
-                name="field_type"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full rounded-xl border-slate-200 text-xs sm:text-sm font-semibold">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl p-1.5">
-                      <SelectItem value="select" className="rounded-xl cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-blue-700">Select (Dropdown Pilihan)</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="checkbox" className="rounded-xl cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-purple-700">Checkbox (Ceklis Multi-Pilihan)</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="toggle" className="rounded-xl cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-amber-700">Toggle (Saklar Ya / Tidak)</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="text" className="rounded-xl cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-emerald-700">Text (Isian Teks Bebas)</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="number" className="rounded-xl cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-700">Number (Isian Angka)</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                <Label htmlFor="is_required" className="text-xs font-bold text-slate-700 cursor-pointer">
-                  Wajib Diisi
-                </Label>
-                <Controller
-                  name="is_required"
-                  control={control}
-                  render={({ field }) => (
-                    <Switch id="is_required" checked={field.value} onCheckedChange={field.onChange} />
-                  )}
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-emerald-50/60 border border-emerald-100">
-                <Label htmlFor="is_active" className="text-xs font-bold text-emerald-900 cursor-pointer">
-                  Status Aktif
-                </Label>
-                <Controller
-                  name="is_active"
-                  control={control}
-                  render={({ field }) => (
-                    <Switch id="is_active" checked={field.value} onCheckedChange={field.onChange} />
-                  )}
-                />
-              </div>
-
-              <div className="space-y-0.5 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                <Label htmlFor="sort_order" className="text-[11px] font-bold text-slate-700">
-                  Urutan
-                </Label>
-                <Input 
-                  id="sort_order" 
-                  type="number" 
-                  {...register('sort_order', { valueAsNumber: true })} 
-                  className="rounded-xl border-slate-200 text-xs font-bold h-7"
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="pt-4 border-t border-slate-100 flex justify-end gap-2">
-              <DialogClose render={<Button variant="outline" className="rounded-xl font-bold text-xs">Batal</Button>} />
-              <Button 
-                type="submit" 
-                disabled={saving} 
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs px-5 shadow-md shadow-emerald-600/20 cursor-pointer"
-              >
-                {saving ? <Loader2 className="size-4 animate-spin mr-1.5" /> : null}
-                {editing ? 'Simpan Perubahan' : 'Tambah Field'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={!!deleteDialog} onOpenChange={(open) => { if (!open) setDeleteDialog(null) }}>
-        <AlertDialogContent className="rounded-3xl p-6 border border-slate-200 shadow-2xl">
-          <AlertDialogHeader className="space-y-3">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 mx-auto sm:mx-0">
-              <AlertTriangle className="size-6" />
-            </div>
-            <AlertDialogTitle className="text-lg font-extrabold text-slate-900">
-              Hapus Field Demografi?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
-              Apakah Anda yakin ingin menghapus field &ldquo;<strong className="text-slate-800">{deleteDialog?.label_id}</strong>&rdquo;? Seluruh data opsi dan jawaban responden terkait juga akan terhapus.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-4 flex gap-2">
-            <AlertDialogCancel className="rounded-xl text-xs font-bold">Batal</AlertDialogCancel>
-            <AlertDialogAction 
-              className="bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs px-5 cursor-pointer shadow-md shadow-rose-600/20" 
-              onClick={confirmDelete} 
-              disabled={deleting}
-            >
-              {deleting ? <Loader2 className="size-4 animate-spin mr-1.5" /> : null}
-              Ya, Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
+      {/* Modular Delete Dialog */}
+      <DemografiDeleteDialog
+        field={deleteDialog}
+        deleting={deleting}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDialog(null);
+        }}
+        onConfirm={confirmDelete}
+      />
     </div>
-  )
+  );
 }

@@ -7,7 +7,7 @@
 - **Transitions**: Astro `<ClientRouter />` for smooth SPA navigation
 
 ## Backend
-- **Framework**: Golang Fiber REST API v2
+- **Framework**: Golang Fiber REST API v3 (`github.com/gofiber/fiber/v3`)
 - **Database**: PocketBase Database (`https://db-survei.kemenag-baritoutara.com`)
 - **Live Reload**: Air (`.air.toml`)
 

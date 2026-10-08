@@ -9,13 +9,10 @@ interface LinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
 }
 
 export default function Link({ href, children, ...rest }: LinkProps) {
-  const isAdmin = typeof href === 'string' && href.startsWith('/admin');
-
   return (
     <a
       href={href}
       data-astro-prefetch="hover"
-      {...(isAdmin ? { 'data-astro-reload': '' } : {})}
       {...rest}
     >
       {children}

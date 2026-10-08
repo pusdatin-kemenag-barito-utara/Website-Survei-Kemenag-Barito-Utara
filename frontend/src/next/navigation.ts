@@ -14,11 +14,19 @@ function subscribe(callback: () => void) {
   window.addEventListener("pushstate", callback);
   window.addEventListener("replacestate", callback);
   window.addEventListener("hashchange", callback);
+  if (typeof document !== "undefined") {
+    document.addEventListener("astro:page-load", callback);
+    document.addEventListener("astro:after-swap", callback);
+  }
   return () => {
     window.removeEventListener("popstate", callback);
     window.removeEventListener("pushstate", callback);
     window.removeEventListener("replacestate", callback);
     window.removeEventListener("hashchange", callback);
+    if (typeof document !== "undefined") {
+      document.removeEventListener("astro:page-load", callback);
+      document.removeEventListener("astro:after-swap", callback);
+    }
   };
 }
 

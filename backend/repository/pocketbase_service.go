@@ -55,6 +55,9 @@ func (r *pocketbaseRepository) ListActiveServices() ([]models.Service, error) {
 }
 
 func (r *pocketbaseRepository) ListAllServicesAdmin() ([]models.Service, error) {
+	if cached, ok := r.getMemCache("all_services_admin"); ok {
+		return cached.([]models.Service), nil
+	}
 	var list pbRecordList
 	q := url.Values{}
 	q.Set("sort", "sort_order")
@@ -66,6 +69,7 @@ func (r *pocketbaseRepository) ListAllServicesAdmin() ([]models.Service, error) 
 	for _, item := range list.Items {
 		res = append(res, mapService(item))
 	}
+	r.setMemCache("all_services_admin", res, 2*time.Minute)
 	return res, nil
 }
 
@@ -231,6 +235,10 @@ func (r *pocketbaseRepository) DeleteServiceCategory(id uuid.UUID) error {
 			foundID := getString(list.Items[0], "id")
 			err = r.pb.Delete(fmt.Sprintf("/api/collections/service_categories/records/%s", foundID))
 		}
+	}
+	if err == nil {
+		r.invalidateMemCache("service_categories")
+		r.invalidateMemCache("active_services")
 	}
 	return err
 }

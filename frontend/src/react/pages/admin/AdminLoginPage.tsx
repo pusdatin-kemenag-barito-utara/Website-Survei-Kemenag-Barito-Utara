@@ -17,11 +17,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { motion } from "framer-motion";
-import { TurnstileWidget, type TurnstileWidgetRef } from "@/components/shared/TurnstileWidget";
+import {
+  TurnstileWidget,
+  type TurnstileWidgetRef,
+} from "@/components/shared/TurnstileWidget";
 import { apiFetch } from "@/lib/api";
 import { Analytics } from "@/lib/analytics";
 import { toast } from "sonner";
+import { AdminLoginHeroPanel } from "@/components/admin/auth/AdminLoginHeroPanel";
 
 const loginSchema = z.object({
   email: z
@@ -45,8 +48,11 @@ export default function AdminLoginPage() {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutTime, setLockoutTime] = useState<number | null>(null);
   const turnstileRef = useRef<TurnstileWidgetRef>(null);
+
   const turnstileSiteKey =
-    (typeof window !== "undefined" && (window as any).__ENV__?.PUBLIC_TURNSTILE_SITE_KEY) ||
+    (typeof window !== "undefined" &&
+      (window as { __ENV__?: { PUBLIC_TURNSTILE_SITE_KEY?: string } }).__ENV__
+        ?.PUBLIC_TURNSTILE_SITE_KEY) ||
     import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ||
     "";
 
@@ -58,7 +64,6 @@ export default function AdminLoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  // Handle lockout countdown timer
   useEffect(() => {
     if (!lockoutTime) return;
     const timer = setInterval(() => {
@@ -104,7 +109,6 @@ export default function AdminLoginPage() {
       }
     } catch (err: unknown) {
       Analytics.adminLogin("failed", data.email);
-      // Reset Turnstile token & widget so next attempt uses a fresh single-use token
       setTurnstileToken("");
       turnstileRef.current?.reset();
 
@@ -125,147 +129,129 @@ export default function AdminLoginPage() {
 
   return (
     <div className="flex min-h-screen bg-slate-900 font-sans selection:bg-emerald-500 selection:text-white">
-      {/* ========================================================================= */}
-      {/* KIRI: Clean & Minimalist Atmosphere Panel (Desktop Only)                  */}
-      {/* ========================================================================= */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 p-12 lg:flex border-r border-emerald-800/30">
-        {/* Glow Effects & Grid Pattern Background */}
-        <div className="absolute -left-28 -top-28 size-[520px] rounded-full bg-emerald-500/15 blur-[120px] pointer-events-none" />
-        <div className="absolute -right-28 -bottom-28 size-[520px] rounded-full bg-teal-500/15 blur-[120px] pointer-events-none" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#05966910_1px,transparent_1px),linear-gradient(to_bottom,#05966910_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
+      {/* KIRI: Modular Brand Atmosphere Panel */}
+      <AdminLoginHeroPanel />
 
-        {/* Top Header Brand Identity */}
-        <div className="relative z-10 flex items-center gap-3.5">
-          <div className="flex size-13 items-center justify-center rounded-2xl bg-white/10 p-2.5 shadow-xl backdrop-blur-md border border-white/20 ring-1 ring-white/10">
-            <Image
-              src="/arus.webp"
-              alt="Logo SI-ARUS"
-              width={44}
-              height={44}
-              priority
-              className="object-contain filter drop-shadow"
-            />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-extrabold text-white tracking-wide">
-                SI-ARUS
-              </h2>
-              <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-400/30">
-                v2.0
-              </span>
-            </div>
-            <p className="text-xs font-medium text-emerald-200/80 mt-0.5">
-              Kemenag Kab. Barito Utara
-            </p>
-          </div>
-        </div>
+      {/* KANAN: Clean Form Panel */}
+      <div className="relative flex w-full flex-col justify-center bg-gradient-to-br from-slate-50 via-gray-50/70 to-emerald-50/30 px-6 py-12 lg:w-1/2 sm:px-12 lg:px-16 xl:px-24">
+        <div className="absolute top-10 right-10 size-72 rounded-full bg-emerald-500/5 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 left-10 size-72 rounded-full bg-teal-500/5 blur-3xl pointer-events-none" />
 
-        {/* Hero Copy - Clean & Spacious */}
-        <div className="relative z-10 my-auto py-8 max-w-md">
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="space-y-4"
-          >
-            <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl leading-tight">
-              Pusat Kendali & <br />
-              <span className="bg-gradient-to-r from-emerald-300 via-teal-200 to-cyan-300 bg-clip-text text-transparent">
-                Analisis Pelayanan
-              </span>
-            </h1>
-            <p className="text-sm leading-relaxed text-emerald-100/70 font-normal">
-              Sistem Informasi Survei Kepuasan Masyarakat (IKM/IPKP & IPAK) Kantor Kementerian Agama Kabupaten Barito Utara.
-            </p>
-          </motion.div>
-        </div>
-
-        {/* Bottom Minimal Copyright */}
-        <div className="relative z-10 pt-4 text-xs font-medium text-emerald-300/60">
-          © 2026 Kemenag Barito Utara. Hak Cipta Dilindungi.
-        </div>
-      </div>
-      {/* ========================================================================= */}
-      {/* KANAN: Clean Minimalist Login Form Card                                  */}
-      {/* ========================================================================= */}
-      <div className="flex w-full flex-col justify-center bg-slate-50/80 px-6 py-14 lg:w-1/2 sm:px-12 lg:px-16 xl:px-24">
-        <div className="mx-auto w-full max-w-[500px]">
+        <div className="relative mx-auto w-full max-w-[480px]">
           {/* Top Navigation */}
-          <div className="mb-8">
+          <div className="mb-6 flex items-center justify-between">
             <Link
               href="/"
-              className="inline-flex items-center gap-2.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-emerald-600 transition-colors py-2 px-3.5 rounded-xl hover:bg-slate-200/60 cursor-pointer group"
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-emerald-700 transition-all py-2 px-3.5 rounded-xl hover:bg-white hover:shadow-xs border border-transparent hover:border-slate-200/60 cursor-pointer group"
             >
               <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
               Kembali ke Beranda
             </Link>
+
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Akses Internal
+            </span>
           </div>
 
-          {/* Form Card Container */}
-          <div className="rounded-3xl bg-white p-8 sm:p-12 shadow-xl shadow-slate-200/70 border border-slate-200/80">
+          {/* Form Card */}
+          <div className="rounded-3xl bg-white p-8 sm:p-11 shadow-2xl shadow-slate-200/60 border border-slate-200/90 backdrop-blur-md">
+            {/* Mobile Header Logo */}
+            <div className="mb-6 flex items-center gap-3 lg:hidden">
+              <div className="flex items-center gap-1.5 rounded-2xl bg-emerald-50 p-2 border border-emerald-100">
+                <Image
+                  src="/kemenag.svg"
+                  alt="Logo Kemenag"
+                  width={28}
+                  height={28}
+                  priority
+                  className="object-contain"
+                />
+                <Image
+                  src="/arus.webp"
+                  alt="Logo SI-ARUS"
+                  width={30}
+                  height={30}
+                  priority
+                  className="object-contain"
+                />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                  SI-ARUS Kemenag
+                </h3>
+                <p className="text-[11px] font-medium text-slate-500">
+                  Kabupaten Barito Utara
+                </p>
+              </div>
+            </div>
+
             {/* Header */}
-            <div className="mb-8 sm:mb-9">
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <div className="mb-7">
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                 Masuk Administrator
               </h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-2 font-medium">
-                Gunakan kredensial resmi untuk mengakses panel kontrol.
+              <p className="text-xs sm:text-sm text-slate-500 mt-2 font-medium leading-relaxed">
+                Gunakan akun resmi pengelola untuk membuka dashboard kendali survei.
               </p>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 sm:space-y-7">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {/* Field: Email */}
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <Label
                   htmlFor="email"
-                  className="text-sm font-semibold text-slate-800 tracking-wide"
+                  className="text-xs font-bold text-slate-700 uppercase tracking-wider"
                 >
-                  Email
+                  Email Resmi
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400 pointer-events-none" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-4.5 text-slate-400 pointer-events-none" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@kemenag.go.id"
+                    placeholder="nama@kemenag.go.id"
                     autoComplete="email"
                     disabled={loading || Boolean(lockoutTime)}
-                    className="pl-12 h-13 sm:h-13.5 rounded-2xl border-slate-200 bg-slate-50/70 text-sm sm:text-base shadow-2xs focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-600 font-medium transition-all"
+                    className="pl-11 h-12 sm:h-13 rounded-2xl border-slate-200 bg-slate-50/70 text-sm font-medium text-slate-900 shadow-2xs focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-emerald-500/25 focus-visible:border-emerald-600 transition-all placeholder:text-slate-400"
                     {...register("email")}
                   />
                 </div>
                 {errors.email && (
-                  <p className="text-xs sm:text-sm font-medium text-rose-500 pl-1 mt-1.5">
+                  <p className="text-xs font-semibold text-rose-500 pl-1 mt-1">
                     {errors.email.message}
                   </p>
                 )}
               </div>
 
               {/* Field: Password */}
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <Label
                   htmlFor="password"
-                  className="text-sm font-semibold text-slate-800 tracking-wide"
+                  className="text-xs font-bold text-slate-700 uppercase tracking-wider"
                 >
                   Kata Sandi
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400 pointer-events-none" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4.5 text-slate-400 pointer-events-none" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••••••"
                     autoComplete="current-password"
                     disabled={loading || Boolean(lockoutTime)}
-                    className="pl-12 pr-12 h-13 sm:h-13.5 rounded-2xl border-slate-200 bg-slate-50/70 text-sm sm:text-base shadow-2xs focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-600 font-medium transition-all"
+                    className="pl-11 pr-11 h-12 sm:h-13 rounded-2xl border-slate-200 bg-slate-50/70 text-sm font-medium text-slate-900 shadow-2xs focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-emerald-500/25 focus-visible:border-emerald-600 transition-all placeholder:text-slate-400"
                     {...register("password")}
                   />
                   <button
                     type="button"
                     tabIndex={-1}
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={
+                      showPassword
+                        ? "Sembunyikan kata sandi"
+                        : "Tampilkan kata sandi"
+                    }
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 focus:outline-none cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
                   >
                     {showPassword ? (
@@ -276,19 +262,19 @@ export default function AdminLoginPage() {
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="text-xs sm:text-sm font-medium text-rose-500 pl-1 mt-1.5">
+                  <p className="text-xs font-semibold text-rose-500 pl-1 mt-1">
                     {errors.password.message}
                   </p>
                 )}
               </div>
 
-              {/* Cloudflare Turnstile Security Widget (Full Width matching button) */}
+              {/* Turnstile Widget */}
               {turnstileSiteKey && (
                 <div className="w-full pt-1 pb-1">
                   <TurnstileWidget
                     ref={turnstileRef}
                     siteKey={turnstileSiteKey}
-                    className="w-full"
+                    className="w-full flex justify-center"
                     onSuccess={(token: string) => setTurnstileToken(token)}
                     onError={() =>
                       console.warn("[Turnstile] Local fallback active")
@@ -297,37 +283,48 @@ export default function AdminLoginPage() {
                 </div>
               )}
 
+              {/* Lockout notice */}
               {failedAttempts > 0 && failedAttempts < 5 && (
-                <div className="flex items-center gap-2.5 rounded-2xl bg-amber-50 p-3.5 text-xs sm:text-sm font-semibold text-amber-700 border border-amber-200 my-2">
+                <div className="flex items-center gap-2.5 rounded-2xl bg-amber-50 p-3 text-xs font-semibold text-amber-800 border border-amber-200/80">
                   <ShieldAlert className="size-4.5 text-amber-600 shrink-0" />
                   <span>
-                    Percobaan gagal: {failedAttempts} dari 5 kesempatan.
+                    Percobaan gagal: {failedAttempts} dari 5 kesempatan sebelum
+                    terkunci sementara.
                   </span>
                 </div>
               )}
 
               {/* Submit Button */}
-              <div className="pt-2 sm:pt-3">
+              <div className="pt-2">
                 <Button
                   type="submit"
-                  className="w-full h-13 sm:h-14 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-sm sm:text-base font-bold text-white hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 shadow-lg shadow-emerald-600/25 active:scale-[0.99] disabled:opacity-75 cursor-pointer pt-0.5"
-                  disabled={loading || Boolean(lockoutTime) || (Boolean(turnstileSiteKey) && !turnstileToken)}
+                  className="w-full h-12 sm:h-13 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-sm sm:text-base font-extrabold text-white hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 shadow-xl shadow-emerald-600/25 hover:shadow-emerald-600/35 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:hover:scale-100 cursor-pointer"
+                  disabled={
+                    loading ||
+                    Boolean(lockoutTime) ||
+                    (Boolean(turnstileSiteKey) && !turnstileToken)
+                  }
                 >
                   {loading ? (
                     <>
                       <Loader2 className="size-5 animate-spin mr-2" />
-                      Memverifikasi...
+                      Memverifikasi Sesi...
                     </>
                   ) : lockoutTime ? (
                     `Terkunci Sementara`
                   ) : (
                     <>
-                      <LogIn className="size-5 mr-2" />
+                      <LogIn className="size-4.5 mr-2" />
                       Masuk ke Dashboard
                     </>
                   )}
                 </Button>
               </div>
+
+              {/* Security Footnote */}
+              <p className="text-center text-[11px] text-slate-400 font-medium pt-2">
+                🔒 Sesi Terenkripsi 256-bit • Akses Terbatas Hanya Untuk Admin.
+              </p>
             </form>
           </div>
         </div>

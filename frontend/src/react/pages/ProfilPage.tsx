@@ -1,9 +1,12 @@
 
+import { useEffect, useState } from "react";
 import { BookOpen, Target, ListChecks, Scale, Info, CheckCircle2, ShieldCheck } from "lucide-react";
 import { PublicNavbar } from "@/components/shared/PublicNavbar";
 import { Footer } from "@/components/shared/Footer";
 import PageBanner from "@/components/shared/PageBanner";
 import { useI18n } from "@/components/shared/I18nProvider";
+import { fetchCachedAdminUnsur, getCachedAdminUnsurSync } from "@/lib/data-cache";
+import type { Unsur } from "@/types";
 
 const unsurSKM_ID = [
   { no: 1, nama: "Persyaratan", deskripsi: "Syarat yang harus dipenuhi dalam pengurusan suatu jenis pelayanan, baik persyaratan teknis maupun administratif." },
@@ -61,10 +64,43 @@ const sasaran_EN = [
 
 export default function ProfilPage() {
   const { locale, t } = useI18n();
-
   const isEn = locale === 'en';
-  const unsurSKM = isEn ? unsurSKM_EN : unsurSKM_ID;
-  const unsurIPAK = isEn ? unsurIPAK_EN : unsurIPAK_ID;
+
+  const cachedUnsur = getCachedAdminUnsurSync();
+  const [dbUnsur, setDbUnsur] = useState<Unsur[]>(() => cachedUnsur || []);
+
+  useEffect(() => {
+    fetchCachedAdminUnsur().then((list) => {
+      if (list && list.length > 0) {
+        setDbUnsur(list);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const ipkpDb = dbUnsur
+    .filter((u) => u.index_type === 'IPKP')
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const ipakDb = dbUnsur
+    .filter((u) => u.index_type === 'IPAK')
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const unsurSKM = ipkpDb.length > 0
+    ? ipkpDb.map((u) => ({
+        no: u.sort_order,
+        nama: u.name,
+        deskripsi: u.description || (isEn ? "Service evaluation element indicator." : "Indikator evaluasi unsur pelayanan publik."),
+      }))
+    : (isEn ? unsurSKM_EN : unsurSKM_ID);
+
+  const unsurIPAK = ipakDb.length > 0
+    ? ipakDb.map((u) => ({
+        no: u.sort_order,
+        nama: u.name,
+        deskripsi: u.description || (isEn ? "Anti-corruption perception evaluation indicator." : "Indikator evaluasi persepsi anti korupsi."),
+      }))
+    : (isEn ? unsurIPAK_EN : unsurIPAK_ID);
+
   const sasaran = isEn ? sasaran_EN : sasaran_ID;
 
   return (

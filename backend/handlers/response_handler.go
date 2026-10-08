@@ -8,7 +8,6 @@ import (
 	"survey-kemenag-backend/service"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 type ResponseHandler struct {
@@ -69,10 +68,9 @@ func (h *ResponseHandler) ListResponsesAdmin(c fiber.Ctx) error {
 }
 
 func (h *ResponseHandler) DeleteResponseAdmin(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID respon tidak valid"})
+		return err
 	}
 
 	if err := h.repo.DeleteResponseFull(id); err != nil {
@@ -80,6 +78,7 @@ func (h *ResponseHandler) DeleteResponseAdmin(c fiber.Ctx) error {
 	}
 	service.DeleteCache("admin_stats")
 	service.DeleteCache("public_results")
+	service.DeleteCachePrefix("archive_results_")
 
 	return c.JSON(fiber.Map{
 		"message": "Data respon survei berhasil dihapus",
@@ -87,10 +86,9 @@ func (h *ResponseHandler) DeleteResponseAdmin(c fiber.Ctx) error {
 }
 
 func (h *ResponseHandler) GetResponseAnswersAdmin(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID respon tidak valid"})
+		return err
 	}
 
 	results, err := h.repo.GetResponseAnswersDetail(id)
@@ -118,10 +116,9 @@ func (h *ResponseHandler) GetResponseAnswersAdmin(c fiber.Ctx) error {
 }
 
 func (h *ResponseHandler) GetResponseDemographicsAdmin(c fiber.Ctx) error {
-	idStr := c.Params("id")
-	id, err := uuid.Parse(idStr)
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID respon tidak valid"})
+		return err
 	}
 
 	results, err := h.repo.GetResponseDemographicsDetail(id)

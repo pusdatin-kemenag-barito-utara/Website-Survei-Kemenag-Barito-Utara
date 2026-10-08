@@ -5,7 +5,6 @@ import (
 	"survey-kemenag-backend/repository"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 type ServiceCategoryHandler struct {
@@ -42,9 +41,9 @@ func (h *ServiceCategoryHandler) Create(c fiber.Ctx) error {
 
 // Update godoc - PUT /admin/service-categories/:id
 func (h *ServiceCategoryHandler) Update(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID"})
+		return err
 	}
 	var body models.ServiceCategory
 	if err := c.Bind().Body(&body); err != nil {
@@ -59,9 +58,9 @@ func (h *ServiceCategoryHandler) Update(c fiber.Ctx) error {
 
 // Delete godoc - DELETE /admin/service-categories/:id
 func (h *ServiceCategoryHandler) Delete(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := parseParamID(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID"})
+		return err
 	}
 	if err := h.repo.DeleteServiceCategory(id); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
