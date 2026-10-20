@@ -19,6 +19,7 @@ const turnstileSiteKey = process.env.PUBLIC_TURNSTILE_SITE_KEY || import.meta.en
 const pusdatinUrl = process.env.PUBLIC_PUSDATIN_URL || import.meta.env.PUBLIC_PUSDATIN_URL || "";
 const pocketbaseUrl = process.env.PUBLIC_POCKETBASE_URL || import.meta.env.PUBLIC_POCKETBASE_URL || process.env.POCKETBASE_URL || "https://db-survei.kemenag-baritoutara.com";
 const superAdminEmail = process.env.PUBLIC_SUPER_ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || import.meta.env.PUBLIC_SUPER_ADMIN_EMAIL || "";
+const sentryDsn = process.env.PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN || import.meta.env.PUBLIC_SENTRY_DSN || "";
 
 const {
   title = "SI-ARUS - Survei Kepuasan Masyarakat Kemenag Barito Utara",
@@ -198,6 +199,22 @@ const jsonLd = {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta http-equiv="Accept-CH" content="DPR, Width, Viewport-Width, Downlink, ECT" />
+    {sentryDsn && <meta name="sentry-dsn" content={sentryDsn} />}
+
+    <!-- Early Runtime Environment Injection for Sentry & Client Monitoring -->
+    <script is:inline define:vars={{
+      earlyEnv: {
+        PUBLIC_SENTRY_DSN: sentryDsn,
+      }
+    }}>
+      window.__ENV__ = Object.assign(window.__ENV__ || {}, earlyEnv);
+      window.__PUBLIC_ENV__ = window.__ENV__;
+      window.Raven = window.Raven || {
+        config: function () {
+          return { install: function () {} };
+        },
+      };
+    </script>
     
     <!-- Clean DevTools Console Filter for Third-Party Iframe & Benign Development Logs -->
     <script is:inline>
@@ -458,6 +475,7 @@ const jsonLd = {
         PUBLIC_GTAG_ID: gtagId,
         PUBLIC_CF_BEACON_TOKEN: cfBeaconToken,
         PUBLIC_SUPER_ADMIN_EMAIL: superAdminEmail,
+        PUBLIC_SENTRY_DSN: sentryDsn,
       }
     }}>
       window.__ENV__ = Object.assign(window.__ENV__ || {}, envData);
