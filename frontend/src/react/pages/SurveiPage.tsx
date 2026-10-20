@@ -1,5 +1,6 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useForm, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -23,13 +24,15 @@ import { pb } from '@/lib/pocketbase'
 import {
   fetchCachedServices,
   fetchCachedFormQuestions,
+  fetchCachedActivePeriod,
   getCachedServicesSync,
   getCachedFormQuestionsSync,
+  getCachedActivePeriodSync,
   invalidateClientCache,
 } from '@/lib/data-cache'
 import { Analytics } from '@/lib/analytics'
 import { toast } from 'sonner'
-import type { Service, Question, UnsurWithQuestions, DemographicField } from '@/types'
+import type { Service, Question, UnsurWithQuestions, DemographicField, SurveyPeriod } from '@/types'
 
 function mapQuestionsToUnsur(questions: Question[]): { ipkp: UnsurWithQuestions[], ipak: UnsurWithQuestions[] } {
   const ipkpMap: Record<string, UnsurWithQuestions> = {}
@@ -89,16 +92,57 @@ type FormValues = z.infer<typeof formSchema>
 export default function SurveiPage() {
   const { t, locale } = useI18n()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [disclaimerOpen, setDisclaimerOpen] = useState(true)
   const [step, setStep] = useState(0)
   const [direction, setDirection] = useState(1)
 
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Prevent background scrolling and trap focus/interaction while disclaimer modal is open
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (disclaimerOpen) {
+      const originalBodyOverflow = document.body.style.overflow
+      const originalHtmlOverflow = document.documentElement.style.overflow
+      const originalBodyPaddingRight = document.body.style.paddingRight
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`
+      }
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        // Prevent Esc key from closing dialog without user explicit decision
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          e.stopPropagation()
+        }
+      }
+
+      window.addEventListener('keydown', handleKeyDown)
+
+      return () => {
+        document.body.style.overflow = originalBodyOverflow
+        document.documentElement.style.overflow = originalHtmlOverflow
+        document.body.style.paddingRight = originalBodyPaddingRight
+        window.removeEventListener('keydown', handleKeyDown)
+      }
+    }
+  }, [disclaimerOpen])
+
   const initServices = getCachedServicesSync()
   const initForm = getCachedFormQuestionsSync()
+  const initActivePeriod = getCachedActivePeriodSync()
 
   const [services, setServices] = useState<Service[]>(initServices || [])
   const [allQuestions, setAllQuestions] = useState<Question[]>(initForm?.questions || [])
   const [demographicFields, setDemographicFields] = useState<DemographicField[]>(initForm?.demographic_fields || [])
+  const [activePeriod, setActivePeriod] = useState<SurveyPeriod | null>(initActivePeriod || null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(!initServices || !initForm)
@@ -132,9 +176,10 @@ export default function SurveiPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [servicesList, formData] = await Promise.all([
+        const [servicesList, formData, activePeriodData] = await Promise.all([
           fetchCachedServices(),
           fetchCachedFormQuestions(true),
+          fetchCachedActivePeriod(),
         ])
 
         if (servicesList) {
@@ -144,6 +189,10 @@ export default function SurveiPage() {
         if (formData) {
           setDemographicFields(formData.demographic_fields || [])
           setAllQuestions(formData.questions || [])
+        }
+
+        if (activePeriodData) {
+          setActivePeriod(activePeriodData)
         }
 
         // Set default service if query param exists
@@ -164,9 +213,60 @@ export default function SurveiPage() {
     fetchData()
   }, [setValue])
 
+  // Draft Auto-Recovery: Restore respondent progress if browser reloaded or accidentally closed
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const rawDraft = sessionStorage.getItem('si_arus_survey_draft')
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft)
+        const ageHours = (Date.now() - (draft.timestamp || 0)) / (1000 * 60 * 60)
+        if (ageHours < 4) {
+          if (draft.answers && Object.keys(draft.answers).length > 0) setAnswers(draft.answers)
+          if (draft.demographics && Object.keys(draft.demographics).length > 0) setDemographics(draft.demographics)
+          if (draft.ipkpFeedback) setIpkpFeedback(draft.ipkpFeedback)
+          if (draft.ipakFeedback) setIpakFeedback(draft.ipakFeedback)
+          if (draft.service_id) setValue('service_id', draft.service_id)
+          if (typeof draft.is_anonymous === 'boolean') setValue('is_anonymous', draft.is_anonymous)
+          if (draft.respondent_name) setValue('respondent_name', draft.respondent_name)
+          if (draft.respondent_contact) setValue('respondent_contact', draft.respondent_contact)
+          if (typeof draft.step === 'number' && draft.step > 0) {
+            setStep(draft.step)
+            setDisclaimerOpen(false)
+          }
+        } else {
+          sessionStorage.removeItem('si_arus_survey_draft')
+        }
+      }
+    } catch {}
+  }, [setValue])
+
+  // Draft Auto-Save: Persist progress in sessionStorage
+  useEffect(() => {
+    if (typeof window === 'undefined' || submitted) return
+    const hasData = Object.keys(answers).length > 0 || Object.keys(demographics).length > 0 || ipkpFeedback || ipakFeedback || step > 0
+    if (hasData) {
+      try {
+        const draft = {
+          answers,
+          demographics,
+          ipkpFeedback,
+          ipakFeedback,
+          step,
+          service_id: selectedServiceId,
+          is_anonymous: isAnonymous,
+          respondent_name: respondentName,
+          respondent_contact: respondentContact,
+          timestamp: Date.now(),
+        }
+        sessionStorage.setItem('si_arus_survey_draft', JSON.stringify(draft))
+      } catch {}
+    }
+  }, [answers, demographics, ipkpFeedback, ipakFeedback, step, selectedServiceId, isAnonymous, respondentName, respondentContact, submitted])
+
   // Instant Realtime Synchronization with Admin Modifications
   useEffect(() => {
-    const syncQuestions = () => {
+    const syncAll = () => {
       invalidateClientCache()
       fetchCachedFormQuestions(true).then((formData) => {
         if (formData?.questions) {
@@ -178,33 +278,56 @@ export default function SurveiPage() {
       }).catch((err) => {
         console.error('[SurveiPage] Realtime sync error:', err)
       })
+
+      fetchCachedActivePeriod(true).then((periodData) => {
+        if (periodData) {
+          setActivePeriod(periodData)
+        }
+      }).catch((err) => {
+        console.error('[SurveiPage] Period sync error:', err)
+      })
     }
 
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'si_arus_data_updated' || e.key === 'si_arus_questions_updated') {
-        syncQuestions()
+        syncAll()
       }
     }
 
     window.addEventListener('storage', handleStorage)
-    window.addEventListener('si-arus-data-changed', syncQuestions)
+    window.addEventListener('si-arus-data-changed', syncAll)
 
-    let unsubscribePb: (() => void) | undefined
+    let unsubscribePbQuestions: (() => void) | undefined
+    let unsubscribePbPeriods: (() => void) | undefined
+
     try {
       pb.collection('questions').subscribe('*', () => {
-        syncQuestions()
+        syncAll()
       }).then((unsub) => {
-        unsubscribePb = unsub
+        unsubscribePbQuestions = unsub
+      }).catch(() => {})
+    } catch {}
+
+    try {
+      pb.collection('survey_periods').subscribe('*', () => {
+        syncAll()
+      }).then((unsub) => {
+        unsubscribePbPeriods = unsub
       }).catch(() => {})
     } catch {}
 
     return () => {
       window.removeEventListener('storage', handleStorage)
-      window.removeEventListener('si-arus-data-changed', syncQuestions)
-      if (unsubscribePb) {
-        try { unsubscribePb() } catch {}
+      window.removeEventListener('si-arus-data-changed', syncAll)
+      if (unsubscribePbQuestions) {
+        try { unsubscribePbQuestions() } catch {}
       } else {
         try { pb.collection('questions').unsubscribe('*').catch(() => {}) } catch {}
+      }
+      if (unsubscribePbPeriods) {
+        try { unsubscribePbPeriods() } catch {}
+      } else {
+        try { pb.collection('survey_periods').unsubscribe('*').catch(() => {}) } catch {}
       }
     }
   }, [])
@@ -306,11 +429,39 @@ export default function SurveiPage() {
     return true
   }
 
+  const formatPeriodLabel = (label: string, isEn: boolean): string => {
+    if (!label) return ''
+    if (!isEn) return label
+
+    return label
+      .replace(/Triwulan\s*I\b/gi, 'Quarter 1')
+      .replace(/Triwulan\s*II\b/gi, 'Quarter 2')
+      .replace(/Triwulan\s*III\b/gi, 'Quarter 3')
+      .replace(/Triwulan\s*IV\b/gi, 'Quarter 4')
+      .replace(/Triwulan\s*1\b/gi, 'Quarter 1')
+      .replace(/Triwulan\s*2\b/gi, 'Quarter 2')
+      .replace(/Triwulan\s*3\b/gi, 'Quarter 3')
+      .replace(/Triwulan\s*4\b/gi, 'Quarter 4')
+      .replace(/Semester\s*I\b/gi, 'Semester 1')
+      .replace(/Semester\s*II\b/gi, 'Semester 2')
+      .replace(/Semester\s*1\b/gi, 'Semester 1')
+      .replace(/Semester\s*2\b/gi, 'Semester 2')
+      .replace(/Tahunan\b/gi, 'Annual')
+      .replace(/\bTahun\b/gi, 'Year')
+  }
+
   const getCurrentPeriodText = () => {
+    const isEn = locale === 'en'
+
+    // Gunakan periode aktif dari panel admin jika ada
+    if (activePeriod?.label) {
+      return formatPeriodLabel(activePeriod.label, isEn)
+    }
+
+    // Fallback: estimasi berdasarkan tanggal kalender jika belum ter-load
     const now = new Date()
     const year = now.getFullYear()
     const month = now.getMonth() + 1
-    const isEn = locale === 'en'
     
     let triwulan = ''
     if (month >= 1 && month <= 3) triwulan = isEn ? 'Quarter 1' : 'Triwulan I'
@@ -367,18 +518,86 @@ export default function SurveiPage() {
 
       Analytics.surveySubmit(payload.service_id)
       invalidateClientCache()
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('si_arus_survey_draft')
+      }
       setSubmitted(true)
       toast.success(t('survey.success_submit'))
     } catch (err: unknown) {
       console.error('[onSubmit] Go API submission error:', err)
-      toast.error(t('survey.error_submit'))
+      const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
+      if (isOffline) {
+        toast.error(locale === 'en' 
+          ? 'Internet connection lost. Your survey data is safely stored in this browser. Please reconnect and submit again.' 
+          : 'Koneksi internet terputus. Data jawaban Anda tetap tersimpan aman di browser ini. Silakan hubungkan kembali internet lalu klik Kirim Survei.')
+      } else {
+        toast.error(t('survey.error_submit'))
+      }
     } finally {
       setSubmitting(false)
     }
   }
 
+  const autoScrollToNextQuestion = useCallback((currentQuestionId: string) => {
+    if (typeof window === 'undefined') return
+
+    // Fitur auto-scroll khusus untuk halaman lembar kuesioner IPKP (step 2) & IPAK (step 3)
+    if (step !== 2 && step !== 3) return
+
+    const currentUnsurList = step === 2 ? ipkpUnsur : ipakUnsur
+    if (!currentUnsurList || currentUnsurList.length === 0) return
+
+    // Susun daftar pertanyaan secara berurutan beserta status apakah awal unsur baru
+    const flatQuestions: { questionId: string; unsurId: string; isFirstInUnsur: boolean }[] = []
+    currentUnsurList.forEach((unsur) => {
+      unsur.questions.forEach((q, qIdx) => {
+        flatQuestions.push({
+          questionId: q.id,
+          unsurId: unsur.id,
+          isFirstInUnsur: qIdx === 0,
+        })
+      })
+    })
+
+    const currentIndex = flatQuestions.findIndex((item) => item.questionId === currentQuestionId)
+    if (currentIndex === -1) return
+
+    // Jeda 200ms agar responden sempat melihat feedback visual highlight/warna pilihan emotikon
+    setTimeout(() => {
+      let targetElement: HTMLElement | null = null
+
+      if (currentIndex < flatQuestions.length - 1) {
+        const nextItem = flatQuestions[currentIndex + 1]
+        // Jika pertanyaan berikutnya adalah nomor 1 di kategori unsur baru, scroll ke judul unsur agar jelas
+        if (nextItem.isFirstInUnsur) {
+          targetElement = document.getElementById(`unsur-block-${nextItem.unsurId}`)
+        }
+        if (!targetElement) {
+          targetElement = document.getElementById(`question-card-${nextItem.questionId}`)
+        }
+      } else {
+        // Jika sudah pertanyaan terakhir di lembar ini, scroll ke bagian saran/masukan atau tombol navigasi
+        const feedbackId = step === 2 ? 'ipkp-feedback-section' : 'ipak-feedback-section'
+        targetElement = document.getElementById(feedbackId) || document.getElementById('survey-step-actions')
+      }
+
+      if (targetElement) {
+        const navbarHeight = window.innerWidth < 640 ? 72 : 84
+        const rect = targetElement.getBoundingClientRect()
+        const scrollTop = window.scrollY || window.pageYOffset || document.documentElement.scrollTop
+        const targetTop = scrollTop + rect.top - navbarHeight - 12
+
+        window.scrollTo({
+          top: Math.max(0, targetTop),
+          behavior: 'smooth',
+        })
+      }
+    }, 200)
+  }, [step, ipkpUnsur, ipakUnsur])
+
   function handleAnswerChange(questionId: string, value: number) {
     setAnswers((prev) => ({ ...prev, [questionId]: value }))
+    autoScrollToNextQuestion(questionId)
   }
 
   function handleDemographicChange(fieldId: string, value: string) {
@@ -390,6 +609,9 @@ export default function SurveiPage() {
       <SurveyThankYou
         serviceName={services.find((s) => s.id === selectedServiceId)?.name}
         onReset={() => {
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('si_arus_survey_draft')
+          }
           setSubmitted(false)
           setStep(0)
           reset({
@@ -421,100 +643,6 @@ export default function SurveiPage() {
 
   return (
     <>
-      {/* Floating Disclaimer / PERHATIAN Modal Dialog */}
-      <AnimatePresence>
-        {disclaimerOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ duration: 0.25 }}
-              className="w-full max-w-2xl max-h-[92vh] flex flex-col my-auto overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-slate-200/90 dark:border-gray-800 shadow-2xl"
-            >
-              {/* Header Banner */}
-              <div className="shrink-0 bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-900 p-4 sm:p-6 text-white text-center relative">
-                <div className="mx-auto flex size-11 sm:size-14 items-center justify-center rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md mb-2 sm:mb-3 shadow-inner">
-                  <ShieldAlert className="size-6 sm:size-8 text-amber-400" />
-                </div>
-                <h2 className="text-lg sm:text-2xl font-black uppercase tracking-wider text-white">
-                  {locale === 'en' ? 'ATTENTION!' : 'PERHATIAN!'}
-                </h2>
-                <p className="text-[11px] sm:text-xs text-emerald-200/90 mt-0.5 sm:mt-1 font-medium">
-                  {locale === 'en'
-                    ? 'Public Satisfaction Survey Respondent Consent Statement'
-                    : 'Pernyataan Persetujuan Responden Survei Kepuasan Masyarakat'}
-                </p>
-              </div>
-
-              {/* Content Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-3 sm:space-y-4 text-slate-700 dark:text-slate-300 leading-relaxed text-xs sm:text-sm">
-                <p className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base">
-                  {locale === 'en' ? 'I hereby declare that:' : 'Dengan ini saya menyatakan bahwa:'}
-                </p>
-
-                <div className="space-y-3 bg-slate-50 dark:bg-gray-800/50 p-3.5 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-gray-700 font-medium">
-                  <div className="flex items-start gap-2.5 sm:gap-3">
-                    <span className="flex size-5 sm:size-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[11px] sm:text-xs font-black mt-0.5">1</span>
-                    <p>
-                      {locale === 'en' ? (
-                        <>I am willing to complete this questionnaire and consent to my data being used for the <strong>Public Satisfaction Survey</strong> at the Ministry of Religious Affairs of Barito Utara Regency.</>
-                      ) : (
-                        <>Saya bersedia mengisi kuesioner ini dan mengizinkan data pribadi saya digunakan untuk kebutuhan <strong>Survei Kepuasan Masyarakat</strong> pada Kantor Kementerian Agama Kabupaten Barito Utara.</>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-2.5 sm:gap-3">
-                    <span className="flex size-5 sm:size-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[11px] sm:text-xs font-black mt-0.5">2</span>
-                    <p>
-                      {locale === 'en' ? (
-                        <>All data and answers I enter correspond to the <strong>actual facts and true conditions</strong> known to me.</>
-                      ) : (
-                        <>Semua data dan jawaban yang saya entrikan sudah sesuai dengan <strong>fakta dan kondisi sebenarnya</strong> yang saya ketahui.</>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-2.5 sm:gap-3">
-                    <span className="flex size-5 sm:size-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[11px] sm:text-xs font-black mt-0.5">3</span>
-                    <p>
-                      {locale === 'en' ? (
-                        <>I also assume <strong>full responsibility</strong> for all information filled in this survey form and agree to abide by the provisions regulated under <strong>Law No. 11 of 2008 concerning Electronic Information & Transactions (ITE)</strong>.</>
-                      ) : (
-                        <>Saya juga <strong>bertanggung jawab penuh</strong> terhadap data dan informasi yang saya isikan pada formulir survei ini dan bersedia mengikuti ketentuan sebagaimana yang diatur dalam <strong>UU Nomor 11 Tahun 2008 tentang ITE</strong>.</>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="shrink-0 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5 p-4 sm:p-6 bg-slate-50/80 dark:bg-gray-800/40 border-t border-slate-100 dark:border-gray-800">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push('/')}
-                  className="w-full sm:w-auto rounded-2xl border-rose-200 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-extrabold text-xs sm:text-sm py-4 sm:py-5 px-6 gap-2 cursor-pointer"
-                >
-                  <X className="size-4" />
-                  <span>{locale === 'en' ? 'Disagree' : 'Tidak Setuju'}</span>
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={() => setDisclaimerOpen(false)}
-                  className="w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs sm:text-sm rounded-2xl py-4 sm:py-5 px-8 shadow-lg shadow-emerald-600/30 hover:scale-[1.02] transition-all gap-2 cursor-pointer"
-                >
-                  <CheckCircle2 className="size-4 text-emerald-200" />
-                  <span>{locale === 'en' ? 'Agree & Continue' : 'Setuju & Lanjutkan'}</span>
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       <PublicNavbar />
       <main className="flex-1 bg-slate-50/70 dark:bg-gray-950 pb-6">
         <div className="w-full px-1.5 sm:px-8 lg:px-16 xl:px-20 py-4 sm:py-8">
@@ -924,7 +1052,7 @@ export default function SurveiPage() {
 
                 <CardContent className="p-3.5 sm:p-8 space-y-6 sm:space-y-8">
                   {ipkpUnsur.map((unsur, uIdx) => (
-                    <div key={unsur.id} className="space-y-4">
+                    <div key={unsur.id} id={`unsur-block-${unsur.id}`} className="space-y-4 scroll-mt-24 sm:scroll-mt-28">
                       <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-gray-800">
                         <span className="flex size-7 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-xs font-black">
                           {uIdx + 1}
@@ -936,7 +1064,11 @@ export default function SurveiPage() {
 
                       <div className="space-y-4">
                         {unsur.questions.map((q) => (
-                          <div key={q.id} className="flex flex-col gap-3 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-gray-800 p-3.5 sm:p-6 bg-slate-50/70 dark:bg-gray-800/40 shadow-xs hover:border-emerald-200 transition-colors">
+                          <div 
+                            key={q.id} 
+                            id={`question-card-${q.id}`} 
+                            className="flex flex-col gap-3 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-gray-800 p-3.5 sm:p-6 bg-slate-50/70 dark:bg-gray-800/40 shadow-xs hover:border-emerald-200 transition-colors scroll-mt-24 sm:scroll-mt-28"
+                          >
                             <p className="text-xs sm:text-sm font-extrabold text-slate-950 dark:text-slate-50 leading-relaxed">
                               {locale === 'id' ? q.question_text_id : q.question_text_en}
                             </p>
@@ -964,7 +1096,7 @@ export default function SurveiPage() {
                     </div>
                   ))}
 
-                  <div className="pt-6 border-t border-slate-200 dark:border-gray-800 space-y-2">
+                  <div id="ipkp-feedback-section" className="pt-6 border-t border-slate-200 dark:border-gray-800 space-y-2 scroll-mt-24 sm:scroll-mt-28">
                     <Label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                       <FileText className="size-4 text-emerald-600" />
                       <span>{locale === 'en' ? 'Service Quality Feedback & Suggestions (Optional)' : 'Saran & Kritik Mengenai Kualitas Pelayanan (Opsional)'}</span>
@@ -1001,7 +1133,7 @@ export default function SurveiPage() {
 
                 <CardContent className="p-3.5 sm:p-8 space-y-6 sm:space-y-8">
                   {ipakUnsur.map((unsur, uIdx) => (
-                    <div key={unsur.id} className="space-y-4">
+                    <div key={unsur.id} id={`unsur-block-${unsur.id}`} className="space-y-4 scroll-mt-24 sm:scroll-mt-28">
                       <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100 dark:border-gray-800">
                         <span className="flex size-7 items-center justify-center rounded-xl bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 text-xs font-black">
                           {uIdx + 1}
@@ -1013,7 +1145,11 @@ export default function SurveiPage() {
 
                       <div className="space-y-4">
                         {unsur.questions.map((q) => (
-                          <div key={q.id} className="flex flex-col gap-3 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-gray-800 p-3.5 sm:p-6 bg-slate-50/70 dark:bg-gray-800/40 shadow-xs hover:border-emerald-200 transition-colors">
+                          <div 
+                            key={q.id} 
+                            id={`question-card-${q.id}`} 
+                            className="flex flex-col gap-3 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-gray-800 p-3.5 sm:p-6 bg-slate-50/70 dark:bg-gray-800/40 shadow-xs hover:border-emerald-200 transition-colors scroll-mt-24 sm:scroll-mt-28"
+                          >
                             <p className="text-xs sm:text-sm font-extrabold text-slate-950 dark:text-slate-50 leading-relaxed">
                               {locale === 'id' ? q.question_text_id : q.question_text_en}
                             </p>
@@ -1041,7 +1177,7 @@ export default function SurveiPage() {
                     </div>
                   ))}
 
-                  <div className="pt-6 border-t border-slate-200 dark:border-gray-800 space-y-2">
+                  <div id="ipak-feedback-section" className="pt-6 border-t border-slate-200 dark:border-gray-800 space-y-2 scroll-mt-24 sm:scroll-mt-28">
                     <Label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                       <FileText className="size-4 text-emerald-600" />
                       <span>{locale === 'en' ? 'Corruption Prevention Feedback & Suggestions (Optional)' : 'Saran & Masukan Pencegahan Korupsi (Opsional)'}</span>
@@ -1194,7 +1330,7 @@ export default function SurveiPage() {
             )}
           </motion.div>
         </AnimatePresence>
-        <div className="mt-8 flex items-center justify-between pt-4 border-t border-slate-200/80 dark:border-gray-800">
+        <div id="survey-step-actions" className="mt-8 flex items-center justify-between pt-4 border-t border-slate-200/80 dark:border-gray-800 scroll-mt-20">
           <Button
             type="button"
             variant="outline"
@@ -1239,6 +1375,113 @@ export default function SurveiPage() {
         </div>
       </main>
       <Footer />
+
+      {/* Floating Disclaimer / PERHATIAN Modal Dialog portaled directly to document.body */}
+      {mounted && typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {disclaimerOpen && (
+            <div
+              className="fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-5 md:p-8 backdrop-blur-md select-none overflow-hidden touch-none"
+              style={{ backgroundColor: 'rgba(2, 6, 23, 0.85)', touchAction: 'none' }}
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+              }}
+            >
+              <motion.div
+                data-modal-content="true"
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-lg md:max-w-xl max-h-[90vh] flex flex-col my-auto overflow-hidden rounded-2xl sm:rounded-3xl bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] select-text"
+              >
+                {/* Header Banner */}
+                <div className="shrink-0 bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-900 p-4 sm:p-5 md:p-6 text-white text-center relative overflow-hidden">
+                  <div className="absolute -top-12 -right-12 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+                  <div className="mx-auto flex size-10 sm:size-12 md:size-14 items-center justify-center rounded-xl sm:rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md mb-2 sm:mb-2.5 shadow-inner">
+                    <ShieldAlert className="size-5 sm:size-7 md:size-8 text-amber-400" />
+                  </div>
+                  <h2 className="text-base sm:text-xl md:text-2xl font-black uppercase tracking-wider text-white">
+                    {locale === 'en' ? 'ATTENTION!' : 'PERHATIAN!'}
+                  </h2>
+                  <p className="text-[10px] sm:text-xs text-emerald-200/90 mt-0.5 sm:mt-1 font-medium max-w-md mx-auto">
+                    {locale === 'en'
+                      ? 'Public Satisfaction Survey Respondent Consent Statement'
+                      : 'Pernyataan Persetujuan Responden Survei Kepuasan Masyarakat'}
+                  </p>
+                </div>
+
+                {/* Content Body */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 sm:space-y-4 text-slate-700 dark:text-slate-300 leading-relaxed text-xs sm:text-sm">
+                  <p className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm md:text-base">
+                    {locale === 'en' ? 'I hereby declare that:' : 'Dengan ini saya menyatakan bahwa:'}
+                  </p>
+
+                  <div className="space-y-2.5 sm:space-y-3 bg-slate-100 dark:bg-gray-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-gray-700 font-medium text-[11px] sm:text-xs md:text-sm">
+                    <div className="flex items-start gap-2.5 sm:gap-3">
+                      <span className="flex size-5 sm:size-5.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] sm:text-xs font-black mt-0.5">1</span>
+                      <p>
+                        {locale === 'en' ? (
+                          <>I am willing to complete this questionnaire and consent to my data being used for the <strong>Public Satisfaction Survey</strong> at the Ministry of Religious Affairs of Barito Utara Regency.</>
+                        ) : (
+                          <>Saya bersedia mengisi kuesioner ini dan mengizinkan data pribadi saya digunakan untuk kebutuhan <strong>Survei Kepuasan Masyarakat</strong> pada Kantor Kementerian Agama Kabupaten Barito Utara.</>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex items-start gap-2.5 sm:gap-3">
+                      <span className="flex size-5 sm:size-5.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] sm:text-xs font-black mt-0.5">2</span>
+                      <p>
+                        {locale === 'en' ? (
+                          <>All data and answers I enter correspond to the <strong>actual facts and true conditions</strong> known to me.</>
+                        ) : (
+                          <>Semua data dan jawaban yang saya entrikan sudah sesuai dengan <strong>fakta dan kondisi sebenarnya</strong> yang saya ketahui.</>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex items-start gap-2.5 sm:gap-3">
+                      <span className="flex size-5 sm:size-5.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] sm:text-xs font-black mt-0.5">3</span>
+                      <p>
+                        {locale === 'en' ? (
+                          <>I also assume <strong>full responsibility</strong> for all information filled in this survey form and agree to abide by the provisions regulated under <strong>Law No. 11 of 2008 concerning Electronic Information & Transactions (ITE)</strong>.</>
+                        ) : (
+                          <>Saya juga <strong>bertanggung jawab penuh</strong> terhadap data dan informasi yang saya isikan pada formulir survei ini dan bersedia mengikuti ketentuan sebagaimana yang diatur dalam <strong>UU Nomor 11 Tahun 2008 tentang ITE</strong>.</>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="shrink-0 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 p-3.5 sm:p-5 bg-slate-50 dark:bg-gray-800/80 border-t border-slate-100 dark:border-gray-800">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => router.push('/')}
+                    className="w-full sm:w-auto rounded-xl sm:rounded-2xl border-rose-200 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-black text-xs sm:text-sm py-2.5 sm:py-3 px-4 sm:px-6 gap-2 cursor-pointer transition-colors"
+                  >
+                    <X className="size-4" />
+                    <span>{locale === 'en' ? 'Disagree' : 'Tidak Setuju'}</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={() => setDisclaimerOpen(false)}
+                    className="w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs sm:text-sm rounded-xl sm:rounded-2xl py-2.5 sm:py-3 px-6 sm:px-8 shadow-md sm:shadow-lg shadow-emerald-600/30 hover:scale-[1.01] transition-all gap-2 cursor-pointer"
+                  >
+                    <CheckCircle2 className="size-4 text-emerald-200" />
+                    <span>{locale === 'en' ? 'Agree & Continue' : 'Setuju & Lanjutkan'}</span>
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   )
 }

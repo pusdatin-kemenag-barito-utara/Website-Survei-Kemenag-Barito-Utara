@@ -6,17 +6,25 @@ const rootDir = path.resolve(__dirname, '..');
 const infisicalJsonPath = path.join(rootDir, '.infisical.json');
 
 // Workspace & Project Metadata
-let projectId = process.env.INFISICAL_PROJECT_ID;
-if (!projectId && fs.existsSync(infisicalJsonPath)) {
+let projectId = 'ad5be957-3c8a-4c2e-b21e-3838cc3a7c0e';
+let defaultSecretPath = '/survei-kemenag';
+if (fs.existsSync(infisicalJsonPath)) {
   try {
     const infisicalJson = JSON.parse(fs.readFileSync(infisicalJsonPath, 'utf8'));
-    projectId = infisicalJson.workspaceId;
+    if (infisicalJson.workspaceId) projectId = infisicalJson.workspaceId;
+    if (infisicalJson.defaultSecretPath) defaultSecretPath = infisicalJson.defaultSecretPath;
   } catch (_e) {}
 }
-projectId = projectId || 'ad5be957-3c8a-4c2e-b21e-3838cc3a7c0e';
+if (process.env.INFISICAL_PROJECT_ID) {
+  projectId = process.env.INFISICAL_PROJECT_ID;
+}
 
 const envName = process.env.INFISICAL_ENV || 'dev';
-const secretPath = process.env.INFISICAL_SECRET_PATH || '/survei-kemenag';
+const envSecretPath = process.env.INFISICAL_SECRET_PATH;
+const secretPath =
+  envSecretPath && !envSecretPath.includes('bot-kemenag')
+    ? envSecretPath
+    : defaultSecretPath;
 const domain = process.env.INFISICAL_API_URL || 'https://app.infisical.com/api';
 
 const clientId =

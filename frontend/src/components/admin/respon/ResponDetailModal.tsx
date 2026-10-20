@@ -273,28 +273,28 @@ export function ResponDetailModal({
                 </div>
               </div>
 
-              {selectedResponse.ipkp_feedback || selectedResponse.ipak_feedback ? (
+              {Boolean((selectedResponse.ipkp_feedback && selectedResponse.ipkp_feedback.trim()) || (selectedResponse.ipak_feedback && selectedResponse.ipak_feedback.trim())) ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedResponse.ipkp_feedback && (
+                  {selectedResponse.ipkp_feedback && selectedResponse.ipkp_feedback.trim() && (
                     <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/60 space-y-2">
                       <div className="flex items-center gap-2 text-blue-900 dark:text-blue-200 font-extrabold text-xs">
                         <Star className="size-3.5 text-blue-600 dark:text-blue-400" />
                         <span>Saran Kualitas Pelayanan (IPKP)</span>
                       </div>
                       <p className="text-xs font-medium italic text-slate-800 dark:text-slate-200 leading-relaxed bg-white dark:bg-gray-900 p-3.5 rounded-lg border border-blue-100 dark:border-blue-900/60">
-                        &ldquo;{selectedResponse.ipkp_feedback}&rdquo;
+                        &ldquo;{selectedResponse.ipkp_feedback.trim()}&rdquo;
                       </p>
                     </div>
                   )}
 
-                  {selectedResponse.ipak_feedback && (
+                  {selectedResponse.ipak_feedback && selectedResponse.ipak_feedback.trim() && (
                     <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/60 space-y-2">
                       <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-extrabold text-xs">
                         <Star className="size-3.5 text-amber-600 dark:text-amber-400" />
                         <span>Saran Persepsi Anti Korupsi (IPAK)</span>
                       </div>
                       <p className="text-xs font-medium italic text-slate-800 dark:text-slate-200 leading-relaxed bg-white dark:bg-gray-900 p-3.5 rounded-lg border border-amber-100 dark:border-amber-900/60">
-                        &ldquo;{selectedResponse.ipak_feedback}&rdquo;
+                        &ldquo;{selectedResponse.ipak_feedback.trim()}&rdquo;
                       </p>
                     </div>
                   )}

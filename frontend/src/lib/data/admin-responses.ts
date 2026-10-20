@@ -105,7 +105,7 @@ export async function fetchAdminResponsesWithFallback(
         sort: '-submitted_at',
         expand: 'service,period',
         filter: pbFilters.length > 0 ? pbFilters.join(' && ') : undefined,
-        fields: 'id,original_id,service,period,is_anonymous,respondent_name,respondent_contact,locale,turnstile_verified,ip_address,submitted_at,created,expand.service.id,expand.service.name,expand.service.slug,expand.service.original_id,expand.period.id,expand.period.label,expand.period.original_id,expand.period.is_active',
+        fields: 'id,original_id,service,period,is_anonymous,respondent_name,respondent_contact,locale,turnstile_verified,ip_address,submitted_at,created,ipkp_feedback,ipak_feedback,expand.service.id,expand.service.name,expand.service.slug,expand.service.original_id,expand.period.id,expand.period.label,expand.period.original_id,expand.period.is_active',
       })
 
       const mappedResponses: Response[] = pbList.items.map((item: any) => ({
@@ -181,7 +181,10 @@ export async function fetchAdminResponsesWithFallback(
 export async function fetchResponseDetailWithFallback(responseId: string): Promise<{
   answers: ResponseAnswerDetail[]
   demographics: ResponseDemographicDetail[]
+  feedback?: { ipkp_feedback: string; ipak_feedback: string }
 }> {
+  let feedbackData: { ipkp_feedback: string; ipak_feedback: string } | undefined
+
   try {
     const [ansData, demoData] = await Promise.all([
       apiFetch<ResponseAnswerDetail[]>(`/admin/responses/${responseId}/answers`).catch(() => null),
@@ -189,16 +192,30 @@ export async function fetchResponseDetailWithFallback(responseId: string): Promi
     ])
 
     if (ansData && ansData.length > 0) {
+      // Also fetch single response to ensure fresh feedback
+      try {
+        const respPb = await pb.collection('responses').getOne(responseId).catch(() =>
+          pb.collection('responses').getFirstListItem(`original_id = '${responseId}'`).catch(() => null)
+        )
+        if (respPb) {
+          feedbackData = {
+            ipkp_feedback: respPb.ipkp_feedback || '',
+            ipak_feedback: respPb.ipak_feedback || '',
+          }
+        }
+      } catch {}
+
       return {
         answers: ansData,
         demographics: demoData || [],
+        feedback: feedbackData,
       }
     }
   } catch {}
 
-  // Direct PocketBase Fallback for Answers & Demographics
+  // Direct PocketBase Fallback for Answers, Demographics, and Feedback
   try {
-    const [ansPb, demoPb] = await Promise.all([
+    const [ansPb, demoPb, respRecord] = await Promise.all([
       pb.collection('response_answers').getList(1, 100, {
         filter: `response = '${responseId}' || response.original_id = '${responseId}'`,
         expand: 'question,unsur',
@@ -207,7 +224,17 @@ export async function fetchResponseDetailWithFallback(responseId: string): Promi
         filter: `response = '${responseId}' || response.original_id = '${responseId}'`,
         expand: 'field',
       }),
+      pb.collection('responses').getOne(responseId).catch(() =>
+        pb.collection('responses').getFirstListItem(`original_id = '${responseId}'`).catch(() => null)
+      ),
     ])
+
+    if (respRecord) {
+      feedbackData = {
+        ipkp_feedback: respRecord.ipkp_feedback || '',
+        ipak_feedback: respRecord.ipak_feedback || '',
+      }
+    }
 
     const answers: ResponseAnswerDetail[] = ansPb.items.map((item: any) => ({
       id: item.original_id || item.id,
@@ -236,7 +263,7 @@ export async function fetchResponseDetailWithFallback(responseId: string): Promi
       },
     }))
 
-    return { answers, demographics }
+    return { answers, demographics, feedback: feedbackData }
   } catch (err) {
     console.error('[DataCache] Failed to load response detail from PocketBase fallback:', err)
     return { answers: [], demographics: [] }

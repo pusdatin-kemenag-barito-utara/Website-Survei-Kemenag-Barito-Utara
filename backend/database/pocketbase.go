@@ -137,29 +137,46 @@ func (c *PocketBaseClient) doRequest(method, endpoint string, query url.Values, 
 		fullURL += "?" + query.Encode()
 	}
 
-	var bodyReader io.Reader
+	var bodyBytes []byte
+	var err error
 	if body != nil {
-		bodyBytes, err := json.Marshal(body)
+		bodyBytes, err = json.Marshal(body)
 		if err != nil {
 			return err
 		}
-		bodyReader = bytes.NewReader(bodyBytes)
 	}
 
-	req, err := http.NewRequest(method, fullURL, bodyReader)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	maxRetries := 2
+	var resp *http.Response
 
-	token := c.getToken()
-	if token != "" {
-		req.Header.Set("Authorization", token)
-	}
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		var bodyReader io.Reader
+		if bodyBytes != nil {
+			bodyReader = bytes.NewReader(bodyBytes)
+		}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
+		req, reqErr := http.NewRequest(method, fullURL, bodyReader)
+		if reqErr != nil {
+			return reqErr
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+
+		token := c.getToken()
+		if token != "" {
+			req.Header.Set("Authorization", token)
+		}
+
+		resp, err = c.httpClient.Do(req)
+		if err == nil {
+			break
+		}
+
+		// Retry on transient network transport errors (socket drops, connection resets)
+		if attempt < maxRetries {
+			time.Sleep(time.Duration(150*(attempt+1)) * time.Millisecond)
+			continue
+		}
 		return err
 	}
 	defer resp.Body.Close()

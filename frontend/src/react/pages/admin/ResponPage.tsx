@@ -161,7 +161,18 @@ export default function AdminResponPage() {
     setDetailLoading(true)
 
     try {
-      const { answers, demographics } = await fetchResponseDetailWithFallback(res.id)
+      const { answers, demographics, feedback } = await fetchResponseDetailWithFallback(res.id)
+      if (feedback) {
+        setSelectedResponse((prev) =>
+          prev
+            ? {
+                ...prev,
+                ipkp_feedback: feedback.ipkp_feedback || prev.ipkp_feedback,
+                ipak_feedback: feedback.ipak_feedback || prev.ipak_feedback,
+              }
+            : prev
+        )
+      }
       setDetailAnswers(answers || [])
       setDetailDemographics(demographics || [])
     } catch (err) {

@@ -74,7 +74,7 @@ func (r *pocketbaseRepository) ListResponsesPaginated(serviceID, periodID, dateF
 	q.Set("perPage", strconv.Itoa(limit))
 	q.Set("sort", "-submitted_at")
 	q.Set("expand", "service,period")
-	q.Set("fields", "id,original_id,service,period,is_anonymous,respondent_name,respondent_contact,locale,turnstile_verified,ip_address,submitted_at,created,expand.service.id,expand.service.name,expand.service.slug,expand.service.original_id,expand.period.id,expand.period.label,expand.period.original_id,expand.period.is_active")
+	q.Set("fields", "id,original_id,service,period,is_anonymous,respondent_name,respondent_contact,locale,turnstile_verified,ipkp_feedback,ipak_feedback,ip_address,submitted_at,created,expand.service.id,expand.service.name,expand.service.slug,expand.service.original_id,expand.period.id,expand.period.label,expand.period.original_id,expand.period.is_active")
 	if len(filters) > 0 {
 		q.Set("filter", strings.Join(filters, " && "))
 	}

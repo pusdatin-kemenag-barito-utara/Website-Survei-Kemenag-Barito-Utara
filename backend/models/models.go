@@ -131,8 +131,8 @@ type Response struct {
 	RespondentContact string    `gorm:"type:text" json:"respondent_contact"`
 	Locale            string    `gorm:"type:text;not null;default:'id'" json:"locale"`
 	TurnstileVerified bool      `gorm:"type:boolean;not null;default:false" json:"turnstile_verified"`
-	IPKPFeedback      string    `gorm:"column:ipkp_feedback;type:text" json:"ipkp_feedback,omitempty"`
-	IPAKFeedback      string    `gorm:"column:ipak_feedback;type:text" json:"ipak_feedback,omitempty"`
+	IPKPFeedback      string    `gorm:"column:ipkp_feedback;type:text" json:"ipkp_feedback"`
+	IPAKFeedback      string    `gorm:"column:ipak_feedback;type:text" json:"ipak_feedback"`
 	IPAddress         string    `gorm:"type:text" json:"ip_address"`
 	SubmittedAt       time.Time `gorm:"type:timestamptz;not null;default:now()" json:"submitted_at"`
 

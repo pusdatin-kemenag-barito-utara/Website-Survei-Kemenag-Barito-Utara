@@ -17,9 +17,14 @@ function getFullApiUrl(endpoint: string): string {
   return `/api/v1${cleanEndpoint}`;
 }
 
+export interface ApiFetchOptions extends RequestInit {
+  timeoutMs?: number;
+  retries?: number;
+}
+
 export async function apiFetch<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiFetchOptions = {}
 ): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -34,16 +39,60 @@ export async function apiFetch<T>(
   }
 
   const url = getFullApiUrl(endpoint);
-  const res = await fetch(url, {
-    cache: options.cache || 'no-store',
-    ...options,
-    headers,
-  });
+  const maxRetries = options.retries ?? (options.method && options.method !== 'GET' ? 1 : 2);
+  const timeoutMs = options.timeoutMs ?? 15000;
 
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `HTTP error ${res.status}`);
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(url, {
+        cache: options.cache || 'no-store',
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        // Retry on temporary server gateway errors (502, 503, 504)
+        if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 300 * Math.pow(2, attempt)));
+          continue;
+        }
+
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error ${res.status}`);
+      }
+
+      return (await res.json()) as T;
+    } catch (err: unknown) {
+      clearTimeout(timeoutId);
+      lastError = err;
+
+      // If aborted by caller, don't retry
+      if (options.signal?.aborted) {
+        throw err;
+      }
+
+      // Check if network error or timeout
+      const isNetworkError =
+        err instanceof TypeError ||
+        (err instanceof DOMException && err.name === 'AbortError') ||
+        (err instanceof Error && (err.message.includes('fetch') || err.message.includes('network')));
+
+      if (isNetworkError && attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 300 * Math.pow(2, attempt)));
+        continue;
+      }
+
+      throw err;
+    }
   }
 
-  return res.json() as Promise<T>;
+  throw lastError;
 }

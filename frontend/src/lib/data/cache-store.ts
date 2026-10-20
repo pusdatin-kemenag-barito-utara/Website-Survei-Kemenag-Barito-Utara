@@ -17,6 +17,7 @@ import type {
 export let cachedPublicResults: PublicResultsResponse | null = null
 export let cachedServices: Service[] | null = null
 export let cachedPeriods: SurveyPeriod[] | null = null
+export let cachedActivePeriod: SurveyPeriod | null = null
 export let cachedFormQuestions: FormQuestionsResponse | null = null
 export const cachedArchiveResults: Record<string, ArchiveResultsResponse> = {}
 
@@ -33,6 +34,7 @@ export let cachedAdminResponses: AdminResponsesResult | null = null
 export let inflightPublicResults: Promise<PublicResultsResponse> | null = null
 export let inflightServices: Promise<Service[]> | null = null
 export let inflightPeriods: Promise<SurveyPeriod[]> | null = null
+export let inflightActivePeriod: Promise<SurveyPeriod | null> | null = null
 export let inflightFormQuestions: Promise<FormQuestionsResponse> | null = null
 export const inflightArchiveResults: Record<string, Promise<ArchiveResultsResponse> | null> = {}
 
@@ -50,6 +52,7 @@ export let hasPrefetchedAdmin = false
 export function setCachedPublicResults(val: PublicResultsResponse | null) { cachedPublicResults = val }
 export function setCachedServices(val: Service[] | null) { cachedServices = val }
 export function setCachedPeriods(val: SurveyPeriod[] | null) { cachedPeriods = val }
+export function setCachedActivePeriod(val: SurveyPeriod | null) { cachedActivePeriod = val }
 export function setCachedFormQuestions(val: FormQuestionsResponse | null) { cachedFormQuestions = val }
 
 export function setCachedAdminServices(val: Service[] | null) { cachedAdminServices = val }
@@ -63,6 +66,7 @@ export function setCachedAdminResponses(val: AdminResponsesResult | null) { cach
 export function setInflightPublicResults(val: Promise<PublicResultsResponse> | null) { inflightPublicResults = val }
 export function setInflightServices(val: Promise<Service[]> | null) { inflightServices = val }
 export function setInflightPeriods(val: Promise<SurveyPeriod[]> | null) { inflightPeriods = val }
+export function setInflightActivePeriod(val: Promise<SurveyPeriod | null> | null) { inflightActivePeriod = val }
 export function setInflightFormQuestions(val: Promise<FormQuestionsResponse> | null) { inflightFormQuestions = val }
 
 export function setInflightAdminServices(val: Promise<Service[]> | null) { inflightAdminServices = val }
@@ -148,6 +152,16 @@ export function getCachedPeriodsSync(): SurveyPeriod[] | null {
   return cachedPeriods || cachedAdminPeriods || getSession<SurveyPeriod[]>('public_periods', 120_000)
 }
 
+export function getCachedActivePeriodSync(): SurveyPeriod | null {
+  if (cachedActivePeriod) return cachedActivePeriod
+  const periods = getCachedPeriodsSync()
+  if (periods && periods.length > 0) {
+    const active = periods.find((p) => p.is_active)
+    if (active) return active
+  }
+  return getSession<SurveyPeriod>('active_period', 120_000)
+}
+
 export function getCachedFormQuestionsSync(): FormQuestionsResponse | null {
   return cachedFormQuestions || getSession<FormQuestionsResponse>('form_questions', 120_000)
 }
@@ -190,6 +204,7 @@ export function invalidateClientCache() {
   cachedPublicResults = null
   cachedServices = null
   cachedPeriods = null
+  cachedActivePeriod = null
   cachedFormQuestions = null
   cachedAdminServices = null
   cachedAdminUnsur = null
@@ -203,4 +218,10 @@ export function invalidateClientCache() {
     delete cachedArchiveResults[k]
   }
   clearSession()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('si-arus-data-changed'))
+    try {
+      localStorage.setItem('si_arus_data_updated', Date.now().toString())
+    } catch {}
+  }
 }

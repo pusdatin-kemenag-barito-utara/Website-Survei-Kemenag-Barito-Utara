@@ -22,19 +22,24 @@ import {
   cachedPublicResults,
   cachedServices,
   cachedPeriods,
+  cachedActivePeriod,
   cachedFormQuestions,
   inflightPublicResults,
   inflightServices,
   inflightPeriods,
+  inflightActivePeriod,
   inflightFormQuestions,
   setCachedPublicResults,
   setCachedServices,
   setCachedPeriods,
+  setCachedActivePeriod,
   setCachedFormQuestions,
   setInflightPublicResults,
   setInflightServices,
   setInflightPeriods,
+  setInflightActivePeriod,
   setInflightFormQuestions,
+  getCachedActivePeriodSync,
   getSession,
   setSession,
 } from './cache-store'
@@ -479,3 +484,76 @@ export async function fetchCachedPeriods(forceRefresh = false): Promise<SurveyPe
   setInflightPeriods(p)
   return p
 }
+
+export async function fetchActivePeriodFromPocketBase(): Promise<SurveyPeriod | null> {
+  // 1. Try Go backend /survey/active-period first (ultra-fast ~5ms)
+  try {
+    const apiP = apiFetch<SurveyPeriod>('/survey/active-period')
+    const timeoutP = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Backend active-period timeout')), 5000)
+    )
+    const res = await Promise.race([apiP, timeoutP])
+    if (res && res.id) {
+      return res
+    }
+  } catch (_e) {}
+
+  // 2. Direct PocketBase fallback
+  try {
+    const records = await pb.collection('survey_periods').getFullList({
+      filter: 'is_active = true',
+      sort: '-start_date',
+    })
+    if (records.length > 0) {
+      const triwulan = records.find((r: any) => r.period_type === 'triwulan')
+      return (triwulan || records[0]) as unknown as SurveyPeriod
+    }
+    const all = await pb.collection('survey_periods').getFullList({
+      sort: '-start_date',
+      perPage: 1,
+    })
+    if (all.length > 0) {
+      return all[0] as unknown as SurveyPeriod
+    }
+  } catch (err) {
+    console.error('[DataCache] PocketBase fetchActivePeriod error:', err)
+  }
+
+  return null
+}
+
+export async function fetchCachedActivePeriod(forceRefresh = false): Promise<SurveyPeriod | null> {
+  if (!forceRefresh) {
+    if (cachedActivePeriod) return cachedActivePeriod
+    const syncActive = getCachedActivePeriodSync()
+    if (syncActive) {
+      setCachedActivePeriod(syncActive)
+      return syncActive
+    }
+    const sess = getSession<SurveyPeriod>('active_period', 120_000)
+    if (sess) {
+      setCachedActivePeriod(sess)
+      return sess
+    }
+  }
+  if (inflightActivePeriod) return inflightActivePeriod
+
+  const p = fetchActivePeriodFromPocketBase()
+    .then((data) => {
+      if (data) {
+        setCachedActivePeriod(data)
+        setSession('active_period', data)
+      }
+      setInflightActivePeriod(null)
+      return data
+    })
+    .catch((err) => {
+      setInflightActivePeriod(null)
+      console.error('[DataCache] fetchCachedActivePeriod error:', err)
+      return null
+    })
+
+  setInflightActivePeriod(p)
+  return p
+}
+
