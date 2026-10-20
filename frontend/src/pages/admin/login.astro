@@ -3,6 +3,6 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import AdminLoginEntry from '@/react/pages/admin/AdminLoginEntry';
 ---
 
-<BaseLayout title="Login Admin - SI-ARUS">
-  <AdminLoginEntry client:load />
+<BaseLayout>
+  <AdminLoginEntry client:only="react" />
 </BaseLayout>

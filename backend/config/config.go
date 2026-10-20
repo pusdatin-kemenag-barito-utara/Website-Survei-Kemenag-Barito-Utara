@@ -18,6 +18,8 @@ type Config struct {
 	AdminEmail              string
 	AdminPassword           string
 	TurnstileSecretKey      string
+	SentryDSN               string
+	Environment             string
 }
 
 func (c *Config) GetCorsOrigins() []string {
@@ -122,6 +124,19 @@ func LoadConfig() *Config {
 		dbSchema = "kemenag_survey"
 	}
 
+	sentryDSN := os.Getenv("SENTRY_DSN")
+	if sentryDSN == "" {
+		sentryDSN = os.Getenv("PUBLIC_SENTRY_DSN")
+	}
+
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = os.Getenv("NODE_ENV")
+	}
+	if env == "" {
+		env = "development"
+	}
+
 	return &Config{
 		DatabaseURL:             dbURL,
 		DatabaseSchema:          dbSchema,
@@ -134,5 +149,7 @@ func LoadConfig() *Config {
 		AdminEmail:              adminEmail,
 		AdminPassword:           adminPassword,
 		TurnstileSecretKey:      turnstileSecretKey,
+		SentryDSN:               sentryDSN,
+		Environment:             env,
 	}
 }

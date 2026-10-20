@@ -264,7 +264,7 @@ export async function fetchServicesFromPocketBase(): Promise<Service[]> {
 }
 
 export async function fetchFormQuestionsFromPocketBase(): Promise<FormQuestionsResponse> {
-  const [questionsRes, fieldsRes, optionsRes] = await Promise.all([
+  const [questionsRes, fieldsRes, optionsRes, unsurRes] = await Promise.all([
     pb.collection('questions').getFullList({
       filter: 'is_active = true',
       sort: 'sort_order',
@@ -277,7 +277,18 @@ export async function fetchFormQuestionsFromPocketBase(): Promise<FormQuestionsR
     pb.collection('demographic_options').getFullList({
       sort: 'sort_order',
     }),
+    pb.collection('unsur').getFullList({
+      filter: 'is_active = true',
+      sort: 'sort_order',
+    }),
   ])
+
+  // Map unsur by id
+  const unsurMap = new Map<string, Unsur>()
+  unsurRes.forEach((u: any) => {
+    unsurMap.set(u.id, u as unknown as Unsur)
+    if (u.original_id) unsurMap.set(u.original_id, u as unknown as Unsur)
+  })
 
   // Attach options to demographic fields
   const fields = fieldsRes.map((f: any) => {
@@ -301,11 +312,13 @@ export async function fetchFormQuestionsFromPocketBase(): Promise<FormQuestionsR
   const questions = questionsRes.map((q: any) => {
     const rawUnsurId = (typeof q.unsur === 'object' && q.unsur?.id ? q.unsur.id : q.unsur) || q.unsur_id || q.expand?.unsur?.id || ''
     const rawServiceId = (typeof q.service === 'object' && q.service?.id ? q.service.id : q.service) ?? (q.service_id ?? null)
+    const resolvedUnsur = (q.expand?.unsur as unknown as Unsur) || unsurMap.get(String(rawUnsurId)) || undefined
+
     return {
       ...(q as unknown as Question),
       unsur_id: String(rawUnsurId),
-      service_id: rawServiceId ? String(rawServiceId) : null,
-      unsur: (q.expand?.unsur as unknown as Unsur) || undefined,
+      service_id: rawServiceId && String(rawServiceId) !== 'ALL' ? String(rawServiceId) : null,
+      unsur: resolvedUnsur,
     }
   })
 
@@ -340,10 +353,10 @@ export async function fetchCachedPublicResults(forceRefresh = false): Promise<Pu
     try {
       const apiP = apiFetch<PublicResultsResponse>('/survey/public-results')
       const timeoutP = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Backend public-results timeout')), 3000)
+        setTimeout(() => reject(new Error('Backend public-results timeout')), 8000)
       )
       const res = await Promise.race([apiP, timeoutP])
-      if (res && res.index_summary && res.index_summary.length > 0) {
+      if (res && (res.total_responses !== undefined || (res.index_summary && res.index_summary.length > 0))) {
         setCachedPublicResults(res)
         setSession('public_results', res)
         return res

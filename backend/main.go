@@ -12,8 +12,10 @@ import (
 
 	"survey-kemenag-backend/config"
 	"survey-kemenag-backend/database"
+	"survey-kemenag-backend/middleware"
 	"survey-kemenag-backend/routes"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/compress"
 	"github.com/gofiber/fiber/v3/middleware/cors"
@@ -45,6 +47,7 @@ func main() {
 	})
 
 	// Global Middlewares
+	app.Use(middleware.InitSentry(cfg.SentryDSN))
 	app.Use(compress.New(compress.Config{
 		Level: compress.LevelBestSpeed,
 	}))
@@ -169,6 +172,8 @@ func main() {
 			log.Println("🔒 Database connections closed cleanly.")
 		}
 	}
+
+	sentry.Flush(2 * time.Second)
 
 	log.Println("✅ Server stopped gracefully.")
 }

@@ -133,10 +133,26 @@ export default function AdminPertanyaanPage() {
   async function onSubmit(data: QuestionFormData) {
     setSaving(true);
     try {
+      const ratingLabels: Record<string, string> = {
+        "1": data.label_1 || "Tidak Puas",
+        "2": data.label_2 || "Kurang Puas",
+        "3": data.label_3 || "Puas",
+        "4": data.label_4 || "Sangat Puas",
+      };
+
       const payload = {
-        ...data,
         unsur_id: data.unsur_id,
-        service_id: data.service_id || null,
+        service_id: data.service_id && data.service_id !== "ALL" ? data.service_id : null,
+        question_text_id: data.question_text_id,
+        question_text_en: data.question_text_en,
+        input_type: data.input_type || "star_rating",
+        rating_labels: ratingLabels,
+        label_1: data.label_1,
+        label_2: data.label_2,
+        label_3: data.label_3,
+        label_4: data.label_4,
+        is_active: data.is_active,
+        sort_order: Number(data.sort_order) || 1,
       };
 
       if (editing) {
@@ -154,9 +170,18 @@ export default function AdminPertanyaanPage() {
       }
       setDialogOpen(false);
       invalidateClientCache();
-      loadData(true);
-    } catch {
-      toast.error("Gagal menyimpan butir pertanyaan");
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("si_arus_form_questions");
+        sessionStorage.removeItem("si_arus_admin_questions");
+        sessionStorage.removeItem("si_arus_public_results");
+        localStorage.setItem("si_arus_data_updated", Date.now().toString());
+        localStorage.setItem("si_arus_questions_updated", Date.now().toString());
+        window.dispatchEvent(new CustomEvent("si-arus-data-changed", { detail: { type: "questions" } }));
+      }
+      await loadData(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Gagal menyimpan butir pertanyaan";
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -173,7 +198,15 @@ export default function AdminPertanyaanPage() {
       await apiFetch(`/admin/questions/${target.id}`, { method: "DELETE" });
       toast.success("Pertanyaan berhasil dihapus");
       invalidateClientCache();
-      loadData(true);
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("si_arus_form_questions");
+        sessionStorage.removeItem("si_arus_admin_questions");
+        sessionStorage.removeItem("si_arus_public_results");
+        localStorage.setItem("si_arus_data_updated", Date.now().toString());
+        localStorage.setItem("si_arus_questions_updated", Date.now().toString());
+        window.dispatchEvent(new CustomEvent("si-arus-data-changed", { detail: { type: "questions" } }));
+      }
+      await loadData(true);
     } catch {
       setAllQuestions((prev) => [...prev, target]);
       toast.error("Gagal menghapus pertanyaan");
@@ -240,8 +273,29 @@ export default function AdminPertanyaanPage() {
             <div className="flex items-center gap-2.5 w-full md:w-auto">
               <Filter className="size-4 text-emerald-600 shrink-0" />
               <Select value={filterUnsur} onValueChange={(val) => setFilterUnsur(val || "all")}>
-                <SelectTrigger className="w-full md:w-[320px] rounded-xl border-slate-200 text-xs font-semibold">
-                  <SelectValue placeholder="Pilih Filter Unsur" />
+                <SelectTrigger className="w-full md:w-[360px] rounded-xl border-slate-200 text-xs font-semibold">
+                  <SelectValue placeholder="Pilih Filter Unsur">
+                    {(() => {
+                      if (!filterUnsur || filterUnsur === "all") {
+                        return `Semua Unsur (${allQuestions.length} Pertanyaan)`;
+                      }
+                      if (filterUnsur === "ipkp_all") {
+                        return "Semua Unsur IPKP (Kepuasan Pelayanan)";
+                      }
+                      if (filterUnsur === "ipak_all") {
+                        return "Semua Unsur IPAK (Anti Korupsi)";
+                      }
+                      const cleanId = extractCleanId(filterUnsur);
+                      const found = unsurList.find(
+                        (u) =>
+                          u.id === cleanId ||
+                          (u as { original_id?: string }).original_id === cleanId
+                      );
+                      return found
+                        ? `U${found.sort_order} - ${found.name} (${found.index_type})`
+                        : filterUnsur;
+                    })()}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl max-h-72">
                   <SelectItem value="all" className="font-bold text-xs">
@@ -285,19 +339,19 @@ export default function AdminPertanyaanPage() {
             <Table>
               <TableHeader className="bg-slate-50/80 dark:bg-gray-800/60">
                 <TableRow className="border-b border-slate-100 dark:border-gray-800">
-                  <TableHead className="w-48 text-xs font-bold text-slate-700 uppercase tracking-wider pl-6">
+                  <TableHead className="w-60 min-w-[240px] text-xs font-bold text-slate-700 uppercase tracking-wider pl-6 pr-4">
                     Unsur
                   </TableHead>
-                  <TableHead className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <TableHead className="min-w-[340px] text-xs font-bold text-slate-700 uppercase tracking-wider px-4">
                     Teks Pertanyaan
                   </TableHead>
-                  <TableHead className="w-44 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <TableHead className="w-48 min-w-[180px] text-xs font-bold text-slate-700 uppercase tracking-wider px-3">
                     Layanan Target
                   </TableHead>
-                  <TableHead className="w-28 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <TableHead className="w-28 min-w-[100px] text-center text-xs font-bold text-slate-700 uppercase tracking-wider px-2">
                     Status
                   </TableHead>
-                  <TableHead className="w-28 text-right text-xs font-bold text-slate-700 uppercase tracking-wider pr-6">
+                  <TableHead className="w-28 min-w-[90px] text-right text-xs font-bold text-slate-700 uppercase tracking-wider pr-6">
                     Aksi
                   </TableHead>
                 </TableRow>

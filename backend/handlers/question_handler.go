@@ -139,6 +139,10 @@ type QuestionInput struct {
 	QuestionTextEN string            `json:"question_text_en"`
 	InputType      string            `json:"input_type"`
 	RatingLabels   map[string]string `json:"rating_labels"`
+	Label1         string            `json:"label_1"`
+	Label2         string            `json:"label_2"`
+	Label3         string            `json:"label_3"`
+	Label4         string            `json:"label_4"`
 	IsActive       bool              `json:"is_active"`
 	SortOrder      int               `json:"sort_order"`
 }
@@ -155,11 +159,30 @@ func (h *QuestionHandler) CreateQuestion(c fiber.Ctx) error {
 	}
 
 	var sUID *uuid.UUID
-	if input.ServiceID != nil && *input.ServiceID != "" {
+	if input.ServiceID != nil && *input.ServiceID != "" && *input.ServiceID != "ALL" {
 		parsed := domain.PbIDToUUID(*input.ServiceID)
 		if parsed != uuid.Nil {
 			sUID = &parsed
 		}
+	}
+
+	if input.RatingLabels == nil {
+		input.RatingLabels = make(map[string]string)
+	}
+	if input.Label1 != "" && input.RatingLabels["1"] == "" {
+		input.RatingLabels["1"] = input.Label1
+	}
+	if input.Label2 != "" && input.RatingLabels["2"] == "" {
+		input.RatingLabels["2"] = input.Label2
+	}
+	if input.Label3 != "" && input.RatingLabels["3"] == "" {
+		input.RatingLabels["3"] = input.Label3
+	}
+	if input.Label4 != "" && input.RatingLabels["4"] == "" {
+		input.RatingLabels["4"] = input.Label4
+	}
+	if input.InputType == "" {
+		input.InputType = "star_rating"
 	}
 
 	q := models.Question{
@@ -178,6 +201,8 @@ func (h *QuestionHandler) CreateQuestion(c fiber.Ctx) error {
 	}
 	service.DeleteCache("survey_form_questions")
 	service.DeleteCache("admin_questions")
+	service.DeleteCache("public_results")
+	service.DeleteCache("admin_stats")
 	return c.Status(fiber.StatusCreated).JSON(q)
 }
 
@@ -194,11 +219,30 @@ func (h *QuestionHandler) UpdateQuestion(c fiber.Ctx) error {
 
 	unsurUID := domain.PbIDToUUID(input.UnsurID)
 	var sUID *uuid.UUID
-	if input.ServiceID != nil && *input.ServiceID != "" {
+	if input.ServiceID != nil && *input.ServiceID != "" && *input.ServiceID != "ALL" {
 		parsed := domain.PbIDToUUID(*input.ServiceID)
 		if parsed != uuid.Nil {
 			sUID = &parsed
 		}
+	}
+
+	if input.RatingLabels == nil {
+		input.RatingLabels = make(map[string]string)
+	}
+	if input.Label1 != "" && input.RatingLabels["1"] == "" {
+		input.RatingLabels["1"] = input.Label1
+	}
+	if input.Label2 != "" && input.RatingLabels["2"] == "" {
+		input.RatingLabels["2"] = input.Label2
+	}
+	if input.Label3 != "" && input.RatingLabels["3"] == "" {
+		input.RatingLabels["3"] = input.Label3
+	}
+	if input.Label4 != "" && input.RatingLabels["4"] == "" {
+		input.RatingLabels["4"] = input.Label4
+	}
+	if input.InputType == "" {
+		input.InputType = "star_rating"
 	}
 
 	q := models.Question{
@@ -218,6 +262,8 @@ func (h *QuestionHandler) UpdateQuestion(c fiber.Ctx) error {
 	}
 	service.DeleteCache("survey_form_questions")
 	service.DeleteCache("admin_questions")
+	service.DeleteCache("public_results")
+	service.DeleteCache("admin_stats")
 	return c.JSON(updated)
 }
 
@@ -231,5 +277,7 @@ func (h *QuestionHandler) DeleteQuestion(c fiber.Ctx) error {
 	}
 	service.DeleteCache("survey_form_questions")
 	service.DeleteCache("admin_questions")
+	service.DeleteCache("public_results")
+	service.DeleteCache("admin_stats")
 	return c.JSON(fiber.Map{"message": "Pertanyaan berhasil dihapus"})
 }

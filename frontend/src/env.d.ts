@@ -15,6 +15,10 @@ interface ImportMetaEnv {
 
   // Security & Cloudflare Turnstile
   readonly PUBLIC_TURNSTILE_SITE_KEY?: string
+
+  // Sentry Error Tracking & Performance Monitoring
+  readonly PUBLIC_SENTRY_DSN?: string
+  readonly SENTRY_DSN?: string
 }
 
 interface ImportMeta {

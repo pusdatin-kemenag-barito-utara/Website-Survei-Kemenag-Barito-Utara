@@ -1,4 +1,5 @@
 import { defineConfig } from "astro/config";
+import sentry from "@sentry/astro";
 import react from "@astrojs/react";
 import node from "@astrojs/node";
 import tailwindcss from "@tailwindcss/vite";
@@ -16,7 +17,7 @@ export default defineConfig({
   output: "server",
   adapter: node({ mode: "standalone" }),
   viewTransitions: true,
-  integrations: [react()],
+  integrations: [sentry(), react()],
   vite: {
     envPrefix: ["PUBLIC_"],
     optimizeDeps: {
@@ -38,7 +39,6 @@ export default defineConfig({
         "react-hook-form",
         "@hookform/resolvers/zod",
         "date-fns",
-        "recharts",
         "qrcode",
         "@dnd-kit/core",
         "@dnd-kit/sortable",
@@ -63,10 +63,18 @@ export default defineConfig({
     },
     plugins: [tailwindcss()],
     resolve: {
-      dedupe: ["react", "react-dom"],
+      dedupe: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+      ],
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
         next: fileURLToPath(new URL("./src/next", import.meta.url)),
+        recharts: fileURLToPath(
+          new URL("./node_modules/recharts/es6/index.js", import.meta.url)
+        ),
       },
     },
   },

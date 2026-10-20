@@ -3,6 +3,6 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import DashboardEntry from '@/react/pages/admin/DashboardEntry';
 ---
 
-<BaseLayout title="Dashboard Administrator - SI-ARUS">
-  <DashboardEntry client:load />
+<BaseLayout>
+  <DashboardEntry client:only="react" />
 </BaseLayout>

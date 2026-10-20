@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -19,6 +19,7 @@ import { SurveyThankYou } from '@/components/public/SurveyThankYou'
 import { PublicNavbar } from '@/components/shared/PublicNavbar'
 import { Footer } from '@/components/shared/Footer'
 import { apiFetch } from '@/lib/api'
+import { pb } from '@/lib/pocketbase'
 import {
   fetchCachedServices,
   fetchCachedFormQuestions,
@@ -45,9 +46,13 @@ function mapQuestionsToUnsur(questions: Question[]): { ipkp: UnsurWithQuestions[
     }
   })
 
+  // Sort questions within each unsur by sort_order
+  Object.values(ipkpMap).forEach(u => u.questions.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
+  Object.values(ipakMap).forEach(u => u.questions.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)))
+
   return {
-    ipkp: Object.values(ipkpMap),
-    ipak: Object.values(ipakMap),
+    ipkp: Object.values(ipkpMap).filter(u => u.questions.length > 0).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)),
+    ipak: Object.values(ipakMap).filter(u => u.questions.length > 0).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)),
   }
 }
 
@@ -90,11 +95,9 @@ export default function SurveiPage() {
 
   const initServices = getCachedServicesSync()
   const initForm = getCachedFormQuestionsSync()
-  const initMapped = initForm?.questions ? mapQuestionsToUnsur(initForm.questions) : null
 
   const [services, setServices] = useState<Service[]>(initServices || [])
-  const [ipkpUnsur, setIpkpUnsur] = useState<UnsurWithQuestions[]>(initMapped?.ipkp || [])
-  const [ipakUnsur, setIpakUnsur] = useState<UnsurWithQuestions[]>(initMapped?.ipak || [])
+  const [allQuestions, setAllQuestions] = useState<Question[]>(initForm?.questions || [])
   const [demographicFields, setDemographicFields] = useState<DemographicField[]>(initForm?.demographic_fields || [])
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -114,12 +117,24 @@ export default function SurveiPage() {
   const respondentName = useWatch({ control, name: 'respondent_name' }) || ''
   const respondentContact = useWatch({ control, name: 'respondent_contact' }) || ''
 
+  // Filter questions dynamically based on selectedServiceId
+  const { ipkp: ipkpUnsur, ipak: ipakUnsur } = useMemo(() => {
+    const filtered = allQuestions.filter((q) => {
+      if (q.is_active === false) return false
+      // General questions (no service_id, empty string, or 'ALL')
+      if (!q.service_id || q.service_id === '' || q.service_id === 'ALL') return true
+      // Specific service questions
+      return selectedServiceId ? q.service_id === selectedServiceId : false
+    })
+    return mapQuestionsToUnsur(filtered)
+  }, [allQuestions, selectedServiceId])
+
   useEffect(() => {
     async function fetchData() {
       try {
         const [servicesList, formData] = await Promise.all([
           fetchCachedServices(),
-          fetchCachedFormQuestions(),
+          fetchCachedFormQuestions(true),
         ])
 
         if (servicesList) {
@@ -128,9 +143,7 @@ export default function SurveiPage() {
 
         if (formData) {
           setDemographicFields(formData.demographic_fields || [])
-          const mapped = mapQuestionsToUnsur(formData.questions || [])
-          setIpkpUnsur(mapped.ipkp)
-          setIpakUnsur(mapped.ipak)
+          setAllQuestions(formData.questions || [])
         }
 
         // Set default service if query param exists
@@ -150,6 +163,51 @@ export default function SurveiPage() {
     }
     fetchData()
   }, [setValue])
+
+  // Instant Realtime Synchronization with Admin Modifications
+  useEffect(() => {
+    const syncQuestions = () => {
+      invalidateClientCache()
+      fetchCachedFormQuestions(true).then((formData) => {
+        if (formData?.questions) {
+          setAllQuestions(formData.questions)
+        }
+        if (formData?.demographic_fields) {
+          setDemographicFields(formData.demographic_fields)
+        }
+      }).catch((err) => {
+        console.error('[SurveiPage] Realtime sync error:', err)
+      })
+    }
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'si_arus_data_updated' || e.key === 'si_arus_questions_updated') {
+        syncQuestions()
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+    window.addEventListener('si-arus-data-changed', syncQuestions)
+
+    let unsubscribePb: (() => void) | undefined
+    try {
+      pb.collection('questions').subscribe('*', () => {
+        syncQuestions()
+      }).then((unsub) => {
+        unsubscribePb = unsub
+      }).catch(() => {})
+    } catch {}
+
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      window.removeEventListener('si-arus-data-changed', syncQuestions)
+      if (unsubscribePb) {
+        try { unsubscribePb() } catch {}
+      } else {
+        try { pb.collection('questions').unsubscribe('*').catch(() => {}) } catch {}
+      }
+    }
+  }, [])
 
   const totalSteps = 5
 
@@ -954,7 +1012,7 @@ export default function SurveiPage() {
                       </div>
 
                       <div className="space-y-4">
-                        {ipakUnsur.flatMap(u => u.questions).filter(q => q.unsur_id === unsur.id).map((q) => (
+                        {unsur.questions.map((q) => (
                           <div key={q.id} className="flex flex-col gap-3 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-gray-800 p-3.5 sm:p-6 bg-slate-50/70 dark:bg-gray-800/40 shadow-xs hover:border-emerald-200 transition-colors">
                             <p className="text-xs sm:text-sm font-extrabold text-slate-950 dark:text-slate-50 leading-relaxed">
                               {locale === 'id' ? q.question_text_id : q.question_text_en}

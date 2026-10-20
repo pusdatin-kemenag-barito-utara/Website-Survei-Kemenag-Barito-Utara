@@ -48,6 +48,11 @@ export default function HasilPage() {
   const [allServices, setAllServices] = useState<{ id: string, name: string }[]>(initServices || [])
   const [loading, setLoading] = useState(!initPublic)
   const [serviceFilter, setServiceFilter] = useState('all')
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     async function fetchData() {
@@ -404,7 +409,7 @@ const getPendidikanRank = (val: string): number => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
@@ -436,7 +441,7 @@ const getPendidikanRank = (val: string): number => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
@@ -463,7 +468,7 @@ const getPendidikanRank = (val: string): number => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
@@ -490,7 +495,7 @@ const getPendidikanRank = (val: string): number => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
@@ -520,7 +525,7 @@ const getPendidikanRank = (val: string): number => {
                 <p className="text-xs text-slate-400 font-medium mt-0.5">Nilai rata-rata konversi (skala 0 - 100) untuk tiap unsur indikator</p>
               </CardHeader>
               <CardContent className="p-5">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
@@ -545,7 +550,7 @@ const getPendidikanRank = (val: string): number => {
                 <p className="text-xs text-slate-400 font-medium mt-0.5">Menampilkan tren perkembangan indeks konversi secara berkala</p>
               </CardHeader>
               <CardContent className="p-5">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>

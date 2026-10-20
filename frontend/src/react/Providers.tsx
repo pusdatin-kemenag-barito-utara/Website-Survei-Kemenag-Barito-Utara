@@ -53,8 +53,13 @@ class GlobalErrorBoundary extends Component<
             <p className="text-xs text-rose-800/80 mb-4 leading-relaxed font-medium">
               Sistem mendeteksi galat berikut saat merender komponen:
             </p>
-            <p className="text-xs text-rose-800 font-mono mb-5 bg-white/90 p-3.5 rounded-2xl border border-rose-200 overflow-x-auto text-left whitespace-pre-wrap">
-              {this.state.error?.message || "Kesalahan internal React"}
+            <p className="text-xs text-rose-800 font-mono mb-5 bg-white/90 p-3.5 rounded-2xl border border-rose-200 overflow-x-auto text-left whitespace-pre-wrap max-h-64">
+              <span className="font-bold">{this.state.error?.message || "Kesalahan internal React"}</span>
+              {this.state.error?.stack && (
+                <span className="block mt-2 text-[10px] text-rose-700/80 font-mono select-all">
+                  {this.state.error.stack}
+                </span>
+              )}
             </p>
             <div className="flex items-center justify-center gap-3">
               <button

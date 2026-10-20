@@ -263,8 +263,10 @@ func (r *pocketbaseRepository) CreateQuestion(q *models.Question) error {
 		"sort_order":       q.SortOrder,
 		"original_id":      q.ID.String(),
 	}
-	if q.ServiceID != nil {
+	if q.ServiceID != nil && *q.ServiceID != uuid.Nil {
 		payload["service"] = domain.UUIDToPbID(q.ServiceID.String())
+	} else {
+		payload["service"] = ""
 	}
 	if err := r.pb.Post("/api/collections/questions/records", payload, nil); err != nil {
 		return err
@@ -284,8 +286,10 @@ func (r *pocketbaseRepository) UpdateQuestion(id uuid.UUID, q *models.Question) 
 		"is_active":        q.IsActive,
 		"sort_order":       q.SortOrder,
 	}
-	if q.ServiceID != nil {
+	if q.ServiceID != nil && *q.ServiceID != uuid.Nil {
 		payload["service"] = domain.UUIDToPbID(q.ServiceID.String())
+	} else {
+		payload["service"] = ""
 	}
 	var updated map[string]interface{}
 	if err := r.pb.Patch(fmt.Sprintf("/api/collections/questions/records/%s", pbID), payload, &updated); err != nil {

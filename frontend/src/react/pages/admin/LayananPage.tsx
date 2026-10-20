@@ -113,12 +113,15 @@ export default function AdminLayananPage() {
   }, []);
 
   // Drag and drop sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 5,
+    },
+  });
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  });
+  const sensors = useSensors(pointerSensor, keyboardSensor);
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -328,10 +331,10 @@ export default function AdminLayananPage() {
               </TableHeader>
               <TableBody>
                 <SortableContext
-                  items={visibleServices.map((s) => s.id)}
+                  items={visibleServices.filter((s): s is Service => Boolean(s && s.id)).map((s) => s.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  {visibleServices.map((service) => (
+                  {visibleServices.filter((s): s is Service => Boolean(s && s.id)).map((service) => (
                     <SortableServiceRow
                       key={service.id}
                       service={service}

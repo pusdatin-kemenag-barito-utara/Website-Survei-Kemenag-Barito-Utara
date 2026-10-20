@@ -60,7 +60,7 @@ function SelectContent({
   children,
   side = "bottom",
   sideOffset = 6,
-  align = "center",
+  align = "start",
   alignOffset = 0,
   alignItemWithTrigger = false,
   ...props
@@ -83,7 +83,7 @@ function SelectContent({
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
           className={cn(
-            "relative isolate z-50 max-h-[380px] w-[var(--anchor-width)] min-w-[280px] origin-[top_center] overflow-x-hidden overflow-y-auto rounded-2xl bg-white border border-gray-200/90 p-2 text-gray-900 shadow-2xl shadow-emerald-950/10 ring-1 ring-black/5 transition-all duration-150 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 space-y-1",
+            "relative isolate z-50 max-h-[360px] w-[var(--anchor-width)] min-w-[280px] max-w-[var(--anchor-width)] sm:max-w-none origin-[top_left] overflow-x-hidden overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 border border-gray-200/90 dark:border-gray-800 p-2 text-gray-900 dark:text-gray-100 shadow-2xl shadow-emerald-950/15 ring-1 ring-black/5 transition-all duration-150 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 space-y-1",
             className
           )}
           {...props}

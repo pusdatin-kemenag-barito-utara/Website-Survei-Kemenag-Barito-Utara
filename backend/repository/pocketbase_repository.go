@@ -143,17 +143,3 @@ func getInt(m map[string]interface{}, key string) int {
 	}
 	return 0
 }
-
-func getFloat(m map[string]interface{}, key string) float64 {
-	if v, ok := m[key]; ok && v != nil {
-		if n, ok := v.(float64); ok {
-			return n
-		}
-		if s, ok := v.(string); ok {
-			if n, err := strconv.ParseFloat(s, 64); err == nil {
-				return n
-			}
-		}
-	}
-	return 0
-}

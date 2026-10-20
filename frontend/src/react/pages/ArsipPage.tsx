@@ -229,6 +229,11 @@ export default function ArsipPage({
   const [totalResponses, setTotalResponses] = useState(initArchive?.total_responses || 0);
   const [loading, setLoading] = useState(!initArchive);
   const [serviceFilter, setServiceFilter] = useState("all");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -841,7 +846,7 @@ export default function ArsipPage({
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
@@ -884,7 +889,7 @@ export default function ArsipPage({
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
@@ -947,7 +952,7 @@ export default function ArsipPage({
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
@@ -1010,7 +1015,7 @@ export default function ArsipPage({
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800 w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
@@ -1072,7 +1077,7 @@ export default function ArsipPage({
                 </p>
               </CardHeader>
               <CardContent className="p-5">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
@@ -1166,7 +1171,7 @@ export default function ArsipPage({
                 </p>
               </CardHeader>
               <CardContent className="p-5">
-                {loading ? (
+                {(!mounted || loading) ? (
                   <div className="h-64 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
