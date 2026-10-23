@@ -82,9 +82,26 @@ function getServiceCategory(service: Service): string {
 const formSchema = z.object({
   service_id: z.string().min(1, { message: 'survey.select_service_error' }),
   is_anonymous: z.boolean(),
-  respondent_name: z.string().min(1, "Nama wajib diisi dengan huruf dan tanda baca umum").regex(/^[a-zA-Z\s.,'-]+$/, "Nama wajib diisi dengan huruf dan tanda baca umum"),
-  respondent_contact: z.string().regex(/^[0-9]{10,13}$/, "Kontak wajib 10-13 digit angka"),
+  respondent_name: z.string().optional(),
+  respondent_contact: z.string().optional(),
   respondent_address: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (!data.is_anonymous) {
+    if (!data.respondent_name || data.respondent_name.trim().length === 0 || !/^[a-zA-Z\s.,'-]+$/.test(data.respondent_name)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['respondent_name'],
+        message: 'Nama wajib diisi dengan huruf dan tanda baca umum',
+      })
+    }
+    if (!data.respondent_contact || !/^[0-9]{10,13}$/.test(data.respondent_contact)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['respondent_contact'],
+        message: 'Kontak wajib 10-13 digit angka',
+      })
+    }
+  }
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -1357,7 +1374,13 @@ export default function SurveiPage() {
               type="button" 
               onClick={(e) => {
                 e.preventDefault()
-                handleSubmit(onSubmit)()
+                handleSubmit(
+                  onSubmit,
+                  (formErrors) => {
+                    console.warn('[SurveiPage] Form validation failed:', formErrors)
+                    toast.error(locale === 'en' ? 'Please check your form entries before submitting.' : 'Mohon periksa kembali isian formulir Anda.')
+                  }
+                )()
               }}
               disabled={!canProceed() || submitting}
               className="rounded-2xl px-9 py-6 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-black shadow-xl shadow-emerald-600/25 transition-all duration-200 active:scale-95 group cursor-pointer"
