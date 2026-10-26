@@ -204,6 +204,41 @@ func (c *PocketBaseClient) Get(endpoint string, query url.Values, out interface{
 	return c.doRequest(http.MethodGet, endpoint, query, nil, out, true)
 }
 
+// PBListResult represents PocketBase paginated record response
+type PBListResult struct {
+	Page       int                      `json:"page"`
+	PerPage    int                      `json:"perPage"`
+	TotalItems int64                    `json:"totalItems"`
+	TotalPages int                      `json:"totalPages"`
+	Items      []map[string]interface{} `json:"items"`
+}
+
+// GetFullList automatically paginates through all pages of a PocketBase collection to retrieve all records
+func (c *PocketBaseClient) GetFullList(endpoint string, query url.Values) ([]map[string]interface{}, error) {
+	q := url.Values{}
+	for k, v := range query {
+		q[k] = v
+	}
+	// PocketBase default max perPage is 500
+	q.Set("perPage", "500")
+
+	var allItems []map[string]interface{}
+	page := 1
+	for {
+		q.Set("page", fmt.Sprintf("%d", page))
+		var list PBListResult
+		if err := c.Get(endpoint, q, &list); err != nil {
+			return nil, err
+		}
+		allItems = append(allItems, list.Items...)
+		if page >= list.TotalPages || len(list.Items) == 0 {
+			break
+		}
+		page++
+	}
+	return allItems, nil
+}
+
 func (c *PocketBaseClient) Post(endpoint string, body interface{}, out interface{}) error {
 	return c.doRequest(http.MethodPost, endpoint, nil, body, out, true)
 }

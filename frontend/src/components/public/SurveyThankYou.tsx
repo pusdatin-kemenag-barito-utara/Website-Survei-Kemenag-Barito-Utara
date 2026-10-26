@@ -163,7 +163,7 @@ export function SurveyThankYou({ serviceName, onReset }: SurveyThankYouProps) {
             <a
               href="/"
               data-astro-prefetch="load"
-              aria-label="Kembali ke Beranda"
+              aria-label={locale === 'en' ? 'Back to Home' : 'Kembali ke Beranda'}
               className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20 transition-all cursor-pointer select-none"
             >
               <Home className="size-4 shrink-0" />
@@ -173,7 +173,7 @@ export function SurveyThankYou({ serviceName, onReset }: SurveyThankYouProps) {
             <a
               href="/hasil/ipkp"
               data-astro-prefetch="load"
-              aria-label="Lihat Hasil Survei"
+              aria-label={locale === 'en' ? 'View Survey Results' : 'Lihat Hasil Survei'}
               className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-white dark:bg-gray-900 border border-emerald-300 dark:border-emerald-700/80 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 active:scale-[0.98] text-emerald-800 dark:text-emerald-300 font-bold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer select-none"
             >
               <BarChart3 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -183,7 +183,7 @@ export function SurveyThankYou({ serviceName, onReset }: SurveyThankYouProps) {
             <button
               type="button"
               onClick={handleReset}
-              aria-label="Isi Survei Lagi"
+              aria-label={locale === 'en' ? 'Take Survey Again' : 'Isi Survei Lagi'}
               className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 active:scale-[0.98] text-slate-700 dark:text-slate-200 font-bold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer select-none"
             >
               <RotateCcw className="size-4 shrink-0 text-slate-500 dark:text-slate-400" />

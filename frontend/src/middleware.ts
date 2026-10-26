@@ -106,11 +106,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
       "http://127.0.0.1:8080";
     const target = new URL(pathname + context.url.search, apiTarget);
     
-    // Clean hop-by-hop headers to prevent decompression/host mismatch
+    // Clean hop-by-hop and client-only headers to prevent decompression/host mismatch/header bloat
     const headers = new Headers();
     context.request.headers.forEach((value, key) => {
       const lowerKey = key.toLowerCase();
-      if (!["host", "connection", "accept-encoding", "content-length"].includes(lowerKey)) {
+      // Go backend is stateless and uses Bearer tokens in Authorization header; strip Cookie to prevent HTTP 431 from accumulated localhost cookies
+      if (!["host", "connection", "accept-encoding", "content-length", "cookie"].includes(lowerKey)) {
         headers.set(key, value);
       }
     });

@@ -83,19 +83,19 @@ export default function BarcodePage() {
               <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-emerald-100">
                 <Scan className="size-6 text-emerald-600" />
               </div>
-              <CardTitle className="text-xl">QR Code Survei</CardTitle>
+              <CardTitle className="text-xl">{t('barcode.title')}</CardTitle>
               <CardDescription>
-                Scan QR code untuk mengakses survei kepuasan masyarakat
+                {t('barcode.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-6">
               <div className="flex w-full max-w-xs">
                 <Select value={selectedService} onValueChange={(v) => v && setSelectedService(v)}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="-- Semua Layanan --" />
+                    <SelectValue placeholder={t('barcode.all_services')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="semua">Semua Layanan</SelectItem>
+                    <SelectItem value="semua">{t('results.all_services')}</SelectItem>
                     {services.map((s) => (
                       <SelectItem key={s.id} value={s.slug}>{s.name}</SelectItem>
                     ))}
@@ -125,7 +125,7 @@ export default function BarcodePage() {
 
               <Button onClick={handleDownload} disabled={!qrDataUrl}>
                 <Download className="mr-2 size-4" />
-                Download PNG
+                {t('barcode.download_png')}
               </Button>
             </CardContent>
           </Card>

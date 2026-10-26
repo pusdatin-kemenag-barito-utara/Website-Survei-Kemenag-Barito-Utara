@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/components/shared/I18nProvider'
+import { getUnsurName } from '@/lib/i18n-helpers'
 import { NILAI_MUTU } from '@/lib/constants'
 import type { IndexSummary, IndexByService, UnsurSummary, DemographicSummary } from '@/types'
 
@@ -18,16 +19,23 @@ interface DetailedBreakdownProps {
   demoSummary: DemographicSummary[]
 }
 
-const getUnsurRatingLabel = (score: number) => {
+const getUnsurRatingLabel = (score: number, locale: string = 'id') => {
+  if (locale === 'en') {
+    if (score >= 3.53) return 'Very Good'
+    if (score >= 3.06) return 'Good'
+    if (score >= 2.60) return 'Fair'
+    return 'Poor'
+  }
   if (score >= 3.53) return 'Sangat Baik'
   if (score >= 3.06) return 'Baik'
   if (score >= 2.60) return 'Kurang Baik'
   return 'Tidak Baik'
 }
 
-function StarRatingItem({ score }: { score: number }) {
+function StarRatingItem({ score, locale }: { score: number; locale: string }) {
   const [showClickScore, setShowClickScore] = useState(false)
-  const label = getUnsurRatingLabel(score)
+  const label = getUnsurRatingLabel(score, locale)
+  const scorePrefix = locale === 'en' ? 'Score' : 'Skor'
 
   const stars = []
   for (let i = 1; i <= 4; i++) {
@@ -46,7 +54,7 @@ function StarRatingItem({ score }: { score: number }) {
         <TooltipTrigger
           onClick={() => setShowClickScore(!showClickScore)}
           className="inline-flex items-center justify-center gap-2.5 px-3 py-1 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-950/60 transition-all cursor-pointer group select-none"
-          title={`Skor: ${score.toFixed(2)} / 4.00 (${label})`}
+          title={`${scorePrefix}: ${score.toFixed(2)} / 4.00 (${label})`}
         >
           <div className="flex items-center gap-1 group-hover:scale-110 transition-transform duration-200">{stars}</div>
           <span className="text-[11px] font-extrabold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/80 border border-amber-200 dark:border-amber-800/80 px-2 py-0.5 rounded-full whitespace-nowrap shadow-sm group-hover:border-amber-300 transition-colors">
@@ -54,7 +62,7 @@ function StarRatingItem({ score }: { score: number }) {
           </span>
         </TooltipTrigger>
         <TooltipContent side="top" className="bg-slate-900 text-white font-extrabold text-xs py-1.5 px-3 rounded-xl shadow-xl">
-          Skor: <span className="text-amber-300 text-sm ml-1">{score.toFixed(2)}</span> / 4.00 ({label})
+          {scorePrefix}: <span className="text-amber-300 text-sm ml-1">{score.toFixed(2)}</span> / 4.00 ({label})
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -211,16 +219,18 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
         <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>Rekapitulasi Nilai Per Unsur</span>
+              <span>{locale === 'en' ? 'Element Score Recapitulation' : 'Rekapitulasi Nilai Per Unsur'}</span>
             </CardTitle>
             <p className="text-xs text-slate-400 font-medium mt-0.5">
-              Tabel rincian kalkulasi indikator {indexType === 'IPKP' ? 'IPKP (9 Unsur)' : 'IPAK (5 Unsur)'}
+              {locale === 'en' 
+                ? `Calculation table for ${indexType === 'IPKP' ? 'IPKP (9 Elements)' : 'IPAK (5 Elements)'} indicators`
+                : `Tabel rincian kalkulasi indikator ${indexType === 'IPKP' ? 'IPKP (9 Unsur)' : 'IPAK (5 Unsur)'}`}
             </p>
           </div>
           {periodTitle && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-extrabold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200/80 shadow-xs shrink-0 self-start sm:self-auto">
               <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-              Periode: {periodTitle}
+              {locale === 'en' ? 'Period' : 'Periode'}: {periodTitle}
             </span>
           )}
         </CardHeader>
@@ -229,29 +239,29 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
             <TableHeader className="bg-slate-50/80 dark:bg-gray-800/60 text-[11px] sm:text-xs">
               <TableRow>
                 <TableHead className="w-12 text-center font-extrabold text-slate-700 dark:text-slate-300">No</TableHead>
-                <TableHead className="min-w-[180px] font-extrabold text-slate-700 dark:text-slate-300">Unsur Pelayanan</TableHead>
-                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap">Jml Soal</TableHead>
-                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap">Total Nilai</TableHead>
-                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800">Rata-Rata</TableHead>
-                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800 min-w-[200px] px-4">Rating Bintang</TableHead>
-                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800">Rata-Rata Tertimbang</TableHead>
+                <TableHead className="min-w-[180px] font-extrabold text-slate-700 dark:text-slate-300">{locale === 'en' ? 'Assessment Element' : 'Unsur Pelayanan'}</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap">{locale === 'en' ? 'Questions' : 'Jml Soal'}</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap">{locale === 'en' ? 'Total Score' : 'Total Nilai'}</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800">{locale === 'en' ? 'Average' : 'Rata-Rata'}</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800 min-w-[200px] px-4">{locale === 'en' ? 'Star Rating' : 'Rating Bintang'}</TableHead>
+                <TableHead className="text-center font-extrabold text-slate-700 dark:text-slate-300 whitespace-nowrap border-x border-slate-100 dark:border-gray-800">{locale === 'en' ? 'Weighted Average' : 'Rata-Rata Tertimbang'}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {unsurData.map((u, i) => (
                 <TableRow key={i} className="hover:bg-slate-50/80 dark:hover:bg-gray-800/50 transition-colors text-xs">
                   <TableCell className="text-center font-bold text-slate-400 py-2.5 sm:py-3">{i + 1}</TableCell>
-                  <TableCell className="font-bold text-slate-800 dark:text-slate-200 py-2.5 sm:py-3">{u.unsur_name}</TableCell>
+                  <TableCell className="font-bold text-slate-800 dark:text-slate-200 py-2.5 sm:py-3">{getUnsurName(u.unsur_name, locale)}</TableCell>
                   <TableCell className="text-center font-bold text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">{u.jumlah_pertanyaan}</TableCell>
                   <TableCell className="text-center font-bold text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">{u.total_nilai}</TableCell>
                   <TableCell className="text-center font-bold text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">{u.rataRata.toFixed(2)}</TableCell>
-                  <TableCell className="text-center py-2.5 sm:py-3"><StarRatingItem score={u.rataRata} /></TableCell>
+                  <TableCell className="text-center py-2.5 sm:py-3"><StarRatingItem score={u.rataRata} locale={locale} /></TableCell>
                   <TableCell className="text-center font-bold text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3">{u.tertimbang.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
               <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs border-t-2 border-slate-200 dark:border-gray-700">
                 <TableCell colSpan={6} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
-                  Indeks Survei ({indexType})
+                  {locale === 'en' ? `Survey Index (${indexType})` : `Indeks Survei (${indexType})`}
                 </TableCell>
                 <TableCell className="text-center text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3 whitespace-nowrap">
                   {scoreData.nilai_index.toFixed(2)} {mutuLabel ? `(${mutuLabel})` : ''}
@@ -259,7 +269,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
               </TableRow>
               <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs">
                 <TableCell colSpan={6} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
-                  Nilai Konversi
+                  {locale === 'en' ? 'Conversion Score' : 'Nilai Konversi'}
                 </TableCell>
                 <TableCell className="text-center text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3 whitespace-nowrap">
                   {scoreData.konversi.toFixed(2)}
@@ -267,7 +277,7 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
               </TableRow>
               <TableRow className="bg-slate-50/90 dark:bg-gray-800/70 font-extrabold text-xs">
                 <TableCell colSpan={6} className="text-right text-slate-700 dark:text-slate-300 py-2.5 sm:py-3">
-                  Mutu Pelayanan
+                  {locale === 'en' ? 'Service Grade' : 'Mutu Pelayanan'}
                 </TableCell>
                 <TableCell className="text-center text-emerald-700 dark:text-emerald-400 py-2.5 sm:py-3 whitespace-nowrap">
                   {scoreData.mutu} {mutuLabel ? `(${mutuLabel})` : ''}
@@ -282,23 +292,23 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
       <Card className="border border-slate-200/80 dark:border-gray-800 shadow-xl shadow-slate-200/40 dark:shadow-black/20 bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
         <div className="text-center py-6 px-4 bg-slate-50/50 dark:bg-gray-800/40 border-b border-slate-100 dark:border-gray-800 flex flex-col items-center">
           <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white uppercase leading-relaxed">
-            Survei {indexType === 'IPKP' ? 'Indeks Persepsi Kualitas Pelayanan (IPKP)' : 'Indeks Persepsi Anti Korupsi (IPAK)'}<br/>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-extrabold">KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA</span>
+            {locale === 'en' ? 'Public Satisfaction Survey' : 'Survei Kepuasan Masyarakat'} {indexType === 'IPKP' ? '(IPKP)' : '(IPAK)'}<br/>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-extrabold">{locale === 'en' ? 'MINISTRY OF RELIGIOUS AFFAIRS OF BARITO UTARA REGENCY' : 'KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA'}</span>
           </h2>
           {periodTitle && (
             <div className="mt-2.5 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-black text-xs tracking-wide shadow-xs">
               <span className="size-2 rounded-full bg-emerald-600 animate-pulse" />
-              <span>PERIODE: {periodTitle.toUpperCase()}</span>
+              <span>{locale === 'en' ? 'PERIOD' : 'PERIODE'}: {periodTitle.toUpperCase()}</span>
             </div>
           )}
         </div>
         
         <div className="flex flex-col sm:flex-row w-full bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white font-extrabold text-xs sm:text-sm">
           <div className="w-full sm:w-1/2 text-center py-3 px-4 border-b sm:border-b-0 sm:border-r border-white/20 uppercase tracking-wide">
-            Nilai Survei {indexType === 'IPKP' ? 'Indeks Persepsi Kualitas Pelayanan (IPKP)' : 'Indeks Persepsi Anti Korupsi (IPAK)'} {periodTitle ? `(${periodTitle})` : ''}
+            {locale === 'en' ? `Survey Score: ${indexType}` : `Nilai Survei ${indexType === 'IPKP' ? 'Indeks Persepsi Kualitas Pelayanan (IPKP)' : 'Indeks Persepsi Anti Korupsi (IPAK)'}`} {periodTitle ? `(${periodTitle})` : ''}
           </div>
           <div className="w-full sm:w-1/2 text-center py-3 px-4 uppercase tracking-wide">
-            {serviceFilter === 'all' ? 'Semua Pelayanan' : serviceFilter}
+            {serviceFilter === 'all' ? (locale === 'en' ? 'All Services' : 'Semua Pelayanan') : serviceFilter}
           </div>
         </div>
 
@@ -313,22 +323,26 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
             <Table>
               <TableBody>
                 <TableRow className="bg-slate-100/60 dark:bg-gray-800/50">
-                  <TableCell className="font-extrabold w-1/3 text-slate-800 dark:text-slate-200 text-xs">Responden</TableCell>
+                  <TableCell className="font-extrabold w-1/3 text-slate-800 dark:text-slate-200 text-xs">{locale === 'en' ? 'Respondents' : 'Responden'}</TableCell>
                   <TableCell></TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="text-xs font-bold text-slate-600 dark:text-slate-400">Jumlah Responden</TableCell>
-                  <TableCell className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">{totalRespondents} Orang</TableCell>
+                  <TableCell className="text-xs font-bold text-slate-600 dark:text-slate-400">{locale === 'en' ? 'Total Respondents' : 'Jumlah Responden'}</TableCell>
+                  <TableCell className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">{totalRespondents} {locale === 'en' ? 'Respondents' : 'Orang'}</TableCell>
                 </TableRow>
                 {demoData.filter(d => ['jenis_kelamin', 'pendidikan'].includes(d.label.toLowerCase())).map((d, idx) => (
                   <TableRow key={idx}>
                     <TableCell className="text-xs font-bold text-slate-600 dark:text-slate-400 capitalize">
-                      {d.label.replace(/_/g, ' ')}
+                      {d.label.toLowerCase() === 'jenis_kelamin' 
+                        ? (locale === 'en' ? 'Gender' : 'Jenis Kelamin')
+                        : d.label.toLowerCase() === 'pendidikan'
+                        ? (locale === 'en' ? 'Education' : 'Pendidikan')
+                        : d.label.replace(/_/g, ' ')}
                     </TableCell>
                     <TableCell className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                       {d.options.map((opt) => (
                         <div key={opt.value} className="mb-1 last:mb-0">
-                          {opt.value} : <span className="font-bold text-emerald-600 dark:text-emerald-400">{opt.count} Orang</span>
+                          {opt.value} : <span className="font-bold text-emerald-600 dark:text-emerald-400">{opt.count} {locale === 'en' ? 'Respondents' : 'Orang'}</span>
                         </div>
                       ))}
                     </TableCell>
@@ -345,12 +359,16 @@ export function DetailedBreakdown({ indexType, serviceFilter, periodTitle, summa
               {demoData.filter(d => ['pekerjaan', 'usia'].includes(d.label.toLowerCase())).map((d, idx) => (
                 <TableRow key={idx}>
                   <TableCell className="font-extrabold text-slate-800 dark:text-slate-200 bg-slate-100/80 dark:bg-gray-800/60 w-[150px] capitalize text-xs">
-                    {d.label.replace(/_/g, ' ')}
+                    {d.label.toLowerCase() === 'pekerjaan'
+                      ? (locale === 'en' ? 'Occupation' : 'Pekerjaan')
+                      : d.label.toLowerCase() === 'usia'
+                      ? (locale === 'en' ? 'Age' : 'Usia')
+                      : d.label.replace(/_/g, ' ')}
                   </TableCell>
                   {d.options.map(opt => (
                     <TableCell key={opt.value} className="text-center align-top min-w-[120px]">
                       <div className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">{opt.value}</div>
-                      <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{opt.count} Orang</div>
+                      <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{opt.count} {locale === 'en' ? 'Respondents' : 'Orang'}</div>
                     </TableCell>
                   ))}
                 </TableRow>

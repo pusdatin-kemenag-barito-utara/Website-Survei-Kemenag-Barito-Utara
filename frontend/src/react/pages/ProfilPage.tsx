@@ -6,6 +6,7 @@ import { Footer } from "@/components/shared/Footer";
 import PageBanner from "@/components/shared/PageBanner";
 import { useI18n } from "@/components/shared/I18nProvider";
 import { fetchCachedAdminUnsur, getCachedAdminUnsurSync } from "@/lib/data-cache";
+import { getUnsurName } from "@/lib/i18n-helpers";
 import type { Unsur } from "@/types";
 
 const unsurSKM_ID = [
@@ -86,19 +87,29 @@ export default function ProfilPage() {
     .sort((a, b) => a.sort_order - b.sort_order);
 
   const unsurSKM = ipkpDb.length > 0
-    ? ipkpDb.map((u) => ({
-        no: u.sort_order,
-        nama: u.name,
-        deskripsi: u.description || (isEn ? "Service evaluation element indicator." : "Indikator evaluasi unsur pelayanan publik."),
-      }))
+    ? ipkpDb.map((u) => {
+        const enItem = unsurSKM_EN.find((x) => x.no === u.sort_order);
+        return {
+          no: u.sort_order,
+          nama: isEn ? (enItem?.nama || getUnsurName(u.name, 'en')) : u.name,
+          deskripsi: isEn
+            ? (enItem?.deskripsi || "Service evaluation element indicator.")
+            : (u.description || "Indikator evaluasi unsur pelayanan publik."),
+        };
+      })
     : (isEn ? unsurSKM_EN : unsurSKM_ID);
 
   const unsurIPAK = ipakDb.length > 0
-    ? ipakDb.map((u) => ({
-        no: u.sort_order,
-        nama: u.name,
-        deskripsi: u.description || (isEn ? "Anti-corruption perception evaluation indicator." : "Indikator evaluasi persepsi anti korupsi."),
-      }))
+    ? ipakDb.map((u) => {
+        const enItem = unsurIPAK_EN.find((x) => x.no === u.sort_order);
+        return {
+          no: u.sort_order,
+          nama: isEn ? (enItem?.nama || getUnsurName(u.name, 'en')) : u.name,
+          deskripsi: isEn
+            ? (enItem?.deskripsi || "Anti-corruption perception evaluation indicator.")
+            : (u.description || "Indikator evaluasi persepsi anti korupsi."),
+        };
+      })
     : (isEn ? unsurIPAK_EN : unsurIPAK_ID);
 
   const sasaran = isEn ? sasaran_EN : sasaran_ID;

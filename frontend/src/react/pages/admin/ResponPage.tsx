@@ -389,55 +389,90 @@ export default function AdminResponPage() {
 
           {/* Enhanced Pagination Navigation Footer */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-100 dark:border-gray-800 bg-slate-50/70 dark:bg-gray-800/40">
-            <div className="text-xs font-bold text-slate-600 dark:text-slate-400">
+            <div className="text-xs font-bold text-slate-600 dark:text-slate-400 text-center sm:text-left">
               Menampilkan <span className="text-slate-900 dark:text-white font-black">{totalCount > 0 ? (page - 1) * pageSize + 1 : 0}</span> - <span className="text-slate-900 dark:text-white font-black">{Math.min(page * pageSize, totalCount)}</span> dari <span className="text-slate-900 dark:text-white font-black">{totalCount}</span> Data Respon
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="rounded-xl text-xs font-bold gap-1 px-3 cursor-pointer"
-                >
-                  <ChevronLeft className="size-4" />
-                  <span>Sebelumnya</span>
-                </Button>
+              <>
+                {/* Desktop Pagination (Full numbered list) */}
+                <div className="hidden sm:flex items-center gap-1.5 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="rounded-xl text-xs font-bold gap-1 px-3 cursor-pointer"
+                  >
+                    <ChevronLeft className="size-4" />
+                    <span>Sebelumnya</span>
+                  </Button>
 
-                {pageNumbers.map((pNum, idx) =>
-                  typeof pNum === 'number' ? (
-                    <button
-                      key={pNum}
-                      type="button"
-                      onClick={() => setPage(pNum)}
-                      className={`size-8 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                        pNum === page
-                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-100 dark:ring-emerald-950'
-                          : 'bg-white dark:bg-gray-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gray-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {pNum}
-                    </button>
-                  ) : (
-                    <span key={`ellipsis-${idx}`} className="px-1 text-xs text-slate-400 font-black">
-                      ...
-                    </span>
-                  )
-                )}
+                  {pageNumbers.map((pNum, idx) =>
+                    typeof pNum === 'number' ? (
+                      <button
+                        key={pNum}
+                        type="button"
+                        onClick={() => setPage(pNum)}
+                        className={`size-8 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                          pNum === page
+                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-100 dark:ring-emerald-950'
+                            : 'bg-white dark:bg-gray-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gray-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {pNum}
+                      </button>
+                    ) : (
+                      <span key={`ellipsis-${idx}`} className="px-1 text-xs text-slate-400 font-black">
+                        ...
+                      </span>
+                    )
+                  )}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="rounded-xl text-xs font-bold gap-1 px-3 cursor-pointer"
-                >
-                  <span>Selanjutnya</span>
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="rounded-xl text-xs font-bold gap-1 px-3 cursor-pointer"
+                  >
+                    <span>Selanjutnya</span>
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </div>
+
+                {/* Mobile Pagination (Single neat row, never wraps) */}
+                <div className="flex sm:hidden items-center justify-between w-full gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="h-8 px-3 rounded-xl text-xs font-bold gap-1 bg-white dark:bg-gray-800 border-slate-200 dark:border-gray-700 text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-40 shrink-0"
+                  >
+                    <ChevronLeft className="size-3.5" />
+                    <span>Sebelumnya</span>
+                  </Button>
+
+                  <div className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-white dark:bg-gray-800 border border-slate-200/80 dark:border-gray-700 shadow-2xs text-xs font-bold">
+                    <span className="text-slate-400">Hal</span>
+                    <span className="font-black text-emerald-600 dark:text-emerald-400">{page}</span>
+                    <span className="text-slate-400">/</span>
+                    <span className="text-slate-600 dark:text-slate-300">{totalPages}</span>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="h-8 px-3 rounded-xl text-xs font-bold gap-1 bg-white dark:bg-gray-800 border-slate-200 dark:border-gray-700 text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-40 shrink-0"
+                  >
+                    <span>Selanjutnya</span>
+                    <ChevronRight className="size-3.5" />
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </CardContent>

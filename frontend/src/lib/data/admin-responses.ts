@@ -244,6 +244,11 @@ export async function fetchResponseDetailWithFallback(responseId: string): Promi
       questions: {
         question_text_id: item.expand?.question?.question_text_id || '',
         question_text_en: item.expand?.question?.question_text_en || '',
+        rating_labels: item.expand?.question?.rating_labels,
+        label_1: item.expand?.question?.label_1,
+        label_2: item.expand?.question?.label_2,
+        label_3: item.expand?.question?.label_3,
+        label_4: item.expand?.question?.label_4,
       },
       unsur: {
         name: item.expand?.unsur?.name || '',

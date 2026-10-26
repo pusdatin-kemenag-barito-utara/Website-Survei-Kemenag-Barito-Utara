@@ -23,20 +23,22 @@ import {
 import { getPocketBase } from '@/lib/pocketbase'
 import { exportToExcel, exportToPdf } from '@/lib/export'
 import { Analytics } from '@/lib/analytics'
+import { getUnsurName } from '@/lib/i18n-helpers'
 import type { IndexSummary, IndexByService, IndexTrend, UnsurSummary, DemographicSummary } from '@/types'
 import { toast } from 'sonner'
 
 export default function HasilPage() {
+  const { t, locale } = useI18n()
   const params = useParams()
   const rawType = (params?.type as string) || (typeof window !== 'undefined' && window.location.pathname.includes('/ipak') ? 'ipak' : 'ipkp')
   const typeLower = rawType.toLowerCase()
   const validatedType = typeLower === 'ipak' ? 'ipak' : 'ipkp'
 
   const indexType = validatedType === 'ipak' ? 'IPAK' : 'IPKP'
-  const pageTitle = indexType === 'IPAK' ? 'Indeks Persepsi Anti Korupsi (IPAK)' : 'Indeks Persepsi Kualitas Pelayanan (IPKP)'
-  const tableTitle = indexType === 'IPAK' ? 'Indeks Persepsi Anti Korupsi (IPAK)' : 'Indeks Persepsi Kualitas Pelayanan (IPKP)'
-
-  const { t, locale } = useI18n()
+  const pageTitle = indexType === 'IPAK' 
+    ? (locale === 'en' ? 'Anti-Corruption Perception Index (IPAK)' : 'Indeks Persepsi Anti Korupsi (IPAK)') 
+    : (locale === 'en' ? 'Service Quality Perception Index (IPKP)' : 'Indeks Persepsi Kualitas Pelayanan (IPKP)')
+  const tableTitle = indexType === 'IPAK' ? t('results.table_title_ipak') : t('results.table_title_ipkp')
   const initPublic = getCachedPublicResultsSync()
   const initServices = getCachedServicesSync()
 
@@ -140,7 +142,8 @@ export default function HasilPage() {
 
     const grouped = new Map<string, { total: number, count: number }>()
     for (const item of filtered) {
-      const shortName = item.unsur_name.length > 18 ? `${item.unsur_name.substring(0, 16)}...` : item.unsur_name
+      const localizedName = getUnsurName(item.unsur_name, locale)
+      const shortName = localizedName.length > 18 ? `${localizedName.substring(0, 16)}...` : localizedName
       if (!grouped.has(shortName)) {
         grouped.set(shortName, { total: 0, count: 0 })
       }
@@ -314,33 +317,35 @@ const getPendidikanRank = (val: string): number => {
           <Card className="mb-10 border border-slate-200/80 dark:border-gray-800 shadow-xl shadow-slate-200/40 dark:shadow-black/20 bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
             <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-6">
               <CardTitle className="text-center text-sm sm:text-base text-slate-900 dark:text-white font-extrabold uppercase tracking-wide leading-relaxed">
-                Rekapitulasi Data Survei {tableTitle} Per Layanan<br/>
-                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA TAHUN {new Date().getFullYear()}</span>
+                {tableTitle}<br/>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">
+                  {locale === 'en' ? 'MINISTRY OF RELIGIOUS AFFAIRS OF BARITO UTARA REGENCY' : 'KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA'} {new Date().getFullYear()}
+                </span>
               </CardTitle>
             </CardHeader>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-slate-50/80 dark:bg-gray-800/60">
                   <TableRow className="border-b border-slate-100 dark:border-gray-800">
-                    <TableHead className="w-14 font-extrabold text-slate-700 uppercase tracking-wider text-center">NO</TableHead>
-                    <TableHead className="font-extrabold text-slate-700 uppercase tracking-wider">Nama Layanan</TableHead>
-                    <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider whitespace-nowrap">Nilai Indeks</TableHead>
-                    <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider">Konversi</TableHead>
-                    <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider whitespace-nowrap">Mutu Pelayanan</TableHead>
-                    <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider whitespace-nowrap">Jumlah Responden</TableHead>
+                    <TableHead className="w-14 font-extrabold text-slate-700 uppercase tracking-wider text-center">{t('results.col_no')}</TableHead>
+                    <TableHead className="font-extrabold text-slate-700 uppercase tracking-wider">{t('results.col_service')}</TableHead>
+                    <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider whitespace-nowrap">{t('results.col_index')}</TableHead>
+                    <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider">{t('results.col_conversion')}</TableHead>
+                    <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider whitespace-nowrap">{t('results.col_grade')}</TableHead>
+                    <TableHead className="text-center font-extrabold text-slate-700 uppercase tracking-wider whitespace-nowrap">{t('results.col_respondents')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-32 text-center text-slate-400 font-medium">
-                        Memuat data survei...
+                        {t('results.loading_data')}
                       </TableCell>
                     </TableRow>
                   ) : displayedServices.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-32 text-center text-slate-400 font-medium">
-                        Belum ada layanan aktif
+                        {t('results.no_active_services')}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -369,12 +374,12 @@ const getPendidikanRank = (val: string): number => {
                               hasData && item?.mutu === 'C' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                               'bg-slate-100 text-slate-600 border border-slate-200'
                             }`}>
-                              {hasData && item ? `${item.mutu} (${mutuText})` : 'Belum Terisi'}
+                              {hasData && item ? `${item.mutu} (${mutuText})` : t('results.not_filled')}
                             </span>
                           </TableCell>
                           <TableCell className="text-center font-bold text-xs">
                             <span className={count > 0 ? 'text-emerald-700 font-black' : 'text-slate-400'}>
-                              {count} Orang
+                              {count} {t('results.respondents_unit')}
                             </span>
                           </TableCell>
                         </TableRow>
@@ -390,7 +395,7 @@ const getPendidikanRank = (val: string): number => {
             <DetailedBreakdown 
               indexType={indexType} 
               serviceFilter={serviceFilter} 
-              periodTitle={`Tahun ${new Date().getFullYear()}`}
+              periodTitle={locale === 'en' ? `Year ${new Date().getFullYear()}` : `Tahun ${new Date().getFullYear()}`}
               summary={summary} 
               byService={byService} 
               unsurSummary={unsurSummary} 
@@ -405,7 +410,7 @@ const getPendidikanRank = (val: string): number => {
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4">
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-2">
                   <Users className="size-4 text-cyan-500" />
-                  <span>Jenis Kelamin <span className="text-slate-400 font-normal">Responden</span></span>
+                  <span>{t('results.chart_gender')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
@@ -437,7 +442,7 @@ const getPendidikanRank = (val: string): number => {
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4">
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-2">
                   <GraduationCap className="size-4 text-amber-500" />
-                  <span>Pendidikan <span className="text-slate-400 font-normal">Responden</span></span>
+                  <span>{t('results.chart_education')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
@@ -464,7 +469,7 @@ const getPendidikanRank = (val: string): number => {
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4">
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-2">
                   <UserCheck className="size-4 text-rose-500" />
-                  <span>Usia <span className="text-slate-400 font-normal">Responden</span></span>
+                  <span>{t('results.chart_age')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
@@ -491,7 +496,7 @@ const getPendidikanRank = (val: string): number => {
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4">
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-2">
                   <Briefcase className="size-4 text-teal-500" />
-                  <span>Pekerjaan <span className="text-slate-400 font-normal">Responden</span></span>
+                  <span>{t('results.chart_occupation')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
@@ -504,7 +509,7 @@ const getPendidikanRank = (val: string): number => {
                       <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-35} textAnchor="end" height={55} />
                       <YAxis tick={{ fontSize: 10, fontWeight: 600 }} allowDecimals={false} />
                       <Tooltip contentStyle={{ borderRadius: '14px', fontWeight: 600, fontSize: '11px' }} />
-                      <Bar dataKey="value" name="Jumlah" radius={[6, 6, 0, 0]}>
+                      <Bar dataKey="value" name={locale === 'en' ? 'Count' : 'Jumlah'} radius={[6, 6, 0, 0]}>
                         <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
                       </Bar>
                     </BarChart>
@@ -520,9 +525,11 @@ const getPendidikanRank = (val: string): number => {
             <Card className="border border-slate-200/80 dark:border-gray-800 shadow-xl shadow-slate-200/40 dark:shadow-black/20 bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-5">
                 <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">
-                  Rincian Nilai Konversi Per Unsur ({indexType})
+                  {locale === 'en' ? `Conversion Score Breakdown per Element (${indexType})` : `Rincian Nilai Konversi Per Unsur (${indexType})`}
                 </CardTitle>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">Nilai rata-rata konversi (skala 0 - 100) untuk tiap unsur indikator</p>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  {locale === 'en' ? 'Average conversion score (0 - 100 scale) for each indicator element' : 'Nilai rata-rata konversi (skala 0 - 100) untuk tiap unsur indikator'}
+                </p>
               </CardHeader>
               <CardContent className="p-5">
                 {(!mounted || loading) ? (
@@ -547,7 +554,9 @@ const getPendidikanRank = (val: string): number => {
             <Card className="border border-slate-200/80 dark:border-gray-800 shadow-xl shadow-slate-200/40 dark:shadow-black/20 bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-5">
                 <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">{t('results.trend')}</CardTitle>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">Menampilkan tren perkembangan indeks konversi secara berkala</p>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  {locale === 'en' ? 'Displays periodic conversion index trends over time' : 'Menampilkan tren perkembangan indeks konversi secara berkala'}
+                </p>
               </CardHeader>
               <CardContent className="p-5">
                 {(!mounted || loading) ? (

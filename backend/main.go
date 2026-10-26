@@ -40,10 +40,11 @@ func main() {
 
 	// Create Fiber app with Proxy Header resolution for Real Client IP
 	app := fiber.New(fiber.Config{
-		AppName:      "SIKAP Kemenag REST API v1.0",
-		ServerHeader: "Fiber",
-		ProxyHeader:  fiber.HeaderXForwardedFor,
-		TrustProxy:   true,
+		AppName:        "SIKAP Kemenag REST API v1.0",
+		ServerHeader:   "Fiber",
+		ProxyHeader:    fiber.HeaderXForwardedFor,
+		TrustProxy:     true,
+		ReadBufferSize: 32 * 1024, // 32KB buffer (default 4KB) prevents HTTP 431 on large proxy/cookie headers
 	})
 
 	// Global Middlewares

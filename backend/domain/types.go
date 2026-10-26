@@ -86,12 +86,17 @@ type ByServiceStat struct {
 }
 
 type AnswerDetailResult struct {
-	ID             uuid.UUID `json:"id"`
-	RatingValue    int       `json:"rating_value"`
-	QuestionTextID string    `json:"question_text_id"`
-	QuestionTextEN string    `json:"question_text_en"`
-	UnsurName      string    `json:"unsur_name"`
-	IndexType      string    `json:"index_type"`
+	ID             uuid.UUID   `json:"id"`
+	RatingValue    int         `json:"rating_value"`
+	QuestionTextID string      `json:"question_text_id"`
+	QuestionTextEN string      `json:"question_text_en"`
+	UnsurName      string      `json:"unsur_name"`
+	IndexType      string      `json:"index_type"`
+	RatingLabels   interface{} `json:"rating_labels,omitempty"`
+	Label1         string      `json:"label_1,omitempty"`
+	Label2         string      `json:"label_2,omitempty"`
+	Label3         string      `json:"label_3,omitempty"`
+	Label4         string      `json:"label_4,omitempty"`
 }
 
 type DemoDetailResult struct {

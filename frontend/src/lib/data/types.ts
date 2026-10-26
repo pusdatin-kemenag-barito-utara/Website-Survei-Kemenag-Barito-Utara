@@ -80,6 +80,11 @@ export interface ResponseAnswerDetail {
   questions?: {
     question_text_id: string
     question_text_en: string
+    rating_labels?: Record<string, string> | string | null
+    label_1?: string
+    label_2?: string
+    label_3?: string
+    label_4?: string
   }
   unsur?: {
     name: string

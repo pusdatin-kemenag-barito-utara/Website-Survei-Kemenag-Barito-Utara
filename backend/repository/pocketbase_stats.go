@@ -50,16 +50,15 @@ func (r *pocketbaseRepository) CountActiveUnsur() (int64, error) {
 }
 
 func (r *pocketbaseRepository) GetAnswerUnsurRawList() ([]domain.AnswerUnsurRaw, error) {
-	var ansList pbRecordList
 	q := url.Values{}
 	q.Set("expand", "unsur")
-	q.Set("perPage", "5000")
-	if err := r.pb.Get("/api/collections/response_answers/records", q, &ansList); err != nil {
+	items, err := r.pb.GetFullList("/api/collections/response_answers/records", q)
+	if err != nil {
 		return nil, err
 	}
 
-	res := make([]domain.AnswerUnsurRaw, 0, len(ansList.Items))
-	for _, item := range ansList.Items {
+	res := make([]domain.AnswerUnsurRaw, 0, len(items))
+	for _, item := range items {
 		ratingVal := getInt(item, "rating_value")
 		indexType := "IPKP"
 		if exp, ok := item["expand"].(map[string]interface{}); ok {
@@ -157,31 +156,43 @@ func (r *pocketbaseRepository) getAllAnswers() ([]map[string]interface{}, error)
 	if cached, ok := r.getMemCache("all_answers"); ok {
 		return cached.([]map[string]interface{}), nil
 	}
-	var list pbRecordList
 	q := url.Values{}
 	q.Set("fields", "id,response,unsur,rating_value")
-	q.Set("perPage", "5000")
-	if err := r.pb.Get("/api/collections/response_answers/records", q, &list); err != nil {
+	items, err := r.pb.GetFullList("/api/collections/response_answers/records", q)
+	if err != nil {
 		return nil, err
 	}
-	r.setMemCache("all_answers", list.Items, 2*time.Minute)
-	return list.Items, nil
+	r.setMemCache("all_answers", items, 2*time.Minute)
+	return items, nil
 }
 
 func (r *pocketbaseRepository) getAllResponses() ([]map[string]interface{}, error) {
 	if cached, ok := r.getMemCache("all_responses"); ok {
 		return cached.([]map[string]interface{}), nil
 	}
-	var respList pbRecordList
 	q := url.Values{}
-	q.Set("perPage", "5000")
 	q.Set("sort", "-submitted_at")
 	q.Set("fields", "id,service,period,submitted_at,created")
-	if err := r.pb.Get("/api/collections/responses/records", q, &respList); err != nil {
+	items, err := r.pb.GetFullList("/api/collections/responses/records", q)
+	if err != nil {
 		return nil, err
 	}
-	r.setMemCache("all_responses", respList.Items, 2*time.Minute)
-	return respList.Items, nil
+	r.setMemCache("all_responses", items, 2*time.Minute)
+	return items, nil
+}
+
+func (r *pocketbaseRepository) getAllResponseDemographics() ([]map[string]interface{}, error) {
+	if cached, ok := r.getMemCache("all_response_demographics"); ok {
+		return cached.([]map[string]interface{}), nil
+	}
+	qDemo := url.Values{}
+	qDemo.Set("fields", "id,response,field,value")
+	items, err := r.pb.GetFullList("/api/collections/response_demographics/records", qDemo)
+	if err != nil {
+		return nil, err
+	}
+	r.setMemCache("all_response_demographics", items, 2*time.Minute)
+	return items, nil
 }
 
 // GetViewIndexSummary calculates weighted NRR identical to Postgres vw_index_summary
@@ -491,10 +502,8 @@ func (r *pocketbaseRepository) GetIndexTrend() ([]domain.IndexTrendRow, error) {
 
 // GetDemographicSummary calculates demographic options counts
 func (r *pocketbaseRepository) GetDemographicSummary() ([]domain.DemographicSummaryRow, error) {
-	var demoList pbRecordList
-	q := url.Values{}
-	q.Set("perPage", "5000")
-	if err := r.pb.Get("/api/collections/response_demographics/records", q, &demoList); err != nil {
+	demoItems, err := r.getAllResponseDemographics()
+	if err != nil {
 		return nil, err
 	}
 
@@ -525,7 +534,7 @@ func (r *pocketbaseRepository) GetDemographicSummary() ([]domain.DemographicSumm
 	}
 	counts := make(map[dKey]int64)
 
-	for _, d := range demoList.Items {
+	for _, d := range demoItems {
 		rID := getString(d, "response")
 		fID := getString(d, "field")
 		val := getString(d, "value")
@@ -739,17 +748,9 @@ func (r *pocketbaseRepository) GetArchiveDemographicSummary(startDate, endDate s
 		fieldKeyMap[domain.UUIDToPbID(f.ID.String())] = f.FieldKey
 	}
 
-	var demoList pbRecordList
-	if cached, ok := r.getMemCache("all_response_demographics"); ok {
-		demoList = cached.(pbRecordList)
-	} else {
-		qDemo := url.Values{}
-		qDemo.Set("perPage", "5000")
-		qDemo.Set("fields", "id,response,field,value")
-		if err := r.pb.Get("/api/collections/response_demographics/records", qDemo, &demoList); err != nil {
-			return nil, err
-		}
-		r.setMemCache("all_response_demographics", demoList, 2*time.Minute)
+	demoItems, err := r.getAllResponseDemographics()
+	if err != nil {
+		return nil, err
 	}
 
 	type dKey struct {
@@ -759,7 +760,7 @@ func (r *pocketbaseRepository) GetArchiveDemographicSummary(startDate, endDate s
 	}
 	counts := make(map[dKey]int64)
 
-	for _, d := range demoList.Items {
+	for _, d := range demoItems {
 		rID := getString(d, "response")
 		if !validRespIDs[rID] {
 			continue

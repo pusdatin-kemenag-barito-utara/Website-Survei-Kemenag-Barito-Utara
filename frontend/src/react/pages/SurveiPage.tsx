@@ -32,6 +32,7 @@ import {
 } from '@/lib/data-cache'
 import { Analytics } from '@/lib/analytics'
 import { toast } from 'sonner'
+import { getUnsurName, getTranslatedRatingLabels, getServiceCategory } from '@/lib/i18n-helpers'
 import type { Service, Question, UnsurWithQuestions, DemographicField, SurveyPeriod } from '@/types'
 
 function mapQuestionsToUnsur(questions: Question[]): { ipkp: UnsurWithQuestions[], ipak: UnsurWithQuestions[] } {
@@ -57,26 +58,6 @@ function mapQuestionsToUnsur(questions: Question[]): { ipkp: UnsurWithQuestions[
     ipkp: Object.values(ipkpMap).filter(u => u.questions.length > 0).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)),
     ipak: Object.values(ipakMap).filter(u => u.questions.length > 0).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)),
   }
-}
-
-function getServiceCategory(service: Service): string {
-  if (service.description && service.description.trim().length > 0) {
-    return service.description.trim()
-  }
-  const lower = service.name.toLowerCase()
-  if (lower.includes('pensiun') || lower.includes('pangkat') || lower.includes('mutasi') || lower.includes('kepegawaian') || lower.includes('cuti') || lower.includes('kgb')) {
-    return 'Layanan Kepegawaian & SDM'
-  }
-  if (lower.includes('haji') || lower.includes('umrah') || lower.includes('paspor')) {
-    return 'Layanan Penyelenggaraan Haji & Umrah'
-  }
-  if (lower.includes('emis') || lower.includes('ijazah') || lower.includes('siswa') || lower.includes('madrasah') || lower.includes('ijin operasional') || lower.includes('tpq') || lower.includes('pesantren')) {
-    return 'Layanan Pendidikan Agama & Keagamaan'
-  }
-  if (lower.includes('gereja') || lower.includes('rohaniwan') || lower.includes('kua') || lower.includes('nikah') || lower.includes('masjid') || lower.includes('rumah ibadah') || lower.includes('zakat') || lower.includes('wakaf')) {
-    return 'Layanan Bimbingan & Urusan Keagamaan'
-  }
-  return 'Layanan Tata Usaha'
 }
 
 const formSchema = z.object({
@@ -698,9 +679,13 @@ export default function SurveiPage() {
               {Array.from({ length: totalSteps }, (_, i) => {
                 const isCompleted = canStepProceed(i)
                 const isReachable = i <= step || Array.from({ length: i }, (_, j) => j).every(j => canStepProceed(j))
-                const stepNames = locale === 'en'
-                  ? ['Identity', 'Demographics', 'IPKP', 'IPAK', 'Submit']
-                  : ['Identitas', 'Demografi', 'IPKP', 'IPAK', 'Kirim']
+                const stepNames = [
+                  t('survey.step_identity'),
+                  t('survey.step_demographics'),
+                  t('survey.step_ipkp'),
+                  t('survey.step_ipak'),
+                  t('survey.step_submit'),
+                ]
 
                 return (
                   <div key={i} className="flex items-center gap-1 sm:gap-3 flex-1 justify-center min-w-0">
@@ -789,9 +774,8 @@ export default function SurveiPage() {
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent className="max-h-[420px] rounded-2xl p-2 shadow-2xl border-slate-200">
-                            {(() => {
-                              const grouped = services.reduce<Record<string, Service[]>>((acc, s) => {
-                                const cat = getServiceCategory(s)
+                            {(() => {                              const grouped = services.reduce<Record<string, Service[]>>((acc, s) => {
+                                const cat = getServiceCategory(s, locale)
                                 if (!acc[cat]) acc[cat] = []
                                 acc[cat].push(s)
                                 return acc
@@ -849,7 +833,7 @@ export default function SurveiPage() {
                             )}
                           />
                           <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 italic pl-1 -mt-0.5">
-                            {locale === 'en' ? '* May include academic / religious titles' : '* Bisa dicantumkan beserta gelar (akademis / keagamaan)'}
+                            {t('survey.title_name_hint')}
                           </p>
                           {errors.respondent_name && (
                             <p className="text-xs font-semibold text-rose-500 pl-1">{errors.respondent_name.message}</p>
@@ -859,7 +843,7 @@ export default function SurveiPage() {
                         <div className="space-y-1.5">
                           <Label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                             <Phone className="size-4 text-emerald-600" />
-                            <span>{locale === 'en' ? 'Contact (Phone/WhatsApp)' : 'Kontak (HP/WhatsApp)'}</span> <span className="text-rose-500">*</span>
+                            <span>{t('survey.contact')}</span> <span className="text-rose-500">*</span>
                           </Label>
                           <Controller
                             name="respondent_contact"
@@ -869,14 +853,14 @@ export default function SurveiPage() {
                                 type="tel"
                                 maxLength={13}
                                 placeholder="08123456789"
-                                {...field}
+                                {...field} 
                                 className="rounded-2xl border-slate-200 text-xs sm:text-sm py-5"
                                 onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
                               />
                             )}
                           />
                           <p className="text-[11px] font-medium text-rose-500 italic pl-1 -mt-0.5">
-                            {locale === 'en' ? '* Must be an active phone number' : '* Harus nomor telepon yang aktif'}
+                            {t('survey.active_phone_warning')}
                           </p>
                           {errors.respondent_contact && (
                             <p className="text-xs font-semibold text-rose-500 pl-1">{errors.respondent_contact.message}</p>
@@ -973,7 +957,7 @@ export default function SurveiPage() {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-gray-800/60 border border-slate-200/80 dark:border-gray-700">
                               <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                                Status Opsi ({demographics[field.id]?.startsWith('Ya') ? 'Ya' : 'Tidak'})
+                                {t('survey.status_option')} ({demographics[field.id]?.startsWith('Ya') ? (locale === 'en' ? 'Yes' : 'Ya') : (locale === 'en' ? 'No' : 'Tidak')})
                               </span>
                               <Switch
                                 checked={demographics[field.id]?.startsWith('Ya') || false}
@@ -985,7 +969,8 @@ export default function SurveiPage() {
                                   }
                                 }}
                               />
-                            </div>                            {/* Sub-options Checkbox List (Tampil saat Toggle = Ya) */}
+                            </div>
+                            {/* Sub-options Checkbox List (Tampil saat Toggle = Ya) */}
                             {demographics[field.id]?.startsWith('Ya') && (field.options || field.demographic_options) && (field.options || field.demographic_options)!.length > 0 && (
                               <motion.div
                                 initial={{ opacity: 0, y: -5 }}
@@ -993,9 +978,7 @@ export default function SurveiPage() {
                                 className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/80 space-y-3"
                               >
                                 <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                                  {locale === 'id' 
-                                    ? 'Jika ya, silakan pilih opsi/kategori yang sesuai (bisa lebih dari satu):' 
-                                    : 'If yes, please select applicable options (multiple allowed):'}
+                                  {t('survey.disability_suboptions_prompt')}
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                   {(field.options || field.demographic_options)!.map((opt) => {
@@ -1020,14 +1003,14 @@ export default function SurveiPage() {
                                           }}
                                           className="size-4 text-emerald-600 rounded focus:ring-emerald-500"
                                         />
-                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{locale === 'id' ? opt.label_id : opt.label_en}</span>
+                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{locale === 'id' ? opt.label_id : (opt.label_en || opt.label_id)}</span>
                                       </label>
                                     )
                                   })}
                                 </div>
                                 {(!demographics[field.id]?.includes('(') || !demographics[field.id]?.includes(')')) && (
                                   <p className="text-[11px] font-bold text-rose-600 italic flex items-center gap-1 pt-1">
-                                    * Wajib memilih minimal 1 kategori disabilitas di atas untuk dapat melanjutkan.
+                                    {t('survey.disability_required_warning')}
                                   </p>
                                 )}
                               </motion.div>
@@ -1036,7 +1019,7 @@ export default function SurveiPage() {
                         ) : (
                           <Input
                             type={field.field_type === 'number' ? 'number' : 'text'}
-                            placeholder={`Masukkan ${labelText}...`}
+                            placeholder={locale === 'en' ? `Enter ${labelText}...` : `Masukkan ${labelText}...`}
                             value={demographics[field.id] || ''}
                             onChange={(e) => handleDemographicChange(field.id, e.target.value)}
                             className="rounded-2xl border-slate-200 text-xs sm:text-sm font-semibold py-5"
@@ -1075,7 +1058,7 @@ export default function SurveiPage() {
                           {uIdx + 1}
                         </span>
                         <h3 className="font-extrabold text-base sm:text-lg text-slate-950 dark:text-white">
-                          {locale === 'en' ? (unsur.name_en || unsur.name) : unsur.name}
+                          {getUnsurName(unsur.name, locale, unsur.name_en)}
                         </h3>
                       </div>
 
@@ -1087,25 +1070,12 @@ export default function SurveiPage() {
                             className="flex flex-col gap-3 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-gray-800 p-3.5 sm:p-6 bg-slate-50/70 dark:bg-gray-800/40 shadow-xs hover:border-emerald-200 transition-colors scroll-mt-24 sm:scroll-mt-28"
                           >
                             <p className="text-xs sm:text-sm font-extrabold text-slate-950 dark:text-slate-50 leading-relaxed">
-                              {locale === 'id' ? q.question_text_id : q.question_text_en}
+                              {locale === 'en' && q.question_text_en ? q.question_text_en : q.question_text_id}
                             </p>
                             <StarRating
                               value={answers[q.id] || 0}
                               onChange={(v) => handleAnswerChange(q.id, v)}
-                              customLabels={(() => {
-                                let parsed: Record<string, string> = {}
-                                if (typeof q.rating_labels === 'string') {
-                                  try { parsed = JSON.parse(q.rating_labels) } catch { }
-                                } else if (q.rating_labels && typeof q.rating_labels === 'object') {
-                                  parsed = q.rating_labels as Record<string, string>
-                                }
-                                return {
-                                  4: parsed['4'] || (locale === 'en' ? 'Very Satisfied' : 'Sangat Baik'),
-                                  3: parsed['3'] || (locale === 'en' ? 'Satisfied' : 'Baik'),
-                                  2: parsed['2'] || (locale === 'en' ? 'Less Satisfied' : 'Kurang Baik'),
-                                  1: parsed['1'] || (locale === 'en' ? 'Dissatisfied' : 'Tidak Baik'),
-                                }
-                              })()}
+                              customLabels={getTranslatedRatingLabels(q.rating_labels, locale)}
                             />
                           </div>
                         ))}
@@ -1116,12 +1086,12 @@ export default function SurveiPage() {
                   <div id="ipkp-feedback-section" className="pt-6 border-t border-slate-200 dark:border-gray-800 space-y-2 scroll-mt-24 sm:scroll-mt-28">
                     <Label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                       <FileText className="size-4 text-emerald-600" />
-                      <span>{locale === 'en' ? 'Service Quality Feedback & Suggestions (Optional)' : 'Saran & Kritik Mengenai Kualitas Pelayanan (Opsional)'}</span>
+                      <span>{t('survey.feedback_ipkp_label')}</span>
                     </Label>
                     <Textarea
                       value={ipkpFeedback}
                       onChange={(e) => setIpkpFeedback(e.target.value)}
-                      placeholder={locale === 'en' ? 'Write your feedback or suggestions regarding service improvement...' : 'Tuliskan saran atau masukan Anda terkait perbaikan pelayanan...'}
+                      placeholder={t('survey.feedback_ipkp_placeholder')}
                       rows={3}
                       className="rounded-2xl border-slate-200 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500/20"
                     />
@@ -1156,7 +1126,7 @@ export default function SurveiPage() {
                           {uIdx + 1}
                         </span>
                         <h3 className="font-extrabold text-base sm:text-lg text-slate-950 dark:text-white">
-                          {locale === 'en' ? (unsur.name_en || unsur.name) : unsur.name}
+                          {getUnsurName(unsur.name, locale, unsur.name_en)}
                         </h3>
                       </div>
 
@@ -1168,25 +1138,12 @@ export default function SurveiPage() {
                             className="flex flex-col gap-3 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-gray-800 p-3.5 sm:p-6 bg-slate-50/70 dark:bg-gray-800/40 shadow-xs hover:border-emerald-200 transition-colors scroll-mt-24 sm:scroll-mt-28"
                           >
                             <p className="text-xs sm:text-sm font-extrabold text-slate-950 dark:text-slate-50 leading-relaxed">
-                              {locale === 'id' ? q.question_text_id : q.question_text_en}
+                              {locale === 'en' && q.question_text_en ? q.question_text_en : q.question_text_id}
                             </p>
                             <StarRating
                               value={answers[q.id] || 0}
                               onChange={(v) => handleAnswerChange(q.id, v)}
-                              customLabels={(() => {
-                                let parsed: Record<string, string> = {}
-                                if (typeof q.rating_labels === 'string') {
-                                  try { parsed = JSON.parse(q.rating_labels) } catch { }
-                                } else if (q.rating_labels && typeof q.rating_labels === 'object') {
-                                  parsed = q.rating_labels as Record<string, string>
-                                }
-                                return {
-                                  4: parsed['4'] || (locale === 'en' ? 'Very Satisfied' : 'Sangat Baik'),
-                                  3: parsed['3'] || (locale === 'en' ? 'Satisfied' : 'Baik'),
-                                  2: parsed['2'] || (locale === 'en' ? 'Less Satisfied' : 'Kurang Baik'),
-                                  1: parsed['1'] || (locale === 'en' ? 'Dissatisfied' : 'Tidak Baik'),
-                                }
-                              })()}
+                              customLabels={getTranslatedRatingLabels(q.rating_labels, locale)}
                             />
                           </div>
                         ))}
@@ -1197,12 +1154,12 @@ export default function SurveiPage() {
                   <div id="ipak-feedback-section" className="pt-6 border-t border-slate-200 dark:border-gray-800 space-y-2 scroll-mt-24 sm:scroll-mt-28">
                     <Label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                       <FileText className="size-4 text-emerald-600" />
-                      <span>{locale === 'en' ? 'Corruption Prevention Feedback & Suggestions (Optional)' : 'Saran & Masukan Pencegahan Korupsi (Opsional)'}</span>
+                      <span>{t('survey.feedback_ipak_label')}</span>
                     </Label>
                     <Textarea
                       value={ipakFeedback}
                       onChange={(e) => setIpakFeedback(e.target.value)}
-                      placeholder={locale === 'en' ? 'Write your feedback or suggestions regarding corruption prevention...' : 'Tuliskan saran atau masukan Anda terkait pencegahan korupsi...'}
+                      placeholder={t('survey.feedback_ipak_placeholder')}
                       rows={3}
                       className="rounded-2xl border-slate-200 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500/20"
                     />
@@ -1218,7 +1175,7 @@ export default function SurveiPage() {
                   <CardHeader className="bg-slate-50/50 dark:bg-gray-800/40 border-b border-slate-100 dark:border-gray-800 p-6">
                     <CardTitle className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                       <User className="size-5 text-emerald-600" />
-                      <span>{locale === 'en' ? 'Respondent Identity & Selected Service' : 'Data Responden & Layanan'}</span>
+                      <span>{t('survey.respondent_summary')}</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 sm:p-8">
@@ -1226,7 +1183,7 @@ export default function SurveiPage() {
                       <div className="flex justify-between items-center py-3">
                         <dt className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
                           <Building2 className="size-4 text-emerald-600" />
-                          <span>{locale === 'en' ? 'Target Service Type' : 'Jenis Layanan Target'}</span>
+                          <span>{t('survey.target_service')}</span>
                         </dt>
                         <dd className="font-bold text-slate-900 dark:text-white text-right max-w-[60%]">
                           {services.find(s => s.id === selectedServiceId)?.name || '-'}
@@ -1236,10 +1193,10 @@ export default function SurveiPage() {
                         <div className="flex justify-between items-center py-3">
                           <dt className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
                             <ShieldCheck className="size-4 text-amber-600" />
-                            <span>{locale === 'en' ? 'Respondent Identity' : 'Identitas Responden'}</span>
+                            <span>{t('survey.respondent_identity')}</span>
                           </dt>
                           <dd className="font-bold inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                            <ShieldAlert className="size-3.5" /> {locale === 'en' ? 'Anonymous Entry' : 'Isian Anonim'}
+                            <ShieldAlert className="size-3.5" /> {t('survey.anonymous_entry')}
                           </dd>
                         </div>
                       ) : (
@@ -1247,14 +1204,14 @@ export default function SurveiPage() {
                           <div className="flex justify-between items-center py-3">
                             <dt className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
                               <User className="size-4 text-emerald-600" />
-                              <span>{locale === 'en' ? 'Respondent Name' : 'Nama Responden'}</span>
+                              <span>{t('survey.name')}</span>
                             </dt>
                             <dd className="font-bold text-slate-900 dark:text-white">{respondentName || '-'}</dd>
                           </div>
                           <div className="flex justify-between items-center py-3">
                             <dt className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
                               <Phone className="size-4 text-emerald-600" />
-                              <span>{locale === 'en' ? 'Contact (Phone/WhatsApp)' : 'Kontak (HP/WhatsApp)'}</span>
+                              <span>{t('survey.contact')}</span>
                             </dt>
                             <dd className="font-bold text-slate-900 dark:text-white">{respondentContact || '-'}</dd>
                           </div>
@@ -1269,7 +1226,7 @@ export default function SurveiPage() {
                   <CardHeader className="bg-slate-50/50 dark:bg-gray-800/40 border-b border-slate-100 dark:border-gray-800 p-6">
                     <CardTitle className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                       <ListTodo className="size-5 text-emerald-600" />
-                      <span>{locale === 'en' ? 'Questionnaire Evaluation Completeness' : 'Kelengkapan Evaluasi Kuesioner'}</span>
+                      <span>{t('survey.evaluation_completeness')}</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 sm:p-8">
@@ -1287,7 +1244,7 @@ export default function SurveiPage() {
                                 isFull ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-50 text-rose-700 border border-rose-200'
                               }`}>
                                 {isFull && <Check className="size-3.5" />}
-                                {filled}/{total} {locale === 'en' ? 'Questions Completed' : 'Pertanyaan Terisi'}
+                                {filled}/{total} {t('survey.questions_completed')}
                               </span>
                             )
                           })()}
@@ -1306,7 +1263,7 @@ export default function SurveiPage() {
                                 isFull ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-50 text-rose-700 border border-rose-200'
                               }`}>
                                 {isFull && <Check className="size-3.5" />}
-                                {filled}/{total} {locale === 'en' ? 'Questions Completed' : 'Pertanyaan Terisi'}
+                                {filled}/{total} {t('survey.questions_completed')}
                               </span>
                             )
                           })()}
@@ -1316,7 +1273,7 @@ export default function SurveiPage() {
                         <div className="flex justify-between items-center py-3">
                           <dt className="text-slate-500 dark:text-slate-400">{locale === 'en' ? 'Service Quality Feedback' : 'Saran Kualitas Pelayanan'}</dt>
                           <dd className="font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                            <Check className="size-4" /> {locale === 'en' ? 'Feedback Filled' : 'Masukan Diisi'}
+                            <Check className="size-4" /> {t('survey.feedback_filled')}
                           </dd>
                         </div>
                       )}
@@ -1324,7 +1281,7 @@ export default function SurveiPage() {
                         <div className="flex justify-between items-center py-3">
                           <dt className="text-slate-500 dark:text-slate-400">{locale === 'en' ? 'Corruption Prevention Feedback' : 'Saran Pencegahan Korupsi'}</dt>
                           <dd className="font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                            <Check className="size-4" /> {locale === 'en' ? 'Feedback Filled' : 'Masukan Diisi'}
+                            <Check className="size-4" /> {t('survey.feedback_filled')}
                           </dd>
                         </div>
                       )}
@@ -1366,7 +1323,7 @@ export default function SurveiPage() {
               disabled={!canProceed()}
               className="rounded-2xl px-8 py-6 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-extrabold shadow-lg shadow-emerald-600/20 transition-all duration-200 active:scale-95 group cursor-pointer"
             >
-              <span>{locale === 'en' ? 'Next' : 'Lanjut'}</span>
+              <span>{t('survey.next_step')}</span>
               <ChevronRight className="ml-2 size-4 transition-transform duration-300 group-hover:translate-x-1" />
             </Button>
           ) : (
@@ -1374,6 +1331,7 @@ export default function SurveiPage() {
               type="button" 
               onClick={(e) => {
                 e.preventDefault()
+                if (submitting) return
                 handleSubmit(
                   onSubmit,
                   (formErrors) => {
@@ -1390,7 +1348,7 @@ export default function SurveiPage() {
               ) : (
                 <Send className="mr-2 size-4 transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1" />
               )}
-              <span>{locale === 'en' ? 'Submit Survey' : 'Kirim Survei'}</span>
+              <span>{t('survey.submit_now')}</span>
             </Button>
           )}
         </div>
@@ -1427,53 +1385,33 @@ export default function SurveiPage() {
                     <ShieldAlert className="size-5 sm:size-7 md:size-8 text-amber-400" />
                   </div>
                   <h2 className="text-base sm:text-xl md:text-2xl font-black uppercase tracking-wider text-white">
-                    {locale === 'en' ? 'ATTENTION!' : 'PERHATIAN!'}
+                    {t('survey.disclaimer_title')}
                   </h2>
                   <p className="text-[10px] sm:text-xs text-emerald-200/90 mt-0.5 sm:mt-1 font-medium max-w-md mx-auto">
-                    {locale === 'en'
-                      ? 'Public Satisfaction Survey Respondent Consent Statement'
-                      : 'Pernyataan Persetujuan Responden Survei Kepuasan Masyarakat'}
+                    {t('survey.disclaimer_subtitle')}
                   </p>
                 </div>
 
                 {/* Content Body */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 sm:space-y-4 text-slate-700 dark:text-slate-300 leading-relaxed text-xs sm:text-sm">
                   <p className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm md:text-base">
-                    {locale === 'en' ? 'I hereby declare that:' : 'Dengan ini saya menyatakan bahwa:'}
+                    {t('survey.declare_intro')}
                   </p>
 
                   <div className="space-y-2.5 sm:space-y-3 bg-slate-100 dark:bg-gray-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-gray-700 font-medium text-[11px] sm:text-xs md:text-sm">
                     <div className="flex items-start gap-2.5 sm:gap-3">
                       <span className="flex size-5 sm:size-5.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] sm:text-xs font-black mt-0.5">1</span>
-                      <p>
-                        {locale === 'en' ? (
-                          <>I am willing to complete this questionnaire and consent to my data being used for the <strong>Public Satisfaction Survey</strong> at the Ministry of Religious Affairs of Barito Utara Regency.</>
-                        ) : (
-                          <>Saya bersedia mengisi kuesioner ini dan mengizinkan data pribadi saya digunakan untuk kebutuhan <strong>Survei Kepuasan Masyarakat</strong> pada Kantor Kementerian Agama Kabupaten Barito Utara.</>
-                        )}
-                      </p>
+                      <p>{t('survey.attention_point_1')}</p>
                     </div>
 
                     <div className="flex items-start gap-2.5 sm:gap-3">
                       <span className="flex size-5 sm:size-5.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] sm:text-xs font-black mt-0.5">2</span>
-                      <p>
-                        {locale === 'en' ? (
-                          <>All data and answers I enter correspond to the <strong>actual facts and true conditions</strong> known to me.</>
-                        ) : (
-                          <>Semua data dan jawaban yang saya entrikan sudah sesuai dengan <strong>fakta dan kondisi sebenarnya</strong> yang saya ketahui.</>
-                        )}
-                      </p>
+                      <p>{t('survey.attention_point_2')}</p>
                     </div>
 
                     <div className="flex items-start gap-2.5 sm:gap-3">
                       <span className="flex size-5 sm:size-5.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] sm:text-xs font-black mt-0.5">3</span>
-                      <p>
-                        {locale === 'en' ? (
-                          <>I also assume <strong>full responsibility</strong> for all information filled in this survey form and agree to abide by the provisions regulated under <strong>Law No. 11 of 2008 concerning Electronic Information & Transactions (ITE)</strong>.</>
-                        ) : (
-                          <>Saya juga <strong>bertanggung jawab penuh</strong> terhadap data dan informasi yang saya isikan pada formulir survei ini dan bersedia mengikuti ketentuan sebagaimana yang diatur dalam <strong>UU Nomor 11 Tahun 2008 tentang ITE</strong>.</>
-                        )}
-                      </p>
+                      <p>{t('survey.attention_point_3')}</p>
                     </div>
                   </div>
                 </div>
@@ -1487,7 +1425,7 @@ export default function SurveiPage() {
                     className="w-full sm:w-auto rounded-xl sm:rounded-2xl border-rose-200 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-black text-xs sm:text-sm py-2.5 sm:py-3 px-4 sm:px-6 gap-2 cursor-pointer transition-colors"
                   >
                     <X className="size-4" />
-                    <span>{locale === 'en' ? 'Disagree' : 'Tidak Setuju'}</span>
+                    <span>{t('survey.disclaimer_disagree')}</span>
                   </Button>
 
                   <Button
@@ -1496,7 +1434,7 @@ export default function SurveiPage() {
                     className="w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs sm:text-sm rounded-xl sm:rounded-2xl py-2.5 sm:py-3 px-6 sm:px-8 shadow-md sm:shadow-lg shadow-emerald-600/30 hover:scale-[1.01] transition-all gap-2 cursor-pointer"
                   >
                     <CheckCircle2 className="size-4 text-emerald-200" />
-                    <span>{locale === 'en' ? 'Agree & Continue' : 'Setuju & Lanjutkan'}</span>
+                    <span>{t('survey.disclaimer_agree')}</span>
                   </Button>
                 </div>
               </motion.div>

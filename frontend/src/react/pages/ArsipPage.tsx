@@ -164,8 +164,12 @@ export default function ArsipPage({
       break;
   }
 
-  const pageTitle = `${indexType === "IPAK" ? "Indeks Persepsi Anti Korupsi (IPAK)" : "Indeks Persepsi Kualitas Pelayanan (IPKP)"}`;
-  const tableTitle = `${indexType === "IPAK" ? "Indeks Persepsi Anti Korupsi (IPAK)" : "Indeks Persepsi Kualitas Pelayanan (IPKP)"}`;
+  const pageTitle = isEn
+    ? (indexType === "IPAK" ? "Anti-Corruption Perception Index (IPAK)" : "Service Quality Perception Index (IPKP)")
+    : (indexType === "IPAK" ? "Indeks Persepsi Anti Korupsi (IPAK)" : "Indeks Persepsi Kualitas Pelayanan (IPKP)");
+  const tableTitle = isEn
+    ? (indexType === "IPAK" ? "Anti-Corruption Perception Index (IPAK)" : "Service Quality Perception Index (IPKP)")
+    : (indexType === "IPAK" ? "Indeks Persepsi Anti Korupsi (IPAK)" : "Indeks Persepsi Kualitas Pelayanan (IPKP)");
 
   const currentDates = getDates(yearStr, period);
   const initArchive = getCachedArchiveResultsSync(currentDates.rawStart, currentDates.rawEnd);
@@ -553,24 +557,24 @@ export default function ArsipPage({
   }, [trend, indexType]);
 
   const getMutuDescription = (mutu: string) => {
-    if (!mutu || mutu === "-") return "Belum Terisi Survey";
+    if (!mutu || mutu === "-") return isEn ? "Not Yet Surveyed" : "Belum Terisi Survey";
     switch (mutu) {
       case "A":
-        return "Sangat Baik";
+        return isEn ? (indexType === "IPAK" ? "Very Clean" : "Very Good") : (indexType === "IPAK" ? "Sangat Bersih" : "Sangat Baik");
       case "B":
-        return "Baik";
+        return isEn ? (indexType === "IPAK" ? "Clean" : "Good") : (indexType === "IPAK" ? "Bersih" : "Baik");
       case "C":
-        return "Kurang Baik";
+        return isEn ? (indexType === "IPAK" ? "Fairly Clean" : "Fair") : (indexType === "IPAK" ? "Kurang Bersih" : "Kurang Baik");
       case "D":
-        return "Tidak Baik";
+        return isEn ? (indexType === "IPAK" ? "Poor" : "Poor") : (indexType === "IPAK" ? "Tidak Bersih" : "Tidak Baik");
       default:
-        return "Belum Terisi Survey";
+        return isEn ? "Not Yet Surveyed" : "Belum Terisi Survey";
     }
   };
 
   async function handleExportExcel() {
     try {
-      const fullPeriodLabel = `${periodName} Tahun ${yearStr}`;
+      const fullPeriodLabel = isEn ? `${periodName} Year ${yearStr}` : `${periodName} Tahun ${yearStr}`;
       const filteredByService =
         serviceFilter === "all"
           ? byService
@@ -582,15 +586,15 @@ export default function ArsipPage({
         fullPeriodLabel,
         demoSummary,
       );
-      toast.success("Berhasil mengekspor ke Excel");
+      toast.success(t("results.export_success_excel"));
     } catch {
-      toast.error("Gagal mengekspor Excel");
+      toast.error(t("results.export_error_excel"));
     }
   }
 
   async function handleExportPdf() {
     try {
-      const fullPeriodLabel = `${periodName} Tahun ${yearStr}`;
+      const fullPeriodLabel = isEn ? `${periodName} Year ${yearStr}` : `${periodName} Tahun ${yearStr}`;
       const filteredByService =
         serviceFilter === "all"
           ? byService
@@ -605,12 +609,12 @@ export default function ArsipPage({
           konversi,
           mutu:
             u.kategori_mutu === "A"
-              ? "A (Sangat Baik)"
+              ? (isEn ? "A (Very Good)" : "A (Sangat Baik)")
               : u.kategori_mutu === "B"
-                ? "B (Baik)"
+                ? (isEn ? "B (Good)" : "B (Baik)")
                 : u.kategori_mutu === "C"
-                  ? "C (Kurang Baik)"
-                  : "D (Tidak Baik)",
+                  ? (isEn ? "C (Fair)" : "C (Kurang Baik)")
+                  : (isEn ? "D (Poor)" : "D (Tidak Baik)"),
         };
       });
       const lowestUnsur =
@@ -630,9 +634,9 @@ export default function ArsipPage({
           indexType: indexType as "IPKP" | "IPAK",
         }
       );
-      toast.success("Berhasil mengekspor ke PDF");
+      toast.success(t("results.export_success_pdf"));
     } catch {
-      toast.error("Gagal mengekspor PDF");
+      toast.error(t("results.export_error_pdf"));
     }
   }
 
@@ -720,14 +724,24 @@ export default function ArsipPage({
           <Card className="mb-12 shadow-lg border-0 bg-white overflow-hidden">
             <CardHeader className="border-b bg-gray-50/50 py-4 flex flex-col items-center">
               <CardTitle className="text-center text-base md:text-lg text-gray-800 font-bold uppercase leading-snug">
-                Rekapitulasi Data Survei {tableTitle} Per Layanan
-                <br />
-                KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA
+                {isEn ? (
+                  <>
+                    Survey Data Recapitulation for {tableTitle} by Service
+                    <br />
+                    MINISTRY OF RELIGIOUS AFFAIRS OF BARITO UTARA REGENCY
+                  </>
+                ) : (
+                  <>
+                    Rekapitulasi Data Survei {tableTitle} Per Layanan
+                    <br />
+                    KANTOR KEMENTERIAN AGAMA KABUPATEN BARITO UTARA
+                  </>
+                )}
               </CardTitle>
               <div className="mt-2.5 inline-flex items-center gap-2 px-4 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 font-extrabold text-xs tracking-wide shadow-xs">
                 <span className="size-2 rounded-full bg-emerald-600 animate-pulse" />
                 <span>
-                  KATEGORI PERIODE: {periodName.toUpperCase()} {yearStr}
+                  {isEn ? "PERIOD CATEGORY: " : "KATEGORI PERIODE: "}{periodName.toUpperCase()} {yearStr}
                 </span>
               </div>
             </CardHeader>
@@ -736,22 +750,22 @@ export default function ArsipPage({
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">
                     <TableHead className="w-[60px] font-bold text-gray-900 text-center">
-                      NO
+                      {t("results.col_no")}
                     </TableHead>
                     <TableHead className="font-bold text-gray-900">
-                      Nama Layanan
+                      {t("results.col_service")}
                     </TableHead>
                     <TableHead className="text-center font-bold text-gray-900 whitespace-nowrap">
-                      Nilai Indeks Pelayanan
+                      {t("results.col_index")}
                     </TableHead>
                     <TableHead className="text-center font-bold text-gray-900">
-                      Konversi
+                      {t("results.col_conversion")}
                     </TableHead>
                     <TableHead className="text-center font-bold text-gray-900 whitespace-nowrap">
-                      Mutu Pelayanan
+                      {t("results.col_grade")}
                     </TableHead>
                     <TableHead className="text-center font-bold text-gray-900 whitespace-nowrap">
-                      Jumlah Responden
+                      {t("results.col_respondents")}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -762,7 +776,7 @@ export default function ArsipPage({
                         colSpan={6}
                         className="h-32 text-center text-muted-foreground"
                       >
-                        Memuat data...
+                        {isEn ? "Loading data..." : "Memuat data..."}
                       </TableCell>
                     </TableRow>
                   ) : displayedServices.length === 0 ? (
@@ -771,7 +785,7 @@ export default function ArsipPage({
                         colSpan={6}
                         className="h-32 text-center text-muted-foreground"
                       >
-                        Belum ada layanan aktif
+                        {isEn ? "No active services yet" : "Belum ada layanan aktif"}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -795,7 +809,7 @@ export default function ArsipPage({
                           <TableCell className="text-center font-medium">
                             {hasData
                               ? `${item.nilai_index.toFixed(2)} (${getMutuDescription(item.mutu)})`
-                              : "0.00 (Belum Terisi Survey)"}
+                              : `0.00 (${isEn ? "Not Yet Surveyed" : "Belum Terisi Survey"})`}
                           </TableCell>
                           <TableCell className="text-center">
                             {hasData ? item.nilai_konversi.toFixed(2) : "0.00"}
@@ -803,11 +817,11 @@ export default function ArsipPage({
                           <TableCell className="text-center font-bold">
                             {hasData
                               ? `${item.mutu} (${getMutuDescription(item.mutu)})`
-                              : "Belum Terisi Survey"}
+                              : (isEn ? "Not Yet Surveyed" : "Belum Terisi Survey")}
                           </TableCell>
                           <TableCell className="text-center">
                             {item ? item.jumlah_responden : 0}{" "}
-                            {item && item.jumlah_responden > 0 ? "Orang" : ""}
+                            {item && item.jumlah_responden > 0 ? (isEn ? "People" : "Orang") : ""}
                           </TableCell>
                         </TableRow>
                       );
@@ -837,12 +851,7 @@ export default function ArsipPage({
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4">
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-2">
                   <Users className="size-4 text-cyan-500" />
-                  <span>
-                    Jenis Kelamin{" "}
-                    <span className="text-slate-400 font-normal">
-                      Responden
-                    </span>
-                  </span>
+                  <span>{t("results.chart_gender")}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
@@ -880,12 +889,7 @@ export default function ArsipPage({
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4">
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-2">
                   <GraduationCap className="size-4 text-amber-500" />
-                  <span>
-                    Pendidikan{" "}
-                    <span className="text-slate-400 font-normal">
-                      Responden
-                    </span>
-                  </span>
+                  <span>{t("results.chart_education")}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
@@ -921,7 +925,7 @@ export default function ArsipPage({
                           fontSize: "11px",
                         }}
                       />
-                      <Bar dataKey="value" name="Jumlah" radius={[6, 6, 0, 0]}>
+                      <Bar dataKey="value" name={isEn ? "Count" : "Jumlah"} radius={[6, 6, 0, 0]}>
                         <LabelList
                           dataKey="value"
                           position="top"
@@ -943,12 +947,7 @@ export default function ArsipPage({
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4">
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-2">
                   <UserCheck className="size-4 text-rose-500" />
-                  <span>
-                    Usia{" "}
-                    <span className="text-slate-400 font-normal">
-                      Responden
-                    </span>
-                  </span>
+                  <span>{t("results.chart_age")}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
@@ -984,7 +983,7 @@ export default function ArsipPage({
                           fontSize: "11px",
                         }}
                       />
-                      <Bar dataKey="value" name="Jumlah" radius={[6, 6, 0, 0]}>
+                      <Bar dataKey="value" name={isEn ? "Count" : "Jumlah"} radius={[6, 6, 0, 0]}>
                         <LabelList
                           dataKey="value"
                           position="top"
@@ -1006,12 +1005,7 @@ export default function ArsipPage({
               <CardHeader className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/40 p-4">
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center justify-center gap-2">
                   <Briefcase className="size-4 text-teal-500" />
-                  <span>
-                    Pekerjaan{" "}
-                    <span className="text-slate-400 font-normal">
-                      Responden
-                    </span>
-                  </span>
+                  <span>{t("results.chart_job")}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 flex flex-col items-center justify-center">
@@ -1073,7 +1067,7 @@ export default function ArsipPage({
                   {t("results.breakdown")}
                 </CardTitle>
                 <p className="text-xs text-slate-400 font-medium mt-0.5">
-                  Rincian perbandingan nilai konversi per layanan
+                  {isEn ? "Score conversion breakdown per service" : "Rincian perbandingan nilai konversi per layanan"}
                 </p>
               </CardHeader>
               <CardContent className="p-5">
@@ -1131,7 +1125,7 @@ export default function ArsipPage({
                           typeof value === "number"
                             ? value.toFixed(2)
                             : String(value ?? ""),
-                          "Nilai Konversi",
+                          t("results.conversion_score"),
                         ]}
                       />
                       <Legend
@@ -1145,13 +1139,13 @@ export default function ArsipPage({
                       />
                       <Bar
                         dataKey="IPKP"
-                        name="Indeks IPKP"
+                        name={isEn ? "IPKP Index" : "Indeks IPKP"}
                         fill="#10b981"
                         radius={[6, 6, 0, 0]}
                       />
                       <Bar
                         dataKey="IPAK"
-                        name="Indeks IPAK"
+                        name={isEn ? "IPAK Index" : "Indeks IPAK"}
                         fill="#3b82f6"
                         radius={[6, 6, 0, 0]}
                       />
@@ -1167,7 +1161,7 @@ export default function ArsipPage({
                   {t("results.trend")}
                 </CardTitle>
                 <p className="text-xs text-slate-400 font-medium mt-0.5">
-                  Tren {periodName} {yearStr}
+                  {isEn ? `Trend for ${periodName} ${yearStr}` : `Tren ${periodName} ${yearStr}`}
                 </p>
               </CardHeader>
               <CardContent className="p-5">
@@ -1250,7 +1244,7 @@ export default function ArsipPage({
                           typeof val === "number"
                             ? val.toFixed(2)
                             : String(val ?? ""),
-                          "Nilai Konversi",
+                          t("results.conversion_score"),
                         ]}
                         labelFormatter={(labelStr: unknown) => {
                           const raw = String(labelStr || "");

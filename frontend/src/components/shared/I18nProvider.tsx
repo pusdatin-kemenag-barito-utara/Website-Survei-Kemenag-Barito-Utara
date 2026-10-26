@@ -58,8 +58,20 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    const handleCustomChange = (e: Event) => {
+      const customEvent = e as CustomEvent<string>
+      if (customEvent.detail && (customEvent.detail === 'id' || customEvent.detail === 'en')) {
+        setLocaleState(customEvent.detail)
+        document.documentElement.lang = customEvent.detail
+      }
+    }
+
     window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
+    window.addEventListener('si_arus_locale_change', handleCustomChange)
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      window.removeEventListener('si_arus_locale_change', handleCustomChange)
+    }
   }, [locale])
 
   const setLocale = useCallback((l: string) => {
@@ -69,6 +81,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       document.cookie = `locale=${validLocale}; path=/; max-age=31536000; SameSite=Lax`
       if (typeof document !== 'undefined') {
         document.documentElement.lang = validLocale
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('si_arus_locale_change', { detail: validLocale }))
       }
     } catch {}
 

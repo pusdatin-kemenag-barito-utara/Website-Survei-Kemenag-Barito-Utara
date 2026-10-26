@@ -264,6 +264,11 @@ func (r *pocketbaseRepository) GetResponseAnswersDetail(id uuid.UUID) ([]domain.
 			if qObj, ok := exp["question"].(map[string]interface{}); ok {
 				row.QuestionTextID = getString(qObj, "question_text_id")
 				row.QuestionTextEN = getString(qObj, "question_text_en")
+				row.RatingLabels = qObj["rating_labels"]
+				row.Label1 = getString(qObj, "label_1")
+				row.Label2 = getString(qObj, "label_2")
+				row.Label3 = getString(qObj, "label_3")
+				row.Label4 = getString(qObj, "label_4")
 			}
 			if uObj, ok := exp["unsur"].(map[string]interface{}); ok {
 				row.UnsurName = getString(uObj, "name")

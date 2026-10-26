@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useI18n } from '@/components/shared/I18nProvider'
 
 export function MaklumatModal() {
+  const { t } = useI18n()
   const [show, setShow] = useState(false)
 
   useEffect(() => {
@@ -50,10 +52,10 @@ export function MaklumatModal() {
               <button
                 onClick={close}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/90 hover:bg-white text-slate-800 text-xs font-bold shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
-                aria-label="Tutup"
+                aria-label={t('maklumat.close')}
               >
                 <X className="size-4" />
-                <span>Tutup</span>
+                <span>{t('maklumat.close')}</span>
               </button>
 
               {/* Gambar Maklumat */}
@@ -70,7 +72,7 @@ export function MaklumatModal() {
               </div>
 
               <p className="w-full text-center text-xs text-white/60 select-none pointer-events-none mt-1">
-                Klik di luar atau tekan Tutup untuk menutup
+                {t('maklumat.hint')}
               </p>
             </div>
           </motion.div>

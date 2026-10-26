@@ -104,6 +104,11 @@ func (h *ResponseHandler) GetResponseAnswersAdmin(c fiber.Ctx) error {
 			"questions": fiber.Map{
 				"question_text_id": r.QuestionTextID,
 				"question_text_en": r.QuestionTextEN,
+				"rating_labels":   r.RatingLabels,
+				"label_1":         r.Label1,
+				"label_2":         r.Label2,
+				"label_3":         r.Label3,
+				"label_4":         r.Label4,
 			},
 			"unsur": fiber.Map{
 				"name":       r.UnsurName,

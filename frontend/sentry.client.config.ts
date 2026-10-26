@@ -40,6 +40,24 @@ if (dsn) {
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,
     environment: env.MODE || (env.PROD ? "production" : "development"),
+    ignoreErrors: [
+      // View Transitions abort when switching tabs or minimizing browser (normal browser spec behavior)
+      /Transition was aborted because of invalid state/i,
+      /InvalidStateError: Transition was aborted/i,
+      // Benign resize observer notifications in modern browsers
+      /ResizeObserver loop completed with undelivered notifications/i,
+      /ResizeObserver loop limit exceeded/i,
+    ],
+    beforeSend(event, hint) {
+      const error = hint?.originalException;
+      if (error && typeof error === "object") {
+        const msg = String((error as any).message || "");
+        if (msg.includes("Transition was aborted") && msg.includes("Document hidden")) {
+          return null; // Ignore benign View Transition cancellation on tab switch
+        }
+      }
+      return event;
+    },
   });
 }
 
